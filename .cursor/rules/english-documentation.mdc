@@ -1,0 +1,35 @@
+---
+name: english-documentation
+description: All project documentation and code comments must be in English
+globs: ["**/*.java", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.sql", "**/*.md", "**/*.yml", "**/*.yaml"]
+---
+
+# Documentation and Comments Language
+
+All documentation and comments in the project codebase **must be written in English**.
+
+## Scope
+
+- **Javadoc / KDoc**: class, method, and field documentation in Java/Kotlin.
+- **Inline comments**: single-line and block comments in source code (Java, TypeScript, JavaScript, SQL, etc.).
+- **README and in-repo docs**: technical documentation in the repository (e.g. module READMEs, architecture notes).
+- **Configuration comments**: comments in YAML, properties, or other config files that describe the codebase behaviour.
+
+## Rationale
+
+- Consistency for contributors and tooling.
+- Aligns with common practice in international and open-source projects.
+- Improves readability for non-native speakers and AI-assisted tooling.
+
+## Examples
+
+- Prefer: `/** Returns the session by UID. */`  
+  Avoid: `/** Повертає сесію за UID. */`
+
+- Prefer: `// Skip packets before SSTA`  
+  Avoid: `// Ігнорувати пакети до SSTA`
+
+- Prefer: `-- Retention policy for raw telemetry (14 days)`  
+  Avoid: `-- Політика зберігання для raw (14 днів)`
+
+User-facing strings (UI labels, API error messages) may follow a separate i18n policy; this rule applies to **developer-facing** documentation and comments in code and config only.
