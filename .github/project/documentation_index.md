@@ -6,6 +6,21 @@
 
 ---
 
+## 📋 Implementation Status
+
+> **Last Updated:** February 1, 2026
+
+**Implementation Progress:** ✅ **75% Complete (9/12 stages)**
+
+- ✅ Stages 0-9: Backend complete (UDP Library, State Management, Kafka Consumers, Aggregation, Persistence, REST API, WebSocket)
+- ❌ Stage 10: Observability (TO DO)
+- ❌ Stage 11: React UI (TO DO)
+- ❌ Stage 12: Final Testing (TO DO)
+
+**See:** [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md) for detailed tracking
+
+---
+
 ## Which document to read first
 
 ### Рекомендований порядок читання
@@ -474,11 +489,13 @@
 ## implementation_steps_plan.md
 
 **Призначення документа**  
-Покроковий план реалізації MVP, розбитий на етапи (Phases). Кожен крок має чіткий критерій готовності.
+Покроковий план реалізації MVP, розбитий на етапи (Stages 0-12). Кожен крок має чіткий критерій готовності.
+
+**Статус:** ✅ **75% COMPLETE** (Stages 0-9 done, Stages 10-12 remaining)
 
 **Роль в архітектурі (glossary-aligned):**
 - *Implementation roadmap*;
-- послідовність робіт від Bootstrap до Phase 11;
+- послідовність робіт від Bootstrap до Stage 12;
 - синхронізація всіх технічних документів.
 
 **Використовується для:**
@@ -486,19 +503,50 @@
 - трекінгу прогресу;
 - визначення залежностей між кроками.
 
-### Етап 0. Bootstrap та репозиторій
-### Етап 1. Контракти (telemetry-api-contracts)
-### Етап 2. Інфраструктура (infra)
-### Етап 3. UDP Ingest Service — реалізація через бібліотеку
-> **Детальний план:** [udp_library_implementation_plan.md](udp_library_implementation_plan.md)
-### Етап 4. Telemetry Processing Service — основа
-### Етап 5. Session FSM + Lifecycle
-### Етап 6. Lap FSM + Aggregation
-### Етап 7. REST API
-### Етап 8. WebSocket (live)
-### Етап 9. Flashback
-### Етап 10. React SPA (Phase 1)
-### Етап 11. React SPA (Phase 2)
+### ✅ Етап 0. Bootstrap та репозиторій (COMPLETE)
+### ✅ Етап 1. Контракти (telemetry-api-contracts) (COMPLETE)
+### ✅ Етап 2. Інфраструктура (infra) (COMPLETE)
+### ✅ Етап 3. UDP Library (COMPLETE)
+> **Детальний план:** [udp_library_implementation_plan.md](udp_library_implementation_plan.md)  
+> **Результати:** [UDP_LIBRARY_SUMMARY.md](UDP_LIBRARY_SUMMARY.md)
+### ✅ Етап 4. State Management & Lifecycle (COMPLETE)
+### ✅ Етап 5. Kafka Consumers + Idempotency (COMPLETE)
+### ✅ Етап 6. Aggregation Logic (COMPLETE)
+### ✅ Етап 7. Persistence Layer (COMPLETE)
+### ✅ Етап 8. REST API (COMPLETE)
+### ✅ Етап 9. WebSocket Live (COMPLETE)
+### ❌ Етап 10. Observability (TO DO)
+### ❌ Етап 11. React SPA (TO DO)
+### ❌ Етап 12. Final Testing & Validation (TO DO)
+
+---
+
+## IMPLEMENTATION_PROGRESS.md ⭐ NEW
+
+**Призначення документа**  
+Детальний звіт про прогрес реалізації відносно implementation_steps_plan.md. Містить статус кожного stage, створені файли, технічний борг, відхилення від плану.
+
+**Статус:** **75% Complete** (Stages 0-9)
+
+**Роль в архітектурі (glossary-aligned):**
+- *Progress tracking & status report*;
+- валідація відповідності плану реалізації;
+- документація технічних рішень та спрощень.
+
+**Використовується для:**
+- аудиту реалізації відносно плану;
+- виявлення technical debt та deviations;
+- планування залишкової роботи (Stages 10-12).
+
+### Executive Summary
+### Detailed Progress by Stage
+- ✅ Stage 0-9: Complete with file counts and notes
+- ❌ Stage 10-12: Not started with estimates
+### Remaining Work
+### Architecture Compliance
+### Technical Debt & Deviations
+### Build & Compilation Status
+### Next Steps
 
 ---
 

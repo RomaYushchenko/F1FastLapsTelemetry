@@ -355,30 +355,56 @@ react_spa_ui_architecture.md
 
 ---
 
-### Етап 8. REST API
+### Етап 8. REST API ✅ ЗАВЕРШЕНО
 
-| # | Крок | Дії | Критерій готовності |
-|---|------|-----|---------------------|
-| 8.1 | GET /api/sessions | List SessionDto, limit/offset | Відповідь за контрактом |
-| 8.2 | GET /api/sessions/{sessionUid} | Один SessionDto | 404 якщо немає |
-| 8.3 | GET /api/sessions/{sessionUid}/laps | List laps, carIndex=0 default | Відповідь за контрактом |
-| 8.4 | GET /api/sessions/{sessionUid}/sectors | Сектори по колах (можна з laps) | За контрактом |
-| 8.5 | GET /api/sessions/{sessionUid}/summary | SessionSummaryDto | Відповідь за контрактом |
-| 8.6 | Поле state в відповідях | ACTIVE / FINISHED (TERMINAL) завжди присутнє де потрібно | За REST contract |
-| 8.7 | (Опційно) GET /api/sessions/{uid}/telemetry?from=&to=&metric= | Читання з car_telemetry_raw | Для графіків |
+> **Статус:** ✅ **ПОВНІСТЮ РЕАЛІЗОВАНО** (February 1, 2026)  
+> **Детальна документація:** [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md#-stage-8-rest-api-complete)  
+> **Файли:** 4 controllers (SessionController, LapController, SessionSummaryController, RestExceptionHandler)
+
+| # | Крок | Дії | Критерій готовності | Статус |
+|---|------|-----|---------------------|--------|
+| 8.1 | GET /api/sessions | List SessionDto, limit/offset | Відповідь за контрактом | ✅ |
+| 8.2 | GET /api/sessions/{sessionUid} | Один SessionDto | 404 якщо немає | ✅ |
+| 8.3 | GET /api/sessions/{sessionUid}/laps | List laps, carIndex=0 default | Відповідь за контрактом | ✅ |
+| 8.4 | GET /api/sessions/{sessionUid}/sectors | Сектори по колах (можна з laps) | За контрактом | ✅ |
+| 8.5 | GET /api/sessions/{sessionUid}/summary | SessionSummaryDto | Відповідь за контрактом | ✅ |
+| 8.6 | Поле state в відповідях | ACTIVE / FINISHED (TERMINAL) завжди присутнє де потрібно | За REST contract | ✅ |
+| 8.7 | (Опційно) GET /api/sessions/{uid}/telemetry?from=&to=&metric= | Читання з car_telemetry_raw | Для графіків | ⚠️ Skipped (MVP) |
+
+**Реалізовано:**
+- ✅ SessionController з endpoints: list, get by ID, get active
+- ✅ LapController з endpoints: laps, sectors
+- ✅ SessionSummaryController з endpoint: summary
+- ✅ RestExceptionHandler для стандартизованих помилок
+- ✅ Entity-to-DTO конвертація
+- ✅ Інтеграція з SessionStateManager для визначення ACTIVE state
+- ✅ Pagination підтримка для списку сесій
 
 ---
 
-### Етап 9. WebSocket Live
+### Етап 9. WebSocket Live ✅ ЗАВЕРШЕНО
 
-| # | Крок | Дії | Критерій готовності |
-|---|------|-----|---------------------|
-| 9.1 | Endpoint /ws/live (або /ws/telemetry/live) | STOMP або plain WebSocket за контрактом | Підключення встановлюється |
-| 9.2 | Subscribe message: sessionUID, carIndex | Зберегти підписку клієнта | Клієнт отримує тільки свою сесію |
-| 9.3 | Snapshot builder | З SessionRuntimeState → WsSnapshotMessage (speed, rpm, gear, throttle, brake, currentLap, currentSector) | 1 snapshot на виході |
-| 9.4 | Scheduler 10 Hz | Кожні 100 ms: для активних підписок взяти state, зібрати snapshot, відправити | UI отримує ~10 msg/s |
-| 9.5 | Reconnect: snapshot on connect | При новому підключенні відправити поточний snapshot | Клієнт одразу бачить стан |
-| 9.6 | Session ended → WsSessionEndedMessage | При переході в TERMINAL відправити і закрити stream | Клієнт бачить завершення |
+> **Статус:** ✅ **ПОВНІСТЮ РЕАЛІЗОВАНО** (February 1, 2026)  
+> **Детальна документація:** [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md#-stage-9-websocket-live-feed-complete)  
+> **Файли:** 5 components (Config, SessionManager, Controller, Broadcaster, EventListener)
+
+| # | Крок | Дії | Критерій готовності | Статус |
+|---|------|-----|---------------------|--------|
+| 9.1 | Endpoint /ws/live (або /ws/telemetry/live) | STOMP або plain WebSocket за контрактом | Підключення встановлюється | ✅ |
+| 9.2 | Subscribe message: sessionUID, carIndex | Зберегти підписку клієнта | Клієнт отримує тільки свою сесію | ✅ |
+| 9.3 | Snapshot builder | З SessionRuntimeState → WsSnapshotMessage (speed, rpm, gear, throttle, brake, currentLap, currentSector) | 1 snapshot на виході | ✅ |
+| 9.4 | Scheduler 10 Hz | Кожні 100 ms: для активних підписок взяти state, зібрати snapshot, відправити | UI отримує ~10 msg/s | ✅ |
+| 9.5 | Reconnect: snapshot on connect | При новому підключенні відправити поточний snapshot | Клієнт одразу бачить стан | ✅ |
+| 9.6 | Session ended → WsSessionEndedMessage | При переході в TERMINAL відправити і закрити stream | Клієнт бачить завершення | ✅ |
+
+**Реалізовано:**
+- ✅ WebSocketConfig: STOMP over WebSocket з SockJS fallback
+- ✅ WebSocketSessionManager: Thread-safe subscription tracking
+- ✅ WebSocketController: Subscribe/unsubscribe handlers з session validation
+- ✅ LiveDataBroadcaster: @Scheduled broadcaster на 10 Hz
+- ✅ WebSocketEventListener: Auto-cleanup на disconnect
+- ✅ Інтеграція з SessionLifecycleService для SESSION_ENDED notifications
+- ✅ SessionRuntimeState.getLatestSnapshot() method
 
 ---
 
@@ -423,101 +449,143 @@ react_spa_ui_architecture.md
 
 ---
 
-## Частина 4. Порядок виконання (оновлено з урахуванням завершеного UDP Library)
+## Частина 4. Порядок виконання (оновлено February 1, 2026)
 
 ### Поточний статус
 - ✅ **Етап 0** — ГОТОВО (Maven multi-module structure)
-- ✅ **Етап 1** — ЧАСТКОВО (Kafka DTO є, потрібні REST DTO)
-- ❌ **Етап 2** — TO DO (Infrastructure)
-- ✅ **Етап 3** — ГОТОВО (UDP Library + udp-ingest-service)
-- ❌ **Етапи 4-12** — TO DO
+- ✅ **Етап 1** — ГОТОВО (19 DTOs: Kafka, REST, WebSocket)
+- ✅ **Етап 2** — ГОТОВО (Infrastructure: docker-compose + 9 DDL scripts)
+- ✅ **Етап 3** — ГОТОВО (UDP Library + udp-ingest-service, 50 tests)
+- ✅ **Етап 4** — ГОТОВО (State Management: FSM, lifecycle, timeout)
+- ✅ **Етап 5** — ГОТОВО (Kafka Consumers + Idempotency)
+- ✅ **Етап 6** — ГОТОВО (Aggregation: Lap tracking, session summary)
+- ✅ **Етап 7** — ГОТОВО (Persistence: JPA entities + repositories)
+- ✅ **Етап 8** — ГОТОВО (REST API: 4 controllers, all endpoints)
+- ✅ **Етап 9** — ГОТОВО (WebSocket: STOMP, 10 Hz broadcast)
+- ❌ **Етап 10** — TO DO (Observability)
+- ❌ **Етап 11** — TO DO (React UI)
+- ❌ **Етап 12** — TO DO (Final Validation)
 
-### Рекомендований порядок реалізації
+**Backend Implementation: 75% Complete**
 
-#### **Stage 1: Foundation (можна почати зараз)**
-1. **Етап 1 (завершити):** REST/WebSocket DTOs в telemetry-api-contracts
-2. **Етап 2:** Infrastructure (docker-compose, DDL scripts)
-3. **Етап 3 (опційно):** Docker image для udp-ingest-service
+### Вже реалізовано (Stages 0-9)
 
-**Результат:** Повна інфраструктура готова для розробки processing service
+#### ✅ **Stage 1: Foundation (COMPLETE)**
+1. ✅ Етап 0: Maven multi-module structure
+2. ✅ Етап 1: All API contracts (Kafka, REST, WebSocket DTOs)
+3. ✅ Етап 2: Infrastructure (docker-compose, PostgreSQL, Kafka, DDL scripts)
+4. ✅ Етап 3: UDP Library with 50 passing tests
+
+**Результат:** Повна інфраструктура + UDP ingestion ready
 
 ---
 
-#### **Stage 2: Core Processing Logic**
-4. **Етап 4:** State Management (SessionRuntimeState, FSM transitions)
-5. **Етап 5:** Kafka Consumers + Idempotency
-6. **Етап 7:** Persistence Layer (JPA entities, repositories)
+#### ✅ **Stage 2: Core Processing Logic (COMPLETE)**
+5. ✅ Етап 4: State Management (FSM: INIT→ACTIVE→ENDING→TERMINAL)
+6. ✅ Етап 5: Kafka Consumers (4 topics) + Idempotency service
+7. ✅ Етап 7: Persistence Layer (JPA entities, repositories)
 
 **Результат:** Дані з Kafka зберігаються в БД з коректним state management
 
 ---
 
-#### **Stage 3: Business Aggregation**
-7. **Етап 6:** Aggregation (LapAggregator, SessionSummaryAggregator, RawTelemetryWriter)
+#### ✅ **Stage 3: Business Aggregation (COMPLETE)**
+8. ✅ Етап 6: Aggregation (LapAggregator, SessionSummaryAggregator)
 
 **Результат:** Laps, sectors, summary коректно агрегуються
 
 ---
 
-#### **Stage 4: API Layer**
-8. **Етап 8:** REST API (SessionController, endpoints)
-9. **Етап 9:** WebSocket Live (STOMP, snapshot broadcasting)
+#### ✅ **Stage 4: API Layer (COMPLETE)**
+9. ✅ Етап 8: REST API (SessionController, LapController, SummaryController)
+10. ✅ Етап 9: WebSocket Live (STOMP, 10 Hz snapshots, subscription management)
 
 **Результат:** Backend API готове для UI
 
 ---
 
-#### **Stage 5: Frontend**
-10. **Етап 11:** React SPA (UI для live dashboard та історії)
+### Залишається реалізувати (Stages 10-12)
 
-**Результат:** Повний end-to-end MVP
+#### ❌ **Stage 5: Observability (NOT STARTED)**
+11. **Етап 10:** Observability (metrics, health checks, logging)
+   - Spring Actuator endpoints
+   - Micrometer metrics
+   - Health indicators for Kafka and DB
+   - Custom metrics (packet loss, lag, etc.)
+
+**Результат:** Production monitoring ready
+
+**Estimated Effort:** 4-6 hours
 
 ---
 
-#### **Stage 6: Production Readiness**
-11. **Етап 10:** Observability (metrics, health checks, logging)
-12. **Етап 12:** Final Validation (scenarios, end-to-end testing)
+#### ❌ **Stage 6: Frontend (NOT STARTED)**
+12. **Етап 11:** React SPA (UI для live dashboard та історії)
+   - Session list screen
+   - Live dashboard with WebSocket
+   - Historical lap analysis
+   - Session summary view
+
+**Результат:** Повний end-to-end MVP
+
+**Estimated Effort:** 20-30 hours
+
+---
+
+#### ❌ **Stage 7: Testing & Validation (NOT STARTED)**
+13. **Етап 12:** Final Validation (scenarios, end-to-end testing)
+   - Integration tests
+   - F1 game testing scenarios
+   - Performance validation
+   - Error handling verification
 
 **Результат:** Production-ready MVP
+
+**Estimated Effort:** 6-8 hours
 
 ---
 
 ### Паралелізація
 
 **Можна робити паралельно:**
-- Етап 1 (REST DTOs) + Етап 2 (Infrastructure) — різні файли, не конфліктують
-- Етап 4 (State) + Етап 7 (Repositories) — незалежні шари
-- Етап 8 (REST) + Етап 9 (WebSocket) — різні endpoints
+- ~~Етап 1 (REST DTOs) + Етап 2 (Infrastructure)~~ ✅ DONE
+- ~~Етап 4 (State) + Етап 7 (Repositories)~~ ✅ DONE
+- ~~Етап 8 (REST) + Етап 9 (WebSocket)~~ ✅ DONE
+- **Етап 10 (Observability) + Етап 11 (React UI)** ← Можна робити паралельно
 
 **Залежності (must be sequential):**
-- Етап 1 → Етапи 4, 5, 8, 9 (потрібні DTOs)
-- Етап 2 → Етапи 5, 6, 7 (потрібна БД і Kafka)
-- Етап 4 → Етап 5 (consumers потребують state manager)
-- Етап 5 → Етап 6 (aggregation потребує consumers)
-- Етап 6, 7 → Етап 8 (REST потребує repositories та aggregates)
-- Етап 4, 6 → Етап 9 (WebSocket потребує state + snapshots)
-- Етапи 8, 9 → Етап 11 (UI потребує API)
+- ~~Етап 1 → Етапи 4, 5, 8, 9~~ ✅ DONE
+- ~~Етап 2 → Етапи 5, 6, 7~~ ✅ DONE
+- ~~Етап 4 → Етап 5~~ ✅ DONE
+- ~~Етап 5 → Етап 6~~ ✅ DONE
+- ~~Етап 6, 7 → Етап 8~~ ✅ DONE
+- ~~Етап 4, 6 → Етап 9~~ ✅ DONE
+- Етапи 8, 9 → Етап 11 (UI потребує API) ← **READY TO START**
+- Етапи 10, 11 → Етап 12 (Final testing потребує всі компоненти)
 
 ---
 
 ### Оціночний час виконання (залишається)
 
-| Етап | Опис | Час | Пріоритет |
-|------|------|-----|-----------|
-| 1 (finish) | REST/WS DTOs | 4-6 год | HIGH |
-| 2 | Infrastructure | 6-8 год | HIGH |
-| 3 (optional) | Docker image ingest | 1 год | LOW |
-| 4 | State Management | 10-12 год | HIGH |
-| 5 | Kafka Consumers | 8-10 год | HIGH |
-| 6 | Aggregation | 12-15 год | HIGH |
-| 7 | Persistence | 8-10 год | HIGH |
-| 8 | REST API | 6-8 год | HIGH |
-| 9 | WebSocket | 8-10 год | HIGH |
-| 10 | Observability | 4-6 год | MEDIUM |
-| 11 | React UI | 20-30 год | HIGH |
-| 12 | Validation | 6-8 год | HIGH |
+| Етап | Опис | Початковий час | Статус | Залишилося |
+|------|------|----------------|--------|------------|
+| ~~0~~ | ~~Bootstrap~~ | ~~4 год~~ | ✅ | 0 |
+| ~~1~~ | ~~REST/WS DTOs~~ | ~~4-6 год~~ | ✅ | 0 |
+| ~~2~~ | ~~Infrastructure~~ | ~~6-8 год~~ | ✅ | 0 |
+| ~~3~~ | ~~UDP Library~~ | ~~30-40 год~~ | ✅ | 0 |
+| ~~4~~ | ~~State Management~~ | ~~10-12 год~~ | ✅ | 0 |
+| ~~5~~ | ~~Kafka Consumers~~ | ~~8-10 год~~ | ✅ | 0 |
+| ~~6~~ | ~~Aggregation~~ | ~~12-15 год~~ | ✅ | 0 |
+| ~~7~~ | ~~Persistence~~ | ~~8-10 год~~ | ✅ | 0 |
+| ~~8~~ | ~~REST API~~ | ~~6-8 год~~ | ✅ | 0 |
+| ~~9~~ | ~~WebSocket~~ | ~~8-10 год~~ | ✅ | 0 |
+| 10 | Observability | 4-6 год | ❌ | **4-6 год** |
+| 11 | React UI | 20-30 год | ❌ | **20-30 год** |
+| 12 | Validation | 6-8 год | ❌ | **6-8 год** |
 
-**Загальний залишковий час:** ~90-120 годин (UDP Library зекономила ~30-40 годин)
+**Виконано:** ~100-125 годин  
+**Залишилося:** ~30-44 години  
+**Загальна економія:** UDP Library була реалізована окремо (~30-40 год)
 
 ---
 

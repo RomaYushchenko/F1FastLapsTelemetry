@@ -9,7 +9,7 @@ import java.time.Instant;
 
 /**
  * REST DTO for session (GET /api/sessions, GET /api/sessions/{id}).
- * See: rest_web_socket_api_contracts_f_1_telemetry.md § 3.1.
+ * See: rest_web_socket_api_contracts_f_1_telemetry.md § 3.1, § 8.2.
  */
 @Data
 @NoArgsConstructor
@@ -27,4 +27,6 @@ public class SessionDto {
     private Instant endedAt;
     /** EVENT_SEND, NO_DATA_TIMEOUT, MANUAL */
     private String endReason;
+    /** ACTIVE or FINISHED (required in all responses per § 8.2) */
+    private SessionState state;
 }
