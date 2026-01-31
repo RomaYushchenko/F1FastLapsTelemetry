@@ -2,6 +2,8 @@
 # Запуск: docker-compose up -d
 # Документація: .github/project/f_1_telemetry_project_architecture.md
 
+version: "3.9"
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.3
@@ -15,10 +17,12 @@ services:
     volumes:
       - zookeeper-data:/var/lib/zookeeper/data
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - f1-net
 
   kafka:
     image: confluentinc/cp-kafka:7.5.3
@@ -28,27 +32,50 @@ services:
       zookeeper:
         condition: service_healthy
     ports:
-      - "9092:9092"
+      - "9092:9092"   # external (host)
+      - "29092:29092" # internal (docker)
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+
+      # listeners
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      # single-node safe defaults
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      # ENABLE auto topic creation
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      # retention
+      KAFKA_LOG_RETENTION_HOURS: 168
     volumes:
       - kafka-data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-topics --bootstrap-server kafka:29092 --list >/dev/null 2>&1"
+        ]
       interval: 10s
       timeout: 10s
       retries: 5
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    networks:
+      - f1-net
 
   postgres:
-    image: timescale/timescaledb:latest-pg16
+    image: timescale/timescaledb:2.14.2-pg16
     container_name: f1-telemetry-postgres
     hostname: postgres
     ports:
@@ -57,14 +84,25 @@ services:
       POSTGRES_USER: telemetry
       POSTGRES_PASSWORD: telemetry
       POSTGRES_DB: telemetry
+      TIMESCALEDB_TELEMETRY: "off"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./init-db:/docker-entrypoint-initdb.d
+      - ./init-db:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U telemetry -d telemetry"]
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    networks:
+      - f1-net
+
+networks:
+  f1-net:
+    driver: bridge
 
 volumes:
   zookeeper-data:

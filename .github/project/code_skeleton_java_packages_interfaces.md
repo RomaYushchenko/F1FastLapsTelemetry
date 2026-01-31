@@ -14,10 +14,31 @@
 ```
 f1-telemetry
 ├── telemetry-api-contracts
+├── f1-telemetry-udp-core
+├── f1-telemetry-udp-spring
+├── f1-telemetry-udp-starter
 ├── udp-ingest-service
 ├── telemetry-processing-api-service
 └── infra
 ```
+
+**Ключові модулі:**
+
+| Модуль | Призначення | Залежності |
+|--------|-------------|-----------|
+| **telemetry-api-contracts** | Спільні DTO, контракти | Lombok, validation |
+| **f1-telemetry-udp-core** | UDP listener, dispatcher (pure Java) | SLF4J, Lombok |
+| **f1-telemetry-udp-spring** | Spring integration для UDP | Spring Context, core |
+| **f1-telemetry-udp-starter** | AutoConfiguration | Spring Boot, spring module |
+| **udp-ingest-service** | Business handlers для UDP | UDP starter, contracts, Kafka |
+| **telemetry-processing-api-service** | Kafka consumers, persistence, API | Spring Boot, Kafka, JPA |
+| **infra** | Docker Compose, SQL scripts | N/A |
+
+**Детальна архітектура UDP модулів:** [udp_telemetry_ingest_as_reusable_library_implementation_guide.md](udp_telemetry_ingest_as_reusable_library_implementation_guide.md)
+
+---
+
+## 1.1 Архітектурні правила
 - Watermark logic:
     - `SessionStateManager`.
 - Lap boundaries:
@@ -75,54 +96,179 @@ telemetry-api-contracts
 
 ---
 
-## 3. udp-ingest-service
+## 3. f1-telemetry-udp-core (pure Java library)
 
-**Роль:** прийом UDP, парсинг, публікація в Kafka.
+**Роль:** UDP packet reception, header decoding, dispatching (no Spring).
+
+```
+f1-telemetry-udp-core
+└── com.ua.yushchenko.f1.fastlaps.telemetry.udp.core
+    ├── listener
+    │   ├── UdpTelemetryListener.java
+    │   └── UdpListenerConfig.java
+    │
+    ├── packet
+    │   ├── PacketHeader.java
+    │   └── PacketHeaderDecoder.java
+    │
+    ├── dispatcher
+    │   ├── UdpPacketDispatcher.java
+    │   ├── SimpleUdpPacketDispatcher.java
+    │   └── UdpPacketConsumer.java
+    │
+    └── exception
+        └── PacketDecodingException.java
+```
+
+### Ключові інтерфейси
+
+```java
+public interface UdpPacketConsumer {
+    short packetId();
+    void handle(PacketHeader header, ByteBuffer payload);
+}
+```
+
+```java
+public interface UdpPacketDispatcher {
+    void dispatch(PacketHeader header, ByteBuffer payload);
+    void registerConsumer(UdpPacketConsumer consumer);
+}
+```
+
+---
+
+## 4. f1-telemetry-udp-spring (Spring integration)
+
+**Роль:** Spring annotations, BeanPostProcessor, method adapter.
+
+```
+f1-telemetry-udp-spring
+└── com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring
+    ├── annotation
+    │   ├── F1UdpListener.java
+    │   └── F1PacketHandler.java
+    │
+    ├── adapter
+    │   └── MethodPacketHandler.java
+    │
+    ├── processor
+    │   └── F1PacketHandlerPostProcessor.java
+    │
+    ├── registry
+    │   └── PacketHandlerRegistry.java
+    │
+    └── config
+        └── UdpListenerConfiguration.java
+```
+
+### Ключові класи
+
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Component
+public @interface F1UdpListener {}
+```
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface F1PacketHandler {
+    short packetId();
+}
+```
+
+---
+
+## 5. f1-telemetry-udp-starter (Spring Boot autoconfiguration)
+
+**Роль:** автоконфігурація UDP listener.
+
+```
+f1-telemetry-udp-starter
+└── com.ua.yushchenko.f1.fastlaps.telemetry.udp.starter
+    ├── autoconfigure
+    │   ├── UdpTelemetryAutoConfiguration.java
+    │   └── UdpTelemetryProperties.java
+    │
+    └── lifecycle
+        └── UdpListenerLifecycleManager.java
+```
+
+**spring.factories / AutoConfiguration.imports:**
+```
+com.ua.yushchenko.f1.fastlaps.telemetry.udp.starter.autoconfigure.UdpTelemetryAutoConfiguration
+```
+
+---
+
+## 6. udp-ingest-service (business logic)
+
+**Роль:** packet handlers, parsing, Kafka publishing.
 
 ```
 udp-ingest-service
 └── com.ua.yushchenko.f1.fastlaps.telemetry.ingest
     ├── config
     │   ├── KafkaProducerConfig.java
-    │   └── UdpServerConfig.java
-    │
-    ├── udp
-    │   ├── UdpServer.java
-    │   ├── UdpPacketListener.java
-    │   └── UdpPacketDispatcher.java
+    │   └── TelemetryPublisherConfig.java
     │
     ├── parser
-    │   ├── PacketParser.java
-    │   ├── CarTelemetryParser.java
-    │   ├── LapDataParser.java
-    │   └── SessionEventParser.java
+    │   ├── SessionPacketParser.java
+    │   ├── LapDataPacketParser.java
+    │   ├── CarTelemetryPacketParser.java
+    │   └── CarStatusPacketParser.java
     │
-    ├── kafka
-    │   ├── TelemetryKafkaProducer.java
-    │   └── TopicResolver.java
+    ├── handler
+    │   ├── SessionPacketHandler.java       // @F1UdpListener + @F1PacketHandler
+    │   ├── LapPacketHandler.java
+    │   ├── TelemetryPacketHandler.java
+    │   └── StatusPacketHandler.java
     │
-    └── mapper
-        └── PacketToEnvelopeMapper.java
+    ├── publisher
+    │   ├── TelemetryPublisher.java
+    │   ├── KafkaTelemetryPublisher.java
+    │   ├── RetryingPublisher.java          // Decorator
+    │   └── ThrottlingPublisher.java        // Decorator
+    │
+    ├── mapper
+    │   └── PacketToEnvelopeMapper.java
+    │
+    └── topic
+        └── TopicResolver.java
+```
+
+### Приклад handler-класу
+
+```java
+@F1UdpListener
+public class SessionPacketHandler {
+    
+    private final TelemetryPublisher publisher;
+    private final PacketToEnvelopeMapper mapper;
+    
+    @F1PacketHandler(packetId = 1)  // Session packet
+    public void onSessionPacket(PacketHeader header, ByteBuffer payload) {
+        SessionEventDto event = SessionPacketParser.parse(payload);
+        KafkaEnvelope<SessionEventDto> envelope = mapper.toEnvelope(header, event);
+        String topic = TopicResolver.resolve(event);
+        publisher.publish(topic, header.getSessionUID(), envelope);
+    }
+}
 ```
 
 ### Ключові інтерфейси
 
 ```java
-public interface PacketParser<T> {
-    boolean supports(int packetId);
-    T parse(ByteBuffer buffer);
-}
-```
-
-```java
-public interface TelemetryKafkaProducer {
-    void send(KafkaEnvelope<?> envelope);
+public interface TelemetryPublisher {
+    void publish(String topic, String key, Object value);
 }
 ```
 
 ---
 
-## 4. telemetry-processing-api-service
+## 7. telemetry-processing-api-service
 
 Найбільший модуль. Поєднує Kafka consumers, агрегацію, persistence та API.
 

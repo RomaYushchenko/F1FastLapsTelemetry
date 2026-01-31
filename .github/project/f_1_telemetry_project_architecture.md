@@ -104,24 +104,46 @@ MVP реалізується як **один інстанс** (Docker Compose), 
 
 ```
 root
- ├─ telemetry-contracts
- ├─ telemetry-parser-f125
+ ├─ telemetry-api-contracts
+ ├─ f1-telemetry-udp-core
+ ├─ f1-telemetry-udp-spring
+ ├─ f1-telemetry-udp-starter
  ├─ udp-ingest-service
  ├─ telemetry-processing-api-service
  ├─ ui
  └─ infra
 ```
 
-### 4.1 telemetry-contracts
-- Kafka envelope
-- DTO
-- enum packetId / eventCode
-- schemaVersion
+### 4.1 telemetry-api-contracts
+- Kafka envelope (`KafkaEnvelope<T>`)
+- DTO (Session, Lap, CarTelemetry, CarStatus)
+- Enum: `PacketId`, `EventCode`
+- Schema versioning: `SchemaVersion`
+- REST/WebSocket DTO contracts
 
-### 4.2 telemetry-parser-f125
-- binary UDP → DTO
-- Little Endian parsing
-- версіонування форматів
+### 4.2 f1-telemetry-udp-core
+**Pure Java module (no Spring dependencies)**
+- UDP packet reception via `DatagramChannel`
+- Packet header decoding (`PacketHeader`, `PacketHeaderDecoder`)
+- Dispatcher pattern (`UdpPacketDispatcher`, `UdpPacketConsumer`)
+- Binary parsing: UDP → ByteBuffer → structured data
+- Little Endian parsing for F1 25 format
+
+### 4.3 f1-telemetry-udp-spring
+**Spring integration layer**
+- Annotations: `@F1UdpListener`, `@F1PacketHandler`
+- `BeanPostProcessor` for handler discovery
+- Method adapter: business methods → `UdpPacketConsumer`
+- Handler registry and Spring-aware wiring
+
+### 4.4 f1-telemetry-udp-starter
+**Spring Boot autoconfiguration**
+- AutoConfiguration for UDP listener
+- Configuration properties binding
+- Lifecycle management (start on ready, stop on shutdown)
+- Conditional bean creation based on properties
+
+**Детальний опис UDP бібліотеки:** [udp_telemetry_ingest_as_reusable_library_implementation_guide.md](udp_telemetry_ingest_as_reusable_library_implementation_guide.md)
 
 ---
 

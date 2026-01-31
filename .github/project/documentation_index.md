@@ -16,19 +16,22 @@
 2. **f_1_telemetry_project_architecture.md**  
    Дає high-level уявлення про архітектуру, сервіси, data flow та зони відповідальності. Пояснює *як* система побудована.
 
-3. **kafka_contracts_f_1_telemetry.md**  
+3. **ARCHITECTURE_CLARIFICATION.md** ⭐ NEW  
+   Детальне роз'яснення: чому UDP Library, udp-ingest-service та telemetry-processing-api-service — це три різні речі. Обов'язково до прочитання для розуміння архітектури.
+
+4. **kafka_contracts_f_1_telemetry.md**  
    Нормативний контракт взаємодії між сервісами. Фіксує message-level API та правила доставки, ordering і еволюції.
 
-4. **state_machines_specification_f_1_telemetry.md**  
+5. **state_machines_specification_f_1_telemetry.md**  
    Формалізує поведінку processing layer. Дає відповідь *як система поводиться* у часі.
 
-5. **telemetry_error_and_lifecycle_contract.md**  
+6. **telemetry_error_and_lifecycle_contract.md**  
    Уточнює lifecycle та error semantics між шарами. Синхронізує FSM, Kafka та API.
 
-6. **rest_web_socket_api_contracts_f_1_telemetry.md**  
+7. **rest_web_socket_api_contracts_f_1_telemetry.md**  
    Проєкція внутрішнього стану системи у зовнішній API та UI.
 
-7. **react_spa_ui_architecture.md**  
+8. **react_spa_ui_architecture.md**  
    Архітектура React SPA: екрани, layout (wireframe), потік даних (REST + WebSocket), структура компонентів та як це виглядає для користувача.
 
 ---
@@ -42,6 +45,8 @@
         |
         v
 [f_1_telemetry_project_architecture]
+        |
+        +----> [ARCHITECTURE_CLARIFICATION] ⭐ (UDP Library роз'яснення)
         |
         v
 [kafka_contracts_f_1_telemetry] <----------------+
@@ -63,6 +68,7 @@
 
 - `mvp-requirements.md` — корінь усієї документації.
 - `f_1_telemetry_project_architecture.md` спирається на MVP-обмеження.
+- **`ARCHITECTURE_CLARIFICATION.md`** — роз'яснення ролі UDP Library vs Services.
 - `kafka_contracts_f_1_telemetry.md` є базовим комунікаційним контрактом.
 - `state_machines_specification_f_1_telemetry.md` реалізує поведінку поверх Kafka контрактів.
 - `telemetry_error_and_lifecycle_contract.md` уточнює та доповнює FSM.
@@ -463,3 +469,117 @@
 
 ### 14. Observability & Monitoring
 
+---
+
+## implementation_steps_plan.md
+
+**Призначення документа**  
+Покроковий план реалізації MVP, розбитий на етапи (Phases). Кожен крок має чіткий критерій готовності.
+
+**Роль в архітектурі (glossary-aligned):**
+- *Implementation roadmap*;
+- послідовність робіт від Bootstrap до Phase 11;
+- синхронізація всіх технічних документів.
+
+**Використовується для:**
+- планування спринтів та завдань;
+- трекінгу прогресу;
+- визначення залежностей між кроками.
+
+### Етап 0. Bootstrap та репозиторій
+### Етап 1. Контракти (telemetry-api-contracts)
+### Етап 2. Інфраструктура (infra)
+### Етап 3. UDP Ingest Service — реалізація через бібліотеку
+> **Детальний план:** [udp_library_implementation_plan.md](udp_library_implementation_plan.md)
+### Етап 4. Telemetry Processing Service — основа
+### Етап 5. Session FSM + Lifecycle
+### Етап 6. Lap FSM + Aggregation
+### Етап 7. REST API
+### Етап 8. WebSocket (live)
+### Етап 9. Flashback
+### Етап 10. React SPA (Phase 1)
+### Етап 11. React SPA (Phase 2)
+
+---
+
+## udp_telemetry_ingest_as_reusable_library_implementation_guide.md
+
+**Призначення документа**  
+Детальний гайд по винесенню UDP-ingest у окрему багаторазову бібліотеку. Пояснює архітектуру трьох модулів: core, spring, starter.
+
+**Роль в архітектурі (glossary-aligned):**
+- *Library design reference*;
+- separation of concerns: infrastructure vs business logic;
+- declarative UDP handling through annotations.
+
+**Використовується для:**
+- реалізації UDP бібліотеки;
+- розуміння патернів (Adapter, Decorator, Registry);
+- створення декларативних handler beans.
+
+### 1. Цільова архітектура
+### 2. Структура модулів
+### 3. Core модуль — що реалізувати
+### 4. Spring модуль — як працюють анотації
+### 5. Registry + Dispatcher binding
+### 6. Kafka output (окремий concern)
+### 7. ЄДИНЕ місце створення bean
+### 8. Як виглядає бізнес-код
+### 9. Чеклист для реалізації
+### 10. Головна ідея
+
+---
+
+## udp_library_implementation_plan.md
+
+**Призначення документа**  
+Покроковий план реалізації UDP telemetry ingest бібліотеки. Містить 7 фаз (Phases) з детальними завданнями та критеріями готовності.
+
+**Роль в архітектурі (glossary-aligned):**
+- *Detailed implementation plan для Stage 3*;
+- task breakdown з acceptance criteria;
+- tracking document для UDP library development.
+
+**Використовується для:**
+- покрокової реалізації UDP бібліотеки;
+- перевірки завершення кожної фази;
+- синхронізації з загальним implementation_steps_plan.md.
+
+### Phase 1: Core Module Setup (f1-telemetry-udp-core)
+### Phase 2: Spring Integration Module (f1-telemetry-udp-spring)
+### Phase 3: Kafka Publisher Integration
+### Phase 4: Packet Parsing Integration
+### Phase 5: Spring Boot Starter Module (f1-telemetry-udp-starter)
+### Phase 6: Testing and Documentation
+### Phase 7: Integration into UDP Ingest Service
+### Success Criteria
+### Notes
+### Related Documents
+
+---
+
+## code_skeleton_java_packages_interfaces.md
+
+**Призначення документа**  
+Каркас коду (code skeleton): структура пакетів Java, ключові інтерфейси, імена класів та responsibility boundaries.
+
+**Роль в архітектурі (glossary-aligned):**
+- *Code organization reference*;
+- naming conventions для всіх модулів;
+- dependency rules та layering.
+
+**Використовується для:**
+- створення Maven modules;
+- визначення package структури;
+- ідентифікації ключових інтерфейсів.
+
+### 1. Загальна структура репозиторію (Maven multi-module)
+### 1.1 Архітектурні правила
+### 2. telemetry-api-contracts (shared module)
+### 3. f1-telemetry-udp-core (pure Java library)
+### 4. f1-telemetry-udp-spring (Spring integration)
+### 5. f1-telemetry-udp-starter (Spring Boot autoconfiguration)
+### 6. udp-ingest-service (business logic)
+### 7. telemetry-processing-api-service
+
+---

@@ -13,6 +13,9 @@
 
     <modules>
         <module>telemetry-api-contracts</module>
+        <module>f1-telemetry-udp-core</module>
+        <module>f1-telemetry-udp-spring</module>
+        <module>f1-telemetry-udp-starter</module>
         <module>udp-ingest-service</module>
         <module>telemetry-processing-api-service</module>
         <module>infra</module>

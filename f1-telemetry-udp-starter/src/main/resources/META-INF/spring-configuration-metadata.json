@@ -1,0 +1,36 @@
+{
+  "groups": [
+    {
+      "name": "f1.telemetry.udp",
+      "type": "com.ua.yushchenko.f1.fastlaps.telemetry.udp.starter.UdpTelemetryProperties",
+      "sourceType": "com.ua.yushchenko.f1.fastlaps.telemetry.udp.starter.UdpTelemetryProperties",
+      "description": "Configuration properties for F1 UDP telemetry listener."
+    }
+  ],
+  "properties": [
+    {
+      "name": "f1.telemetry.udp.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Enable UDP telemetry listener.",
+      "defaultValue": true
+    },
+    {
+      "name": "f1.telemetry.udp.host",
+      "type": "java.lang.String",
+      "description": "UDP host to bind to.",
+      "defaultValue": "0.0.0.0"
+    },
+    {
+      "name": "f1.telemetry.udp.port",
+      "type": "java.lang.Integer",
+      "description": "UDP port to listen on.",
+      "defaultValue": 20777
+    },
+    {
+      "name": "f1.telemetry.udp.buffer-size",
+      "type": "java.lang.Integer",
+      "description": "Buffer size for UDP packets in bytes.",
+      "defaultValue": 2048
+    }
+  ]
+}

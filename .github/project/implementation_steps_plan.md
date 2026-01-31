@@ -69,55 +69,94 @@ react_spa_ui_architecture.md
 ### 2.1 High-level схема
 
 ```
-┌─────────┐    UDP     ┌──────────────────┐    Kafka     ┌─────────────────────────────────┐
-│ F1 Game │ ────────► │ udp-ingest-svc   │ ───────────► │ telemetry-processing-api-svc    │
-└─────────┘           │ (parse+publish)  │              │ (consume+aggregate+store+API)    │
-                      └──────────────────┘              └──────────────┬──────────────────┘
-                                                                        │
-                                                                        ▼
-                                                         ┌──────────────────────────────┐
-                                                         │ PostgreSQL + TimescaleDB     │
-                                                         └──────────────┬───────────────┘
-                                                                        │ REST / WebSocket
-                                                                        ▼
-                                                              ┌─────────────────┐
-                                                              │   React SPA     │
-                                                              └─────────────────┘
+┌─────────┐   UDP      ┌────────────────────────────┐
+│ F1 Game │ ────────►  │ udp-ingest-service         │
+└─────────┘            │ (uses UDP Library:         │
+                       │  - parse UDP packets       │
+                       │  - publish to Kafka)       │
+                       └────────┬───────────────────┘
+                                │ Kafka (4 topics)
+                                ▼
+                    ┌──────────────────────────────────────┐
+                    │ telemetry-processing-api-service     │
+                    │ (Kafka consumers → FSM →              │
+                    │  aggregation → DB → REST/WebSocket)  │
+                    └──────────────┬───────────────────────┘
+                                   │
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │ PostgreSQL + TimescaleDB     │
+                    └──────────────┬───────────────┘
+                                   │ REST / WebSocket
+                                   ▼
+                        ┌─────────────────────┐
+                        │    React SPA        │
+                        └─────────────────────┘
 ```
+
+**⚠️ ВАЖЛИВО:** UDP Library **не є окремим сервісом**. Це інфраструктурна бібліотека (як Spring Boot Starter), яка **використовується** udp-ingest-service. Див. [ARCHITECTURE_CLARIFICATION.md](ARCHITECTURE_CLARIFICATION.md) для детального роз'яснення.
 
 ---
 
 ### 2.2 Компоненти
 
-| Компонент | Відповідальність | Стек |
-|-----------|------------------|------|
-| **UDP Ingest Service** | Слухати UDP, парсити пакети, нормалізувати DTO, публікувати в Kafka | Java 17, Spring Boot |
-| **Telemetry Processing & API Service** | Kafka consumers, агрегація, persistence, REST + WebSocket | Java 17, Spring Boot |
-| **PostgreSQL + TimescaleDB** | Raw telemetry (hypertables), sessions/laps/sectors/summary | PostgreSQL, TimescaleDB |
-| **Kafka** | Буфер подій, decoupling, backpressure | Kafka |
-| **React SPA** | Live dashboard, перегляд сесій, laps/sectors | React |
+| Компонент | Відповідальність | Стек | Де знаходиться |
+|-----------|------------------|------|----------------|
+| **UDP Library (3 модулі)** | Інфраструктура: UDP listener, парсинг, Kafka publishing | Java 17, Pure Java + Spring | f1-telemetry-udp-core, f1-telemetry-udp-spring, f1-telemetry-udp-starter |
+| **UDP Ingest Service** | Deployment wrapper для UDP Library, конфігурація | Java 17, Spring Boot | udp-ingest-service |
+| **Telemetry Processing & API Service** | Kafka consumers, FSM, агрегація, persistence, REST + WebSocket | Java 17, Spring Boot, JPA, WebSocket | telemetry-processing-api-service |
+| **PostgreSQL + TimescaleDB** | Raw telemetry (hypertables), sessions/laps/sectors/summary | PostgreSQL, TimescaleDB | infra/docker-compose.yml |
+| **Kafka** | Буфер подій, decoupling, backpressure | Kafka | infra/docker-compose.yml |
+| **React SPA** | Live dashboard, перегляд сесій, laps/sectors | React | ui/ (майбутній модуль) |
 
 ---
 
-### 2.3 Maven-модулі (з code skeleton)
+### 2.3 Maven-модулі (фактична структура)
 
-| Модуль | Призначення |
-|--------|-------------|
-| **telemetry-api-contracts** | DTO, Kafka envelope, enum (PacketId, EventCode), REST/WS DTO — без Spring/Kafka/DB |
-| **telemetry-parser-f125** | Binary UDP → DTO, Little Endian (опційно окремий модуль або в ingest) |
-| **udp-ingest-service** | UDP server, parser, Kafka producer |
-| **telemetry-processing-api-service** | Kafka consumers, FSM, aggregation, persistence, REST, WebSocket |
-| **infra** | docker-compose (Kafka, PostgreSQL+TimescaleDB), скрипти |
+| Модуль | Призначення | Статус |
+|--------|-------------|--------|
+| **telemetry-api-contracts** | DTO, Kafka envelope, enum (PacketId, EventCode), REST/WS DTO | ✅ Частково (потрібні REST DTOs) |
+| **f1-telemetry-udp-core** | Pure Java: UDP listener, dispatcher, packet header decoder | ✅ ЗАВЕРШЕНО (14 тестів) |
+| **f1-telemetry-udp-spring** | Spring integration: annotations, handlers, Kafka publisher | ✅ ЗАВЕРШЕНО (32 тести) |
+| **f1-telemetry-udp-starter** | Spring Boot autoconfiguration | ✅ ЗАВЕРШЕНО (4 тести) |
+| **udp-ingest-service** | Spring Boot app (uses UDP starter) | ✅ Базова структура готова |
+| **telemetry-processing-api-service** | Kafka consumers, FSM, aggregation, REST/WS | ❌ ТО DO |
+| **infra** | docker-compose (Kafka, PostgreSQL+TimescaleDB), DDL scripts | ❌ TO DO |
 
 ---
 
-### 2.4 Data flow (стисло)
+### 2.4 Data flow (детально)
 
-1. **F1 Game** → UDP пакети (Session, LapData, CarTelemetry, CarStatus).
-2. **Ingest** → парсинг → `KafkaEnvelope` + payload → Kafka (key = sessionUID).
-3. **Processing** → consumer → idempotency check → FSM (session/lap) → raw batch insert + aggregates upsert.
-4. **API** → REST (sessions, laps, summary) + WebSocket (live snapshot 10 Hz).
-5. **UI** → GET /api/sessions, /laps, /summary + WS /ws/live.
+1. **F1 Game** → UDP пакети (Session, LapData, CarTelemetry, CarStatus) на порт 20777.
+
+2. **udp-ingest-service** (uses UDP Library):
+   - UDP Library отримує пакети
+   - Built-in handlers парсять binary → DTO
+   - Built-in handlers публікують у Kafka (4 топіки)
+   - **Не зберігає в БД, не агрегує**
+
+3. **Kafka topics:**
+   - `telemetry.session` (key = sessionUID)
+   - `telemetry.lap` (key = sessionUID-carIndex)
+   - `telemetry.carTelemetry` (key = sessionUID-carIndex)
+   - `telemetry.carStatus` (key = sessionUID-carIndex)
+
+4. **telemetry-processing-api-service:**
+   - 4 Kafka consumers читають з топіків
+   - Idempotency check (processed_packets table)
+   - Session FSM (INIT → ACTIVE → ENDING → TERMINAL)
+   - Lap aggregation (sector times, lap finalization)
+   - Session summary (best lap, best sectors)
+   - Batch insert raw telemetry (TimescaleDB hypertables)
+   - Upsert aggregated data (laps, sessions, summary)
+
+5. **API layer (telemetry-processing-api-service):**
+   - REST endpoints: `GET /api/sessions`, `/sessions/{uid}/laps`, `/summary`
+   - WebSocket: `/ws/live` → 10 Hz snapshots для live dashboard
+
+6. **React SPA:**
+   - HTTP calls для історичних даних
+   - WebSocket для live оновлень
 
 ---
 
@@ -178,24 +217,80 @@ react_spa_ui_architecture.md
 
 ---
 
-### Етап 3. UDP Ingest Service — основа
+### Етап 3. UDP Ingestion (UDP Library + udp-ingest-service) ✅ ЗАВЕРШЕНО
 
-| # | Крок | Дії | Критерій готовності |
-|---|------|-----|---------------------|
-| 3.1 | Конфіг UDP | host, port, packet format (2025) у application.yml | Значення читаються |
-| 3.2 | Клас `UdpPacketListener` / `UdpServer` | Слухати UDP порт, отримувати DatagramPacket → ByteBuffer | Лог "received N bytes" |
-| 3.3 | Визначення packetId з UDP header | Читати packetId з буфера (за F1 25 spec) | Правильний packetId для тестових байтів |
-| 3.4 | Інтерфейс `PacketParser<T>` | `boolean supports(int packetId); T parse(ByteBuffer buffer);` | Компіляція |
-| 3.5 | Session packet parser | Парсинг Session → SessionEventDto (або внутрішня структура) | Unit-тест на прикладі байтів |
-| 3.6 | LapData parser | Парсинг LapData → LapDto | Unit-тест |
-| 3.7 | CarTelemetry parser | Парсинг CarTelemetry → CarTelemetryDto | Unit-тест |
-| 3.8 | CarStatus parser | Парсинг CarStatus → CarStatusDto | Unit-тест |
-| 3.9 | Dispatcher: packetId → parser | switch(packetId) → виклик відповідного parser | Один DTO на виході |
-| 3.10 | Маппер Packet → KafkaEnvelope | sessionUID, frameIdentifier, sessionTime, carIndex з header; producedAt = now() | Envelope заповнений |
-| 3.11 | Kafka producer config | bootstrap-servers, key-serializer, value-serializer (JSON), linger.ms, batch.size | Producer створюється |
-| 3.12 | TopicResolver | packetId / eventCode → topic name | Правильний topic на envelope |
-| 3.13 | TelemetryKafkaProducer.send(KafkaEnvelope) | Serialize JSON, key = sessionUID, send | Повідомлення в Kafka (перевірити kafka-console-consumer) |
-| 3.14 | Інтеграція: UDP → Parser → Envelope → Kafka | Тільки player car (carIndex з конфігу або з пакета) | Пакети з гри потрапляють у Kafka |
+> **Статус:** ✅ **ПОВНІСТЮ РЕАЛІЗОВАНО**  
+> **Детальна документація:** [UDP_LIBRARY_SUMMARY.md](../UDP_LIBRARY_SUMMARY.md)  
+> **Покроковий план:** [udp_library_implementation_plan.md](udp_library_implementation_plan.md)  
+> **Роз'яснення архітектури:** [ARCHITECTURE_CLARIFICATION.md](ARCHITECTURE_CLARIFICATION.md)
+
+#### Що вже реалізовано
+
+**UDP Бібліотека (3 модулі):**
+- ✅ **f1-telemetry-udp-core** — Pure Java, UDP listener, dispatcher (14 тестів)
+- ✅ **f1-telemetry-udp-spring** — Spring інтеграція, анотації, built-in handlers (32 тести)
+- ✅ **f1-telemetry-udp-starter** — Spring Boot autoconfiguration (4 тести)
+- ✅ **Всього 50 тестів, всі проходять**
+
+**Вбудовані обробники (в бібліотеці):**
+- ✅ SessionPacketHandler (packetId=1) → Kafka topic: `telemetry.session`
+- ✅ LapDataPacketHandler (packetId=2) → Kafka topic: `telemetry.lap`
+- ✅ CarTelemetryPacketHandler (packetId=6) → Kafka topic: `telemetry.carTelemetry`
+- ✅ CarStatusPacketHandler (packetId=7) → Kafka topic: `telemetry.carStatus`
+
+**udp-ingest-service:**
+- ✅ Spring Boot application з dependency на UDP starter
+- ✅ Конфігурація (application.yml): UDP port 20777, Kafka settings
+- ✅ Автоматичний запуск UDP listener при старті
+- ✅ Автоматична реєстрація built-in handlers
+- ✅ Готовий до deployment
+
+#### Що робить UDP Library
+
+**Інфраструктура (не бізнес-логіка):**
+1. Отримує UDP пакети з F1 Game
+2. Парсить packet header (sessionUID, frameIdentifier, packetId, etc.)
+3. Диспетчеризує пакети за packetId
+4. Built-in handlers парсять binary payload → DTO
+5. Будують KafkaEnvelope з метаданими
+6. Публікують у Kafka з retry/throttling
+7. **НЕ ЗБЕРІГАЄ в БД, не агрегує, не має REST API**
+
+#### Роль udp-ingest-service
+
+**Deployment wrapper (мінімальний код):**
+- Main class: `UdpIngestApplication.java` (~10 рядків)
+- Конфігурація: UDP port, Kafka bootstrap servers
+- **Опціонально:** Кастомні handlers (якщо потрібні інші типи пакетів)
+- **Опціонально:** Метрики, health checks, custom business logic
+
+**Чому потрібен окремий сервіс:**
+- ✅ Deployment boundary (мікросервіс з власним lifecycle)
+- ✅ Production configuration (порти, Kafka URL)
+- ✅ Розширюваність (custom handlers)
+- ✅ Масштабування (кілька інстансів)
+- ✅ Ізоляція від processing logic
+
+**Аналогія:** UDP library = Spring Boot Starter, udp-ingest-service = ваш Spring Boot application
+
+#### Ключові переваги реалізації
+
+- ✅ **Відсутність Spring залежностей у core** — Pure Java, повністю тестований
+- ✅ **Декларативна модель** — `@F1UdpListener`, `@F1PacketHandler` annotations
+- ✅ **Decorator pattern** — Retry, throttling для Kafka publisher
+- ✅ **Відсутність циклічних залежностей** — Manual bean wiring
+- ✅ **Переповторне використання** — Бібліотека може використовуватись в інших проєктах
+- ✅ **50 тестів** — Unit + integration тести
+
+#### Залишається зробити (мінімально)
+
+| # | Завдання | Зусилля | Пріоритет |
+|---|----------|---------|-----------|
+| 3.1 | Health checks в udp-ingest-service | 30 хв | LOW (працює з Spring Actuator) |
+| 3.2 | Metrics integration (Micrometer) | 1-2 год | MEDIUM (для production) |
+| 3.3 | Docker image для udp-ingest-service | 1 год | HIGH (для docker-compose) |
+
+**Висновок:** Етап 3 фактично завершений, udp-ingest-service готовий до використання.
 
 ---
 
@@ -328,18 +423,101 @@ react_spa_ui_architecture.md
 
 ---
 
-## Частина 4. Порядок виконання (залежності)
+## Частина 4. Порядок виконання (оновлено з урахуванням завершеного UDP Library)
 
-- **Етап 0** — перший (репозиторій і модулі).
-- **Етап 1** — потрібен перед етапами 3, 4, 5, 8, 9 (контракти).
-- **Етап 2** — можна паралельно з 1; потрібен перед 5, 6, 7.
-- **Етапи 3, 4, 5** — 3 перед 5 (Kafka messages); 4 перед 5 і 6 (state).
-- **Етапи 5 → 6 → 7** — consumers → aggregation → persistence.
-- **Етапи 7 → 8** — repositories перед REST.
-- **Етапи 4, 6 → 9** — state + snapshot для WebSocket.
-- **Етапи 8, 9 → 11** — API та WS перед UI.
-- **Етап 10** — можна впроваджувати поступово після 3 і 5.
-- **Етап 12** — після готовності 3–11.
+### Поточний статус
+- ✅ **Етап 0** — ГОТОВО (Maven multi-module structure)
+- ✅ **Етап 1** — ЧАСТКОВО (Kafka DTO є, потрібні REST DTO)
+- ❌ **Етап 2** — TO DO (Infrastructure)
+- ✅ **Етап 3** — ГОТОВО (UDP Library + udp-ingest-service)
+- ❌ **Етапи 4-12** — TO DO
+
+### Рекомендований порядок реалізації
+
+#### **Stage 1: Foundation (можна почати зараз)**
+1. **Етап 1 (завершити):** REST/WebSocket DTOs в telemetry-api-contracts
+2. **Етап 2:** Infrastructure (docker-compose, DDL scripts)
+3. **Етап 3 (опційно):** Docker image для udp-ingest-service
+
+**Результат:** Повна інфраструктура готова для розробки processing service
+
+---
+
+#### **Stage 2: Core Processing Logic**
+4. **Етап 4:** State Management (SessionRuntimeState, FSM transitions)
+5. **Етап 5:** Kafka Consumers + Idempotency
+6. **Етап 7:** Persistence Layer (JPA entities, repositories)
+
+**Результат:** Дані з Kafka зберігаються в БД з коректним state management
+
+---
+
+#### **Stage 3: Business Aggregation**
+7. **Етап 6:** Aggregation (LapAggregator, SessionSummaryAggregator, RawTelemetryWriter)
+
+**Результат:** Laps, sectors, summary коректно агрегуються
+
+---
+
+#### **Stage 4: API Layer**
+8. **Етап 8:** REST API (SessionController, endpoints)
+9. **Етап 9:** WebSocket Live (STOMP, snapshot broadcasting)
+
+**Результат:** Backend API готове для UI
+
+---
+
+#### **Stage 5: Frontend**
+10. **Етап 11:** React SPA (UI для live dashboard та історії)
+
+**Результат:** Повний end-to-end MVP
+
+---
+
+#### **Stage 6: Production Readiness**
+11. **Етап 10:** Observability (metrics, health checks, logging)
+12. **Етап 12:** Final Validation (scenarios, end-to-end testing)
+
+**Результат:** Production-ready MVP
+
+---
+
+### Паралелізація
+
+**Можна робити паралельно:**
+- Етап 1 (REST DTOs) + Етап 2 (Infrastructure) — різні файли, не конфліктують
+- Етап 4 (State) + Етап 7 (Repositories) — незалежні шари
+- Етап 8 (REST) + Етап 9 (WebSocket) — різні endpoints
+
+**Залежності (must be sequential):**
+- Етап 1 → Етапи 4, 5, 8, 9 (потрібні DTOs)
+- Етап 2 → Етапи 5, 6, 7 (потрібна БД і Kafka)
+- Етап 4 → Етап 5 (consumers потребують state manager)
+- Етап 5 → Етап 6 (aggregation потребує consumers)
+- Етап 6, 7 → Етап 8 (REST потребує repositories та aggregates)
+- Етап 4, 6 → Етап 9 (WebSocket потребує state + snapshots)
+- Етапи 8, 9 → Етап 11 (UI потребує API)
+
+---
+
+### Оціночний час виконання (залишається)
+
+| Етап | Опис | Час | Пріоритет |
+|------|------|-----|-----------|
+| 1 (finish) | REST/WS DTOs | 4-6 год | HIGH |
+| 2 | Infrastructure | 6-8 год | HIGH |
+| 3 (optional) | Docker image ingest | 1 год | LOW |
+| 4 | State Management | 10-12 год | HIGH |
+| 5 | Kafka Consumers | 8-10 год | HIGH |
+| 6 | Aggregation | 12-15 год | HIGH |
+| 7 | Persistence | 8-10 год | HIGH |
+| 8 | REST API | 6-8 год | HIGH |
+| 9 | WebSocket | 8-10 год | HIGH |
+| 10 | Observability | 4-6 год | MEDIUM |
+| 11 | React UI | 20-30 год | HIGH |
+| 12 | Validation | 6-8 год | HIGH |
+
+**Загальний залишковий час:** ~90-120 годин (UDP Library зекономила ~30-40 годин)
 
 ---
 
