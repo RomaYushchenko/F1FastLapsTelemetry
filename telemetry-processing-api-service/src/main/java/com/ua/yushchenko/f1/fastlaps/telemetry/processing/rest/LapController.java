@@ -27,8 +27,8 @@ public class LapController {
      */
     @GetMapping("/laps")
     public List<LapResponseDto> getLaps(
-            @PathVariable Long sessionUid,
-            @RequestParam(defaultValue = "0") Short carIndex
+            @PathVariable("sessionUid") Long sessionUid,
+            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
         log.debug("Get laps: sessionUid={}, carIndex={}", sessionUid, carIndex);
         
@@ -43,8 +43,8 @@ public class LapController {
      */
     @GetMapping("/sectors")
     public List<LapResponseDto> getSectors(
-            @PathVariable Long sessionUid,
-            @RequestParam(defaultValue = "0") Short carIndex
+            @PathVariable("sessionUid") Long sessionUid,
+            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
         log.debug("Get sectors: sessionUid={}, carIndex={}", sessionUid, carIndex);
         

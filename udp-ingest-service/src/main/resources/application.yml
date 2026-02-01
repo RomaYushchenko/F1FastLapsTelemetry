@@ -22,3 +22,7 @@ f1:
       throttle:
         enabled: true
         permits-per-second: 100
+
+logging:
+  level:
+    com.ua.yushchenko.f1.fastlaps: DEBUG

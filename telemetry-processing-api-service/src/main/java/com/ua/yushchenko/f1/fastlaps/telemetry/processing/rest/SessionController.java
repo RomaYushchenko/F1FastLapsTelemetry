@@ -32,8 +32,8 @@ public class SessionController {
      */
     @GetMapping
     public List<SessionDto> listSessions(
-            @RequestParam(defaultValue = "0") int offset,
-            @RequestParam(defaultValue = "50") int limit
+            @RequestParam(name = "offset", defaultValue = "0") int offset,
+            @RequestParam(name = "limit", defaultValue = "50") int limit
     ) {
         log.debug("List sessions: offset={}, limit={}", offset, limit);
         

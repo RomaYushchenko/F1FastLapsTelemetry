@@ -25,8 +25,8 @@ public class SessionSummaryController {
      */
     @GetMapping("/summary")
     public ResponseEntity<SessionSummaryDto> getSummary(
-            @PathVariable Long sessionUid,
-            @RequestParam(defaultValue = "0") Short carIndex
+            @PathVariable("sessionUid") Long sessionUid,
+            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
         log.debug("Get summary: sessionUid={}, carIndex={}", sessionUid, carIndex);
         
