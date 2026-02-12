@@ -6,6 +6,8 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+f1:
   telemetry:
     udp:
       enabled: true
@@ -20,5 +22,7 @@ spring:
       throttle:
         enabled: true
         permits-per-second: 100
+
+logging:
   level:
     com.ua.yushchenko.f1.fastlaps: DEBUG
