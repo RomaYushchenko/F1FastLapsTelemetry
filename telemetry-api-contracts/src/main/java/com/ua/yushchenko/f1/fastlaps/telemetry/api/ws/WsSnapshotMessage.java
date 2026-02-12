@@ -26,6 +26,8 @@ public class WsSnapshotMessage {
     private Integer engineRpm;
     private Float throttle;
     private Float brake;
+    /** DRS active (from car status); null if not yet received */
+    private Boolean drs;
     private Integer currentLap;
     private Integer currentSector;
 }

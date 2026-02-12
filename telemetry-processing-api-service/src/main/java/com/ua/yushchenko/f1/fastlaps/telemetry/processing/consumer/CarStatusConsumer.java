@@ -67,6 +67,12 @@ public class CarStatusConsumer {
             log.debug("Car status: sessionUid={}, carIndex={}, fuel={}, drsAllowed={}",
                     sessionUid, carIndex, status.getFuelInTank(), status.getDrsAllowed());
 
+            // Update live snapshot with DRS for WebSocket (same carIndex as telemetry snapshot)
+            SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
+            if (snapshot != null) {
+                snapshot.setDrs(Boolean.TRUE.equals(status.getDrsAllowed()));
+            }
+
             // TODO (Етап 6): Pass to RawTelemetryWriter for batch insert into car_status_raw
 
             acknowledgment.acknowledge();

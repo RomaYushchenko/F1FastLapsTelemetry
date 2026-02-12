@@ -5,9 +5,7 @@ spring:
     bootstrap-servers: localhost:9092
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-
-f1:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializerf1:
   telemetry:
     udp:
       enabled: true
@@ -21,8 +19,6 @@ f1:
         initial-backoff-ms: 100
       throttle:
         enabled: true
-        permits-per-second: 100
-
-logging:
+        permits-per-second: 100logging:
   level:
     com.ua.yushchenko.f1.fastlaps: DEBUG

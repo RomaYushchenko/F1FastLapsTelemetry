@@ -72,6 +72,13 @@ public class LapDataConsumer {
             // Pass to LapAggregator for sector/lap finalization
             lapAggregator.processLapData(sessionUid, carIndex, lap);
 
+            // Update live snapshot with current lap/sector for WebSocket
+            SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
+            if (snapshot != null) {
+                snapshot.setCurrentLap(lap.getLapNumber());
+                snapshot.setCurrentSector(lap.getSector() != null ? lap.getSector() : 0);
+            }
+
             acknowledgment.acknowledge();
         } catch (Exception e) {
             log.error("Error processing lap data", e);

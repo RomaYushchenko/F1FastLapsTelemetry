@@ -1,6 +1,7 @@
 # F1 FastLaps Telemetry — Implementation Progress Report
 
-> **Last Updated:** February 1, 2026  
+> **Last Updated:** February 11, 2026  
+> **Порядок етапів:** MVP спочатку (11 → 12), Observability (10) — після MVP.  
 > **Purpose:** Track implementation progress against [implementation_steps_plan.md](implementation_steps_plan.md)
 
 ---
@@ -21,9 +22,9 @@
 | Stage 7: Persistence | ✅ Complete | 100% | 8 files | JPA entities, repositories |
 | Stage 8: REST API | ✅ Complete | 100% | 4 files | Session, lap, summary endpoints |
 | Stage 9: WebSocket | ✅ Complete | 100% | 5 files | STOMP, 10Hz broadcast |
-| Stage 10: Observability | ❌ Not Started | 0% | — | Metrics, health checks |
-| Stage 11: React UI | ❌ Not Started | 0% | — | Frontend implementation |
-| Stage 12: Final Testing | ❌ Not Started | 0% | — | Integration tests |
+| Stage 11: React UI | ❌ Not Started | 0% | — | **Наступний крок** — frontend |
+| Stage 12: Final Testing | ❌ Not Started | 0% | — | MVP validation |
+| Stage 10: Observability | ❌ Not Started | 0% | — | Після MVP — metrics, health |
 
 **Key Metrics:**
 - ✅ **36 Java files** in telemetry-processing-api-service
@@ -304,31 +305,33 @@
 
 ## Remaining Work
 
-### ❌ Stage 10: Observability (NOT STARTED)
+*Порядок виконання: спочатку MVP (Stage 11 → Stage 12), потім Observability (Stage 10).*
 
-**Required Steps:**
-- Metrics: UDP packets, Kafka lag, packet loss
-- Health checks: Kafka, Database
-- Structured logging
-- Spring Actuator endpoints
+### ❌ Stage 11: React UI (NOT STARTED) — **наступний крок**
 
-**Estimated Effort:** 4-6 hours
-
----
-
-### ❌ Stage 11: React UI (NOT STARTED)
+**Plan reference:** [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) — перелік live-віджетів та історичних діаграм, джерела даних, критерії готовності. Детальний опис та макети: **План реалізації діаграм телеметрії EA SPORTS F1 25.pdf**.
 
 **Required Components:**
-- Session list screen
-- Live dashboard with WebSocket
-- Historical lap analysis
-- Session summary view
+
+| Step | Component | Data source | Criterion (see telemetry_diagrams_plan) |
+|------|-----------|-------------|----------------------------------------|
+| 11.1–11.2 | React project, routing, API client | — | Pages: /, /sessions, /sessions/:id; data from REST |
+| 11.3 | WebSocket connection for Live | /ws/live, SUBSCRIBE | Snapshot received |
+| 11.4 / 11.4a–e | **Live dashboard: telemetry widgets** | WebSocket SNAPSHOT | Speed, RPM, Gear, Throttle, Brake, DRS, Current lap/Sector (§3) |
+| 11.5 | Session list | GET /api/sessions | Table/cards |
+| 11.6–11.8 | Session Detail: laps table, sectors, summary | REST laps, summary | Best lap/sectors highlighted (§4.1–4.3) |
+| 11.9 (optional) | Historical telemetry chart | GET .../telemetry? (if endpoint exists) | Chart per plan (§4.4) |
+
+**Checklist (telemetry_diagrams_plan §7):**
+- [ ] All live widgets 3.1–3.7 display and update from WebSocket
+- [ ] Session Detail: summary, laps table, sectors match contract and plan
+- [ ] Best lap and best sectors visually highlighted
 
 **Estimated Effort:** 20-30 hours
 
 ---
 
-### ❌ Stage 12: Final Testing & Validation (NOT STARTED)
+### ❌ Stage 12: Final Testing & Validation MVP (NOT STARTED)
 
 **Required Tests:**
 - End-to-end integration tests
@@ -337,6 +340,20 @@
 - Performance testing
 
 **Estimated Effort:** 8-12 hours
+
+---
+
+### ❌ Stage 10: Observability (після MVP, NOT STARTED)
+
+Виконується **після** завершення Етапів 11 та 12.
+
+**Required Steps:**
+- Metrics: UDP packets, Kafka lag, packet loss
+- Health checks: Kafka, Database
+- Structured logging
+- Spring Actuator endpoints
+
+**Estimated Effort:** 4-6 hours
 
 ---
 
@@ -408,28 +425,31 @@ All core architecture principles maintained:
 
 ## Next Steps
 
-### Immediate (Stage 10)
+*Етап 10 (Observability) перенесено після MVP. Спочатку — Етап 11 (UI), потім Етап 12 (Validation), потім Етап 10.*
+
+### Immediate — наступний крок (Stage 11: React UI)
+
+1. Create React project structure (routing, API client)
+2. Implement session list component
+3. Add WebSocket client connection for live data
+4. Build live dashboard UI with **telemetry widgets** per [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) §3 (Speed, RPM, Gear, Throttle, Brake, DRS, Lap/Sector)
+5. Session Detail: summary block, laps table with best lap/sector highlighting, sectors view (§4)
+6. (Optional) Historical telemetry chart if endpoint and PDF plan require it
+
+### Short Term (Stage 12: Final Validation MVP)
+
+1. End-to-end testing with F1 game
+2. Performance validation
+3. Error scenario testing
+
+### After MVP (Stage 10: Observability)
 
 1. Add Spring Actuator dependency
 2. Configure health checks for Kafka and DB
 3. Add Micrometer metrics
 4. Implement custom metrics collectors
 5. Test `/actuator/health` and `/actuator/metrics`
-
-### Short Term (Stage 11)
-
-1. Create React project structure
-2. Implement session list component
-3. Add WebSocket client connection
-4. Build live dashboard UI
-5. Add lap analysis views
-
-### Long Term (Stage 12)
-
-1. End-to-end testing with F1 game
-2. Performance optimization
-3. Documentation updates
-4. Deployment preparation
+6. Documentation updates, deployment preparation
 
 ---
 
@@ -437,10 +457,11 @@ All core architecture principles maintained:
 
 ### Files to Update
 
-1. ✅ **This file** - Created to track progress
-2. ⚠️ `implementation_steps_plan.md` - Add Stage 8-9 completion markers
-3. ⚠️ `f_1_telemetry_project_architecture.md` - Verify alignment
-4. ⚠️ Module READMEs - Update with actual implementation details
+1. ✅ **This file** - Created to track progress; updated Feb 11, 2026 with Stage 11 diagram refs
+2. ✅ **telemetry_diagrams_plan.md** - Added (Feb 11, 2026): plan for live widgets and historical diagrams; references PDF
+3. ✅ **documentation_index.md**, **implementation_steps_plan.md**, **react_spa_ui_architecture.md** - Updated with diagram plan and PDF references
+4. ⚠️ `f_1_telemetry_project_architecture.md` - Verify alignment
+5. ⚠️ Module READMEs - Update with actual implementation details
 
 ---
 

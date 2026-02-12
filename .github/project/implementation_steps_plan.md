@@ -31,6 +31,8 @@ rest_web_socket_api_contracts_f_1_telemetry.md
         │
         ▼
 react_spa_ui_architecture.md
+        │
+        +----> telemetry_diagrams_plan.md  ◄──  План реалізації діаграм телеметрії EA SPORTS F1 25.pdf
 ```
 
 ---
@@ -46,6 +48,8 @@ react_spa_ui_architecture.md
 | **telemetry_error_and_lifecycle_contract.md** | Lifecycle та помилки між шарами | Session lifecycle, timeout → endReason |
 | **rest_web_socket_api_contracts_f_1_telemetry.md** | REST та WebSocket API | Backend API, React SPA |
 | **react_spa_ui_architecture.md** | Архітектура React SPA, екрани, layout (wireframe), потік даних | Реалізація UI, маршрути, компоненти |
+| **telemetry_diagrams_plan.md** | План діаграм телеметрії: live-віджети, історичні діаграми, джерела даних | Етап 11 — перелік візуалізацій, критерії готовності |
+| **План реалізації діаграм телеметрії EA SPORTS F1 25.pdf** | Детальний опис діаграм, макети, вимоги (первинне джерело) | Узгодження з telemetry_diagrams_plan та UI |
 | **backend_implementation_plan_f_1_telemetry.md** | Фази реалізації бекенду | Послідовність Phase 0–11 |
 | **code_skeleton_java_packages_interfaces.md** | Пакети Java, інтерфейси, модулі | Структура коду, імена класів |
 | **documentation_index.md** | Індекс та навігація по документах | Швидкий пошук секцій |
@@ -408,7 +412,9 @@ react_spa_ui_architecture.md
 
 ---
 
-### Етап 10. Observability
+### Етап 10. Observability *(після MVP)*
+
+> **Порядок виконання:** Етап 10 виконується **після** завершення MVP (після Етапів 11 та 12). Спочатку реалізуємо UI та фінальну валідацію, потім — метрики та health checks для production.
 
 | # | Крок | Дії | Критерій готовності |
 |---|------|-----|---------------------|
@@ -423,17 +429,42 @@ react_spa_ui_architecture.md
 
 ### Етап 11. React SPA (UI)
 
+> **План діаграм телеметрії:** перелік live-віджетів та історичних діаграм, джерела даних і критерії готовності — у [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md). Детальний опис та макети — у [План реалізації діаграм телеметрії EA SPORTS F1 25.pdf](План%20реалізації%20діаграм%20телеметрії%20EA%20SPORTS%20F1%2025.pdf).  
+> **Деталі протоколу WebSocket (STOMP)** та змінні оточення — у [react_spa_ui_architecture.md § 4.4](react_spa_ui_architecture.md#44-websocket-протокол-stomp-деталі-для-етапу-11).  
+> **Стиль та елементи інтерфейсу:** кольори, типографіка, компоненти по екранах — у [ui_ux_specification.md](ui_ux_specification.md).
+
+#### 11.0 Передумови (backend, якщо ще не зроблено)
+
+| # | Крок | Дії | Критерій готовності |
+|---|------|-----|---------------------|
+| 11.0a | DRS у snapshot | Додати поле `drs` (Boolean) у `WsSnapshotMessage` та `CarSnapshot`; у `CarStatusConsumer` оновлювати snapshot.drs з `payload.drsAllowed` | SNAPSHOT містить drs; віджет DRS показує ON/OFF |
+| 11.0b | currentLap/currentSector у snapshot | У `LapDataConsumer` після `processLapData` оновлювати `state.getSnapshot(carIndex)` з `lapNumber` та `sector` з LapDto | SNAPSHOT містить currentLap, currentSector |
+
+#### Кроки UI
+
 | # | Крок | Дії | Критерій готовності |
 |---|------|-----|---------------------|
 | 11.1 | Проєкт React (Vite/CRA) | Базова структура, роутинг | Сторінки: /, /sessions, /sessions/:id |
-| 11.2 | API client | fetch/axios до /api/sessions, /api/sessions/:id/laps, /summary | Дані приходять |
-| 11.3 | Live dashboard: підключення WebSocket | /ws/live, subscribe по sessionUID | Отримання snapshot |
-| 11.4 | Live dashboard: відображення Speed, RPM, Gear, Throttle, Brake, DRS | Компоненти + state з WS | Оновлення в реальному часі |
-| 11.5 | Сторінка списку сесій | GET /api/sessions, таблиця/картки | Список сесій |
-| 11.6 | Сторінка сесії: таблиця кіл | GET /api/sessions/:id/laps | Best lap highlight |
-| 11.7 | Сторінка сесії: сектори | GET /api/sessions/:id/sectors або з laps | Fastest S1/S2/S3 + lap number |
-| 11.8 | Сторінка сесії: summary | GET /api/sessions/:id/summary | Best lap, best sectors |
-| 11.9 | (Опційно) Графік speed/rpm по часу | GET telemetry?from=&to=&metric= | Графік |
+| 11.2 | API client | fetch/axios до /api/sessions, /api/sessions/:id/laps, /summary | Дані приходять; base URL з `VITE_API_BASE_URL` (default `http://localhost:8080`) |
+| 11.3 | Live dashboard: підключення WebSocket | **SockJS + STOMP**: endpoint `/ws/live`, відправка SUBSCRIBE на `/app/subscribe`, підписка на `/topic/live/{sessionUID}` та `/user/queue/errors` | Отримання SNAPSHOT; обробка SESSION_ENDED та ERROR |
+| 11.4 | **Live dashboard: віджети телеметрії (згідно з планом діаграм)** | Speed, RPM, Gear, Throttle, Brake, DRS, Current lap/Sector — дані з WS SNAPSHOT | Усі віджети з [telemetry_diagrams_plan.md §3](telemetry_diagrams_plan.md#3-live-віджети-live-dashboard) оновлюються ~10 Hz |
+| 11.4a | Віджет Speed | speedKph, одиниця km/h | Велике число, оновлення в реальному часі |
+| 11.4b | Віджет RPM | engineRpm | Число; опційно progress bar / redline |
+| 11.4c | Віджети Gear, Throttle, Brake, DRS | gear, throttle, brake, drs | Формат згідно з планом діаграм та wireframe; якщо drs null — показувати "—" |
+| 11.4d | Current lap / Sector | currentLap, currentSector | Текст типу "Lap 5 · Sector 2"; якщо null — "—" |
+| 11.4e | Стан "немає активной сесії" | — | Повідомлення + посилання на /sessions |
+| 11.5 | Сторінка списку сесій | GET /api/sessions?offset=0&limit=50, таблиця/картки | Колонки: session (short UID або дата), type, track, started, ended, state (ACTIVE/FINISHED) |
+| 11.6 | Сторінка сесії: таблиця кіл | GET /api/sessions/:id/laps?carIndex=0 | Best lap row виділена; колонки Lap, Time (формат M:SS.mmm з lapTimeMs), S1, S2, S3, Valid |
+| 11.7 | Сторінка сесії: сектори | GET /api/sessions/:id/sectors або дані з laps | Best S1/S2/S3: час з summary; номер кола — обчислити з laps (lap, де sectorXMs = bestSectorXMs) |
+| 11.8 | Сторінка сесії: summary | GET /api/sessions/:id/summary?carIndex=0 | Best lap time (M:SS.mmm) + bestLapNumber; best S1/S2/S3 (сек) + lap number; totalLaps |
+| 11.9 | **(Опційно MVP) Історичний графік телеметрії** | GET /api/sessions/{uid}/telemetry?from=&to=&metric= (якщо endpoint є) | Графік speed/rpm по часу; вибір метрики та діапазону. Див. [telemetry_diagrams_plan.md §4.4](telemetry_diagrams_plan.md#4-історичні-діаграми-та-таблиці-session-detail) |
+
+#### Додаткові деталі для реалізації
+
+- **Формат часу:** lapTimeMs, sectorXMs — у мілісекундах; відображати як `M:SS.mmm` (наприклад 86210 → "1:26.210").
+- **Track:** API повертає `trackId` (number); UI показує trackId або опційну мапу trackId → назва траси (наприклад 12 → "Monaco") за власним словником.
+- **Активна сесія:** GET /api/sessions/active — 200 + SessionDto або 204 No Content; при 200 зберегти sessionUID і підключити WebSocket.
+- **Помилки WS:** підписка на `/user/queue/errors`; код `SESSION_NOT_ACTIVE` — показати "Session is not active", перейти до стану "no active session".
 
 ---
 
@@ -449,7 +480,7 @@ react_spa_ui_architecture.md
 
 ---
 
-## Частина 4. Порядок виконання (оновлено February 1, 2026)
+## Частина 4. Порядок виконання (оновлено February 11, 2026)
 
 ### Поточний статус
 - ✅ **Етап 0** — ГОТОВО (Maven multi-module structure)
@@ -462,11 +493,11 @@ react_spa_ui_architecture.md
 - ✅ **Етап 7** — ГОТОВО (Persistence: JPA entities + repositories)
 - ✅ **Етап 8** — ГОТОВО (REST API: 4 controllers, all endpoints)
 - ✅ **Етап 9** — ГОТОВО (WebSocket: STOMP, 10 Hz broadcast)
-- ❌ **Етап 10** — TO DO (Observability)
-- ❌ **Етап 11** — TO DO (React UI)
-- ❌ **Етап 12** — TO DO (Final Validation)
+- ❌ **Етап 11** — TO DO (React UI) ← **наступний крок**
+- ❌ **Етап 12** — TO DO (Final Validation MVP)
+- ❌ **Етап 10** — TO DO після MVP (Observability)
 
-**Backend Implementation: 75% Complete**
+**Backend Implementation: 75% Complete.** Порядок: спочатку MVP (Етап 11 → Етап 12), потім Observability (Етап 10).
 
 ### Вже реалізовано (Stages 0-9)
 
@@ -504,10 +535,38 @@ react_spa_ui_architecture.md
 
 ---
 
-### Залишається реалізувати (Stages 10-12)
+### Залишається реалізувати (MVP спочатку, Observability після)
 
-#### ❌ **Stage 5: Observability (NOT STARTED)**
-11. **Етап 10:** Observability (metrics, health checks, logging)
+#### ❌ **Stage 5: Frontend — наступний крок (NOT STARTED)**
+11. **Етап 11:** React SPA (UI для live dashboard та історії)
+   - Session list screen
+   - Live dashboard з WebSocket та **віджетами телеметрії** (Speed, RPM, Gear, Throttle, Brake, DRS, Lap/Sector) — згідно з [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) та PDF планом діаграм
+   - Session Detail: таблиця кіл, сектори, summary; best lap/sectors виділені
+   - Опційно: історичний графік телеметрії (залежить від endpoint та PDF)
+
+**Результат:** Повний end-to-end MVP
+
+**Джерела для діаграм:** [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md), [План реалізації діаграм телеметрії EA SPORTS F1 25.pdf](План%20реалізації%20діаграм%20телеметрії%20EA%20SPORTS%20F1%2025.pdf)
+
+**Estimated Effort:** 20-30 hours
+
+---
+
+#### ❌ **Stage 6: Testing & Validation MVP (NOT STARTED)**
+12. **Етап 12:** Final Validation MVP (scenarios, end-to-end testing)
+   - Integration tests
+   - F1 game testing scenarios
+   - Performance validation
+   - Error handling verification
+
+**Результат:** MVP готовий до використання
+
+**Estimated Effort:** 6-8 hours
+
+---
+
+#### ❌ **Stage 7: Observability (після MVP, NOT STARTED)**
+13. **Етап 10:** Observability (metrics, health checks, logging) — виконується **після** Етапів 11 та 12
    - Spring Actuator endpoints
    - Micrometer metrics
    - Health indicators for Kafka and DB
@@ -519,39 +578,7 @@ react_spa_ui_architecture.md
 
 ---
 
-#### ❌ **Stage 6: Frontend (NOT STARTED)**
-12. **Етап 11:** React SPA (UI для live dashboard та історії)
-   - Session list screen
-   - Live dashboard with WebSocket
-   - Historical lap analysis
-   - Session summary view
-
-**Результат:** Повний end-to-end MVP
-
-**Estimated Effort:** 20-30 hours
-
----
-
-#### ❌ **Stage 7: Testing & Validation (NOT STARTED)**
-13. **Етап 12:** Final Validation (scenarios, end-to-end testing)
-   - Integration tests
-   - F1 game testing scenarios
-   - Performance validation
-   - Error handling verification
-
-**Результат:** Production-ready MVP
-
-**Estimated Effort:** 6-8 hours
-
----
-
-### Паралелізація
-
-**Можна робити паралельно:**
-- ~~Етап 1 (REST DTOs) + Етап 2 (Infrastructure)~~ ✅ DONE
-- ~~Етап 4 (State) + Етап 7 (Repositories)~~ ✅ DONE
-- ~~Етап 8 (REST) + Етап 9 (WebSocket)~~ ✅ DONE
-- **Етап 10 (Observability) + Етап 11 (React UI)** ← Можна робити паралельно
+### Паралелізація та порядок
 
 **Залежності (must be sequential):**
 - ~~Етап 1 → Етапи 4, 5, 8, 9~~ ✅ DONE
@@ -560,8 +587,9 @@ react_spa_ui_architecture.md
 - ~~Етап 5 → Етап 6~~ ✅ DONE
 - ~~Етап 6, 7 → Етап 8~~ ✅ DONE
 - ~~Етап 4, 6 → Етап 9~~ ✅ DONE
-- Етапи 8, 9 → Етап 11 (UI потребує API) ← **READY TO START**
-- Етапи 10, 11 → Етап 12 (Final testing потребує всі компоненти)
+- Етапи 8, 9 → **Етап 11** (UI) ← **READY TO START — наступний крок**
+- Етап 11 → **Етап 12** (Final validation MVP)
+- Етап 12 → **Етап 10** (Observability після MVP)
 
 ---
 
@@ -579,12 +607,12 @@ react_spa_ui_architecture.md
 | ~~7~~ | ~~Persistence~~ | ~~8-10 год~~ | ✅ | 0 |
 | ~~8~~ | ~~REST API~~ | ~~6-8 год~~ | ✅ | 0 |
 | ~~9~~ | ~~WebSocket~~ | ~~8-10 год~~ | ✅ | 0 |
-| 10 | Observability | 4-6 год | ❌ | **4-6 год** |
-| 11 | React UI | 20-30 год | ❌ | **20-30 год** |
-| 12 | Validation | 6-8 год | ❌ | **6-8 год** |
+| 11 | React UI | 20-30 год | ❌ | **20-30 год** ← наступний |
+| 12 | Validation MVP | 6-8 год | ❌ | **6-8 год** |
+| 10 | Observability (після MVP) | 4-6 год | ❌ | **4-6 год** |
 
 **Виконано:** ~100-125 годин  
-**Залишилося:** ~30-44 години  
+**Залишилося до MVP:** ~26-38 год (Етап 11 + 12). Після MVP: Етап 10 (4-6 год).  
 **Загальна економія:** UDP Library була реалізована окремо (~30-40 год)
 
 ---
@@ -593,7 +621,8 @@ react_spa_ui_architecture.md
 
 - [ ] UDP ingestion працює стабільно і публікує події в Kafka.
 - [ ] Дані сесії зберігаються в БД: raw telemetry (обмежено), laps + sectors + summary.
-- [ ] UI показує: live dashboard, список сесій, перегляд сесії з колами/секторами, fastest lap і fastest sectors з прив'язкою до номера кола.
+- [ ] UI показує: live dashboard з **віджетами телеметрії** (Speed, RPM, Gear, Throttle, Brake, DRS, Lap/Sector) згідно з [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md); список сесій; перегляд сесії з колами/секторами; fastest lap і fastest sectors з прив'язкою до номера кола.
+- [ ] Діаграми та віджети узгоджені з планом діаграм (PDF та telemetry_diagrams_plan).
 - [ ] Lifecycle детермінований: SSTA → ACTIVE → SEND/Timeout → ENDING → TERMINAL.
 - [ ] Локальний запуск одним docker-compose (infra + сервіси за бажанням у compose).
 
@@ -611,6 +640,8 @@ react_spa_ui_architecture.md
 | [state_machines_specification_f_1_telemetry.md](state_machines_specification_f_1_telemetry.md) | Session/Lap/Timeout FSM |
 | [rest_web_socket_api_contracts_f_1_telemetry.md](rest_web_socket_api_contracts_f_1_telemetry.md) | REST та WebSocket API |
 | [react_spa_ui_architecture.md](react_spa_ui_architecture.md) | Архітектура React SPA, екрани, layout, потік даних |
+| [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) | План діаграм телеметрії: live-віджети, історичні діаграми, критерії готовності |
+| [План реалізації діаграм телеметрії EA SPORTS F1 25.pdf](План%20реалізації%20діаграм%20телеметрії%20EA%20SPORTS%20F1%2025.pdf) | Детальний опис діаграм, макети (первинне джерело) |
 | [backend_implementation_plan_f_1_telemetry.md](backend_implementation_plan_f_1_telemetry.md) | Фази реалізації (Phase 0–11) |
 | [code_skeleton_java_packages_interfaces.md](code_skeleton_java_packages_interfaces.md) | Пакети Java, інтерфейси |
 
