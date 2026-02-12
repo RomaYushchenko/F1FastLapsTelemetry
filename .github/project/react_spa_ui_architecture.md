@@ -151,6 +151,13 @@ ui/
 - **Current lap / Sector** — з SNAPSHOT (`currentLap`, `currentSector`).
 - Якщо **немає активной сесії** — повідомлення замість даних; кнопка "View past sessions" → `/sessions`.
 
+#### 4.1.1 Діаграми та віджети телеметрії (Live)
+
+Перелік live-віджетів, поля з WebSocket SNAPSHOT та критерії готовності описані в **[telemetry_diagrams_plan.md](telemetry_diagrams_plan.md)** (розділ 3) та в **План реалізації діаграм телеметрії EA SPORTS F1 25.pdf**. Під час реалізації Етапу 11 слід дотримуватися цього плану:
+
+- **Speed** (speedKph), **RPM** (engineRpm), **Gear** (gear), **Throttle** (throttle), **Brake** (brake), **DRS** (drs), **Current lap / Sector** (currentLap, currentSector).
+- Оновлення ~10 Hz з backend; стани екрану: є активна сесія / немає активной сесії.
+
 ---
 
 ### 4.2 Session List (`/sessions`)
@@ -232,6 +239,31 @@ ui/
 - **Laps table:** Lap, Lap time, S1, S2, S3, Valid. Best lap row — highlight (наприклад, зірочка або фон). Best sector у колонці — виділення (наприклад, зірочка).
 - **Опційно (MVP мінімально):** графік Speed або RPM по часу для сесії — дані з `GET /api/sessions/{uid}/telemetry?from=&to=&metric=speedKph` якщо endpoint реалізовано.
 - Стани: **Loading** (окремо для session / laps / summary), **404** (session not found), **Error** (retry).
+
+#### 4.3.1 Діаграми телеметрії (історичні)
+
+Summary block, таблиця кіл, сектори та опційний графік по часу описані в **[telemetry_diagrams_plan.md](telemetry_diagrams_plan.md)** (розділ 4) та в **План реалізації діаграм телеметрії EA SPORTS F1 25.pdf**. Критерії готовності:
+
+- Summary: best lap time + lap number; best S1/S2/S3 + lap number; total laps.
+- Таблиця кіл: best lap row виділена; best sector у колонці виділений.
+- Історичний графік (якщо endpoint telemetry є) — згідно з планом діаграм.
+
+---
+
+### 4.4 WebSocket протокол (STOMP) — деталі для Етапу 11
+
+Backend використовує **STOMP over SockJS**. Клієнт (React) повинен:
+
+1. **Підключення:** SockJS до `{VITE_WS_URL}/ws/live` (наприклад `http://localhost:8080/ws/live`), потім поверх — STOMP-клієнт.
+2. **Відправка SUBSCRIBE:** надіслати повідомлення на **destination** `/app/subscribe` з тілом JSON:
+   ```json
+   { "type": "SUBSCRIBE", "sessionUID": 1234567890123, "carIndex": 0 }
+   ```
+3. **Отримання live-даних:** підписатися на **destination** `/topic/live/{sessionUID}` (наприклад `/topic/live/1234567890123`). Сервер надсилає туди повідомлення типу `SNAPSHOT` (10 Hz) та `SESSION_ENDED`.
+4. **Помилки:** підписатися на **destination** `/user/queue/errors`. Сервер надсилає туди повідомлення типу `ERROR` (наприклад код `SESSION_NOT_ACTIVE`).
+5. **Відправка UNSUBSCRIBE:** destination `/app/unsubscribe`, тіло `{ "type": "UNSUBSCRIBE" }`.
+
+Змінні оточення (приклад для Vite): `VITE_API_BASE_URL` (REST, default `http://localhost:8080`), `VITE_WS_URL` (для SockJS, default той самий origin, тобто `http://localhost:5173` у dev з proxy або `http://localhost:8080` якщо UI обслуговується з backend).
 
 ---
 
@@ -323,9 +355,11 @@ ui/
 | Документ | Що бере UI |
 |----------|-------------|
 | [rest_web_socket_api_contracts_f_1_telemetry.md](rest_web_socket_api_contracts_f_1_telemetry.md) | Повний контракт REST та WebSocket, формати запитів/відповідей |
+| [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) | План діаграм телеметрії: live-віджети, історичні діаграми, джерела даних, критерії готовності |
+| План реалізації діаграм телеметрії EA SPORTS F1 25.pdf | Детальний опис діаграм, макети (первинне джерело для візуалізацій) |
 | [mvp-requirements.md](mvp-requirements.md) | Scope фронтенду (розділ 6), критерії готовності MVP |
 | [f_1_telemetry_project_architecture.md](f_1_telemetry_project_architecture.md) | Місце UI в загальній архітектурі |
-| [implementation_steps_plan.md](implementation_steps_plan.md) | Кроки імплементації UI (Етап 11) |
+| [implementation_steps_plan.md](implementation_steps_plan.md) | Кроки імплементації UI (Етап 11), включно з підкроками для діаграм |
 
 ---
 

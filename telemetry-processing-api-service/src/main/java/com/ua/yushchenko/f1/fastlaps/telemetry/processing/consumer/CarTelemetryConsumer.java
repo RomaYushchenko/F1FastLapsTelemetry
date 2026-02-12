@@ -67,8 +67,14 @@ public class CarTelemetryConsumer {
 
             CarTelemetryDto telemetry = envelope.getPayload();
 
-            // Update snapshot for WebSocket live feed
-            SessionRuntimeState.CarSnapshot snapshot = new SessionRuntimeState.CarSnapshot();
+            // Update snapshot for WebSocket live feed.
+            // Important: reuse existing snapshot (if any) so that fields coming
+            // from other, lower-frequency packets (DRS, lap/sector, etc.) are
+            // preserved between telemetry updates.
+            SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
+            if (snapshot == null) {
+                snapshot = new SessionRuntimeState.CarSnapshot();
+            }
             snapshot.setSpeedKph(telemetry.getSpeedKph());
             snapshot.setGear(telemetry.getGear());
             snapshot.setEngineRpm(telemetry.getEngineRpm());

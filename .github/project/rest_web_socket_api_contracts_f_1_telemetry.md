@@ -201,10 +201,14 @@ Response:
   "engineRpm": 10832,
   "throttle": 0.91,
   "brake": 0.0,
+  "drs": false,
   "currentLap": 5,
   "currentSector": 2
 }
 ```
+
+- `drs` (boolean, optional): DRS active; may be null until first car status packet received.
+- `currentLap`, `currentSector`: from lap data; may be null until first lap packet.
 
 ---
 

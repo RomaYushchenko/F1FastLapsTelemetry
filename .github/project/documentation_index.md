@@ -8,13 +8,13 @@
 
 ## 📋 Implementation Status
 
-> **Last Updated:** February 1, 2026
+> **Last Updated:** February 12, 2026
 
-**Implementation Progress:** ✅ **75% Complete (9/12 stages)**
+**Implementation Progress:** ✅ **~85% Complete (Stages 0-9, 11 of 12)**
 
 - ✅ Stages 0-9: Backend complete (UDP Library, State Management, Kafka Consumers, Aggregation, Persistence, REST API, WebSocket)
+- ✅ Stage 11: React UI complete (live dashboard, sessions list/detail, initial pace & pedal charts)
 - ❌ Stage 10: Observability (TO DO)
-- ❌ Stage 11: React UI (TO DO)
 - ❌ Stage 12: Final Testing (TO DO)
 
 **See:** [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md) for detailed tracking
@@ -49,6 +49,22 @@
 8. **react_spa_ui_architecture.md**  
    Архітектура React SPA: екрани, layout (wireframe), потік даних (REST + WebSocket), структура компонентів та як це виглядає для користувача.
 
+9. **telemetry_diagrams_plan.md** ⭐ (План діаграм)  
+   Чіткий план діаграм телеметрії: live-віджети та історичні діаграми, джерела даних, критерії готовності. Референс для Етапу 11 (React UI). Детальний опис та макети — у PDF нижче.
+
+10. **ui_ux_specification.md** ⭐ (UI/UX специфікація)  
+   Зовнішній вигляд і стиль фронтенду: кольори, типографіка, відступи, опис елементів по екранах, переиспользуємі компоненти. Використовувати при реалізації Етапу 11 разом із [react_spa_ui_architecture.md](react_spa_ui_architecture.md) та [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md).
+
+---
+
+## Зовнішні джерела та план діаграм телеметрії
+
+| Джерело | Призначення |
+|---------|-------------|
+| **План реалізації діаграм телеметрії EA SPORTS F1 25.pdf** | Первинне джерело: перелік діаграм, макети, додаткові вимоги до візуалізацій телеметрії для F1 25. Використовується разом із [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) при реалізації UI (Етап 11). |
+| **[telemetry_diagrams_plan.md](telemetry_diagrams_plan.md)** | Витяг і чеклист: категорії візуалізацій (live vs історичні), джерела даних, порядок імплементації, зв'язок з implementation_steps_plan. |
+| **[ui_ux_specification.md](ui_ux_specification.md)** | Специфікація UI/UX: дизайн-токени, стиль елементів, екрани, компоненти. Референс для реалізації React SPA (Етап 11). |
+
 ---
 
 ## Documentation Dependency Graph
@@ -76,7 +92,10 @@
 [rest_web_socket_api_contracts_f_1_telemetry]
         |
         v
-[react_spa_ui_architecture]
+[react_spa_ui_architecture] ------> [telemetry_diagrams_plan]  (діаграми телеметрії)
+        |                                    ^
+        |                                    |
+        +------------------------------------+  (PDF: План реалізації діаграм телеметрії EA SPORTS F1 25)
 ```
 
 ### Пояснення
@@ -89,6 +108,7 @@
 - `telemetry_error_and_lifecycle_contract.md` уточнює та доповнює FSM.
 - `rest_web_socket_api_contracts_f_1_telemetry.md` є read-model проєкцією внутрішнього стану.
 - `react_spa_ui_architecture.md` описує реалізацію клієнта (React SPA) на основі REST/WS контрактів.
+- **`telemetry_diagrams_plan.md`** — план діаграм телеметрії (live-віджети, історичні діаграми); референс для Етапу 11. Детальний опис і макети — у PDF «План реалізації діаграм телеметрії EA SPORTS F1 25».
 
 ---
 
@@ -117,6 +137,60 @@
 ### 8. Reconnect та узгодження з backend
 ### 9. Нефункціональні вимоги (UI)
 ### 10. Посилання на суміжні документи
+
+---
+
+## telemetry_diagrams_plan.md ⭐ (План діаграм телеметрії)
+
+**Призначення документа**  
+Чіткий план візуалізацій телеметрії: live-віджети (Live Dashboard) та історичні діаграми/таблиці (Session Detail). Джерела даних, критерії готовності, порядок імплементації.
+
+**Первинне джерело (деталі, макети):** [План реалізації діаграм телеметрії EA SPORTS F1 25.pdf](План%20реалізації%20діаграм%20телеметрії%20EA%20SPORTS%20F1%2025.pdf)
+
+**Роль в архітектурі (glossary-aligned):**
+- *Reference для діаграм та віджетів UI*;
+- зв'язок між PDF-планом та Етапом 11 (React SPA).
+
+**Використовується для:**
+- реалізації Live Dashboard (Speed, RPM, Gear, Throttle, Brake, DRS, Lap/Sector);
+- реалізації Session Detail (summary, таблиця кіл, сектори, опційно графік);
+- чеклисту готовності діаграм у Stage 11/12.
+
+### 1. Призначення
+### 2. Категорії візуалізацій (Live vs Історичні)
+### 3. Live-віджети (Live Dashboard)
+### 4. Історичні діаграми та таблиці (Session Detail)
+### 5. Порядок імплементації (узгодження з Етапом 11)
+### 6. Залежності документів
+### 7. Чеклист готовності діаграм
+
+---
+
+## ui_ux_specification.md ⭐ (UI/UX специфікація)
+
+**Призначення документа**  
+Один документ для зовнішнього вигляду та стилю фронтенду: дизайн-токени (кольори, типографіка, відступи), опис елементів по екранах, переиспользуємі компоненти, стани (loading, empty, error). При реалізації Етапу 11 слід дотримуватися цієї специфікації.
+
+**Роль в архітектурі:**
+- *Single source of truth* для стилю та UX елементів React SPA;
+- доповнює [react_spa_ui_architecture.md](react_spa_ui_architecture.md) (layout, потік даних) та [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) (віджети, джерела даних).
+
+**Використовується для:**
+- вибору кольорів, шрифтів, відступів і радіусів;
+- реалізації Header, Live Dashboard віджетів, Session List, Session Detail у заданому стилі;
+- чеклисту готовності UI при Stage 11.
+
+**Розділ «Рішення від тебе» (§ 8):** опційні перевизначення (тема, акцентний колір, референси тощо).
+
+### 1. Призначення документа
+### 2. Дизайн-напрямок (пропозиція)
+### 3. Дизайн-токени (кольори, типографіка, відступи, тіні)
+### 4. Глобальний layout (Header, Main)
+### 5. Екрани та елементи (Live, Session List, Session Detail)
+### 6. Переиспользуємі компоненти (кнопки, картки, таблиці, progress bar)
+### 7. Адаптивність та доступність
+### 8. Рішення від тебе (опційно)
+### 9. Чеклист для реалізації
 
 ---
 
@@ -536,9 +610,7 @@
 **Використовується для:**
 - аудиту реалізації відносно плану;
 - виявлення technical debt та deviations;
-- планування залишкової роботи (Stages 10-12).
-
-### Executive Summary
+- планування залишкової роботи (Stages 10-12).### Executive Summary
 ### Detailed Progress by Stage
 - ✅ Stage 0-9: Complete with file counts and notes
 - ❌ Stage 10-12: Not started with estimates

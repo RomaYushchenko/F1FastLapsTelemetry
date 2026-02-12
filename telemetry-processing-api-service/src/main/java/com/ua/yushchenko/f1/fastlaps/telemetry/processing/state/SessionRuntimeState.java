@@ -119,6 +119,7 @@ public class SessionRuntimeState {
                 .engineRpm(snapshot.getEngineRpm())
                 .throttle(snapshot.getThrottle())
                 .brake(snapshot.getBrake())
+                .drs(snapshot.getDrs())
                 .currentLap(snapshot.getCurrentLap())
                 .currentSector(snapshot.getCurrentSector())
                 .build();
@@ -134,6 +135,8 @@ public class SessionRuntimeState {
         private Integer engineRpm;
         private Float throttle;
         private Float brake;
+        /** DRS active; set from CarStatusConsumer */
+        private Boolean drs;
         private Integer currentLap;
         private Integer currentSector;
         private Instant timestamp;
