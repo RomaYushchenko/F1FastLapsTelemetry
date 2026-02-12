@@ -51,11 +51,10 @@ export function SessionDetailPage() {
 
     try {
       const id = sessionUid
-      const [sessionRes, lapsRes, summaryRes, paceRes] = await Promise.all([
+      const [sessionRes, lapsRes, summaryRes] = await Promise.all([
         getSession(id),
         getSessionLaps(id, 0),
         getSessionSummary(id, 0),
-        getSessionPace(id),
       ])
 
       if (isCancelledRef.current) return
@@ -63,13 +62,26 @@ export function SessionDetailPage() {
       setSession(sessionRes)
       setLaps(lapsRes)
       setSummary(summaryRes)
-      setPacePoints(paceRes)
 
       const initialLapForTrace = summaryRes.bestLapNumber ?? (lapsRes[0]?.lapNumber ?? null)
       if (initialLapForTrace != null) {
         setSelectedLapForTrace(initialLapForTrace)
         void loadTrace(id, initialLapForTrace)
       }
+
+      // Pace API is optional: load it separately so that failures (e.g. 404/501)
+      // do not block the core session details from rendering.
+      void (async () => {
+        try {
+          const paceRes = await getSessionPace(id)
+          if (isCancelledRef.current) return
+          setPacePoints(paceRes)
+        } catch {
+          // Ignore pace errors for now; core session data is still usable.
+          // We intentionally do not change page `status` here.
+        }
+      })()
+
       setStatus('loaded')
     } catch (error) {
       if (isCancelledRef.current) return
