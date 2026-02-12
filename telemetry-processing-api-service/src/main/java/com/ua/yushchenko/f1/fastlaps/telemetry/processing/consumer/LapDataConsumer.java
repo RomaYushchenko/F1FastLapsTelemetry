@@ -72,12 +72,15 @@ public class LapDataConsumer {
             // Pass to LapAggregator for sector/lap finalization
             lapAggregator.processLapData(sessionUid, carIndex, lap);
 
-            // Update live snapshot with current lap/sector for WebSocket
+            // Update live snapshot with current lap/sector for WebSocket.
+            // Create snapshot if absent so lap/sector are preserved when telemetry packets merge into it later.
             SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
-            if (snapshot != null) {
-                snapshot.setCurrentLap(lap.getLapNumber());
-                snapshot.setCurrentSector(lap.getSector() != null ? lap.getSector() : 0);
+            if (snapshot == null) {
+                snapshot = new SessionRuntimeState.CarSnapshot();
+                state.updateSnapshot(carIndex, snapshot);
             }
+            snapshot.setCurrentLap(lap.getLapNumber());
+            snapshot.setCurrentSector(lap.getSector() != null ? lap.getSector() : 0);
 
             acknowledgment.acknowledge();
         } catch (Exception e) {
