@@ -493,11 +493,11 @@ react_spa_ui_architecture.md
 - ✅ **Етап 7** — ГОТОВО (Persistence: JPA entities + repositories)
 - ✅ **Етап 8** — ГОТОВО (REST API: 4 controllers, all endpoints)
 - ✅ **Етап 9** — ГОТОВО (WebSocket: STOMP, 10 Hz broadcast)
-- ❌ **Етап 11** — TO DO (React UI) ← **наступний крок**
+- ✅ **Етап 11** — ГОТОВО (React UI: live dashboard, sessions list/detail, pace & pedal charts)
 - ❌ **Етап 12** — TO DO (Final Validation MVP)
 - ❌ **Етап 10** — TO DO після MVP (Observability)
 
-**Backend Implementation: 75% Complete.** Порядок: спочатку MVP (Етап 11 → Етап 12), потім Observability (Етап 10).
+**Backend + UI Implementation: ~85% Complete.** Порядок: спочатку MVP (Етап 12), потім Observability (Етап 10).
 
 ### Вже реалізовано (Stages 0-9)
 
@@ -537,18 +537,14 @@ react_spa_ui_architecture.md
 
 ### Залишається реалізувати (MVP спочатку, Observability після)
 
-#### ❌ **Stage 5: Frontend — наступний крок (NOT STARTED)**
-11. **Етап 11:** React SPA (UI для live dashboard та історії)
-   - Session list screen
-   - Live dashboard з WebSocket та **віджетами телеметрії** (Speed, RPM, Gear, Throttle, Brake, DRS, Lap/Sector) — згідно з [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) та PDF планом діаграм
-   - Session Detail: таблиця кіл, сектори, summary; best lap/sectors виділені
-   - Опційно: історичний графік телеметрії (залежить від endpoint та PDF)
+#### ✅ **Stage 5: Frontend (COMPLETE)**
+11. **Етап 11:** React SPA (UI для live dashboard, історії та базових діаграм)
+   - Session list screen (таблиця сесій, стани loading/empty/error, hover/click по рядку).
+   - Live dashboard з WebSocket та **віджетами телеметрії** (Speed, RPM, Gear, Throttle, Brake, DRS, Lap/Sector) — згідно з [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) та PDF планом діаграм.
+   - Session Detail: summary-блок, таблиця кіл, сектори; best lap/sectors виділені; 404 UX + Retry.
+   - Додатково: базові діаграми темпу (pace chart) та педалей (throttle/brake trace) з окремих REST endpoint'ів.
 
-**Результат:** Повний end-to-end MVP
-
-**Джерела для діаграм:** [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md), [План реалізації діаграм телеметрії EA SPORTS F1 25.pdf](План%20реалізації%20діаграм%20телеметрії%20EA%20SPORTS%20F1%2025.pdf)
-
-**Estimated Effort:** 20-30 hours
+**Результат:** Повний end-to-end MVP по даним (UDP → Kafka → Processing → DB → REST/WS → React SPA).
 
 ---
 
@@ -607,12 +603,12 @@ react_spa_ui_architecture.md
 | ~~7~~ | ~~Persistence~~ | ~~8-10 год~~ | ✅ | 0 |
 | ~~8~~ | ~~REST API~~ | ~~6-8 год~~ | ✅ | 0 |
 | ~~9~~ | ~~WebSocket~~ | ~~8-10 год~~ | ✅ | 0 |
-| 11 | React UI | 20-30 год | ❌ | **20-30 год** ← наступний |
+| ~~11~~ | ~~React UI~~ | ~~20-30 год~~ | ✅ | 0 |
 | 12 | Validation MVP | 6-8 год | ❌ | **6-8 год** |
 | 10 | Observability (після MVP) | 4-6 год | ❌ | **4-6 год** |
 
-**Виконано:** ~100-125 годин  
-**Залишилося до MVP:** ~26-38 год (Етап 11 + 12). Після MVP: Етап 10 (4-6 год).  
+**Виконано:** ~120-150 годин  
+**Залишилося до MVP:** ~6-8 год (Етап 12). Після MVP: Етап 10 (4-6 год).  
 **Загальна економія:** UDP Library була реалізована окремо (~30-40 год)
 
 ---

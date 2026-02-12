@@ -1,6 +1,6 @@
 # F1 FastLaps Telemetry — Implementation Progress Report
 
-> **Last Updated:** February 11, 2026  
+> **Last Updated:** February 12, 2026  
 > **Порядок етапів:** MVP спочатку (11 → 12), Observability (10) — після MVP.  
 > **Purpose:** Track implementation progress against [implementation_steps_plan.md](implementation_steps_plan.md)
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-### Overall Status: 75% Complete (Stages 0-9 of 12)
+### Overall Status: ~85% Complete (Stages 0-9, 11 of 12)
 
 | Stage | Status | Completion | Files | Notes |
 |-------|--------|------------|-------|-------|
@@ -22,7 +22,7 @@
 | Stage 7: Persistence | ✅ Complete | 100% | 8 files | JPA entities, repositories |
 | Stage 8: REST API | ✅ Complete | 100% | 4 files | Session, lap, summary endpoints |
 | Stage 9: WebSocket | ✅ Complete | 100% | 5 files | STOMP, 10Hz broadcast |
-| Stage 11: React UI | ❌ Not Started | 0% | — | **Наступний крок** — frontend |
+| Stage 11: React UI | ✅ Complete | 100% | 30+ TSX/TS files | Live dashboard, sessions list/detail, pace & pedal charts |
 | Stage 12: Final Testing | ❌ Not Started | 0% | — | MVP validation |
 | Stage 10: Observability | ❌ Not Started | 0% | — | Після MVP — metrics, health |
 
@@ -307,27 +307,27 @@
 
 *Порядок виконання: спочатку MVP (Stage 11 → Stage 12), потім Observability (Stage 10).*
 
-### ❌ Stage 11: React UI (NOT STARTED) — **наступний крок**
+### ✅ Stage 11: React UI (COMPLETE)
 
 **Plan reference:** [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) — перелік live-віджетів та історичних діаграм, джерела даних, критерії готовності. Детальний опис та макети: **План реалізації діаграм телеметрії EA SPORTS F1 25.pdf**.
 
-**Required Components:**
+**Implemented Components (ui/ module):**
 
-| Step | Component | Data source | Criterion (see telemetry_diagrams_plan) |
-|------|-----------|-------------|----------------------------------------|
-| 11.1–11.2 | React project, routing, API client | — | Pages: /, /sessions, /sessions/:id; data from REST |
-| 11.3 | WebSocket connection for Live | /ws/live, SUBSCRIBE | Snapshot received |
-| 11.4 / 11.4a–e | **Live dashboard: telemetry widgets** | WebSocket SNAPSHOT | Speed, RPM, Gear, Throttle, Brake, DRS, Current lap/Sector (§3) |
-| 11.5 | Session list | GET /api/sessions | Table/cards |
-| 11.6–11.8 | Session Detail: laps table, sectors, summary | REST laps, summary | Best lap/sectors highlighted (§4.1–4.3) |
-| 11.9 (optional) | Historical telemetry chart | GET .../telemetry? (if endpoint exists) | Chart per plan (§4.4) |
+| Step | Component | Data source | Status |
+|------|-----------|-------------|--------|
+| 11.1–11.2 | React project (Vite+TS), routing, API client | — | ✅ Pages `/`, `/sessions`, `/sessions/:sessionUid`; typed REST client |
+| 11.3 | WebSocket connection for Live | `/ws/live`, STOMP SUBSCRIBE | ✅ `useLiveTelemetry` hook, session discovery via `GET /api/sessions/active` |
+| 11.4 / 11.4a–e | **Live dashboard: telemetry widgets** | WebSocket SNAPSHOT | ✅ Speed, RPM, Gear, Throttle, Brake, DRS, Current lap/Sector per §3 |
+| 11.5 | Session list | `GET /api/sessions` | ✅ Table with ACTIVE/FINISHED badge, hover/click row behaviour, error/loading/empty states |
+| 11.6–11.8 | Session Detail: summary, laps table, sectors | `GET /api/sessions/{uid}`, `/laps`, `/summary` | ✅ Summary with best lap + best S1/S2/S3 lap numbers; laps table with best lap/sector highlighting, 404 UX, retry |
+| 11.C | Pace & pedal trace charts | `GET /api/sessions/{uid}/pace`, `/laps/{lap}/trace` | ✅ Recharts-based pace chart + throttle/brake trace with lap selector |
 
 **Checklist (telemetry_diagrams_plan §7):**
-- [ ] All live widgets 3.1–3.7 display and update from WebSocket
-- [ ] Session Detail: summary, laps table, sectors match contract and plan
-- [ ] Best lap and best sectors visually highlighted
+- ✅ All live widgets 3.1–3.7 display and update from WebSocket.
+- ✅ Session Detail: summary, laps table, sectors match contract and plan (best lap & best sectors visually highlighted, lap numbers shown).
+- ✅ Initial historical-like charts implemented for lap pace and pedal trace (per PDF & план C); full raw-telemetry time graph remains optional.
 
-**Estimated Effort:** 20-30 hours
+**Next for UI:** only bugfix/visual polish as needed; no blocking gaps for MVP.
 
 ---
 
@@ -425,18 +425,9 @@ All core architecture principles maintained:
 
 ## Next Steps
 
-*Етап 10 (Observability) перенесено після MVP. Спочатку — Етап 11 (UI), потім Етап 12 (Validation), потім Етап 10.*
+*Етап 10 (Observability) перенесено після MVP. Stage 11 (UI) завершено; далі — Етап 12 (Validation), потім Етап 10.*
 
-### Immediate — наступний крок (Stage 11: React UI)
-
-1. Create React project structure (routing, API client)
-2. Implement session list component
-3. Add WebSocket client connection for live data
-4. Build live dashboard UI with **telemetry widgets** per [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) §3 (Speed, RPM, Gear, Throttle, Brake, DRS, Lap/Sector)
-5. Session Detail: summary block, laps table with best lap/sector highlighting, sectors view (§4)
-6. (Optional) Historical telemetry chart if endpoint and PDF plan require it
-
-### Short Term (Stage 12: Final Validation MVP)
+### Immediate — наступний крок (Stage 12: Final Validation MVP)
 
 1. End-to-end testing with F1 game
 2. Performance validation
