@@ -1,4 +1,5 @@
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from 'recharts'
+import type { TooltipProps } from 'recharts'
 import type { PedalTracePoint } from './types'
 
 interface ThrottleBrakeChartProps {
@@ -47,7 +48,7 @@ function toPercent(value: number): string {
   return `${Math.round(value * 100)}%`
 }
 
-function PedalTooltip(props: any) {
+function PedalTooltip(props: TooltipProps<number, string>) {
   const { active, payload } = props
   if (!active || !payload || !payload.length) return null
 

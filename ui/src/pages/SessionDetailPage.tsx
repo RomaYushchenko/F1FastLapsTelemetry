@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary } from '../api/client'
 import type { Lap, Session, SessionSummary } from '../api/types'
@@ -24,7 +24,22 @@ export function SessionDetailPage() {
   const [traceStatus, setTraceStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
   const [traceError, setTraceError] = useState<string | null>(null)
 
-  async function load() {
+  async function loadTrace(currentSessionUid: string, lapNumber: number) {
+    setTraceStatus('loading')
+    setTraceError(null)
+    try {
+      const points = await getLapTrace(currentSessionUid, lapNumber)
+      if (isCancelledRef.current) return
+      setTracePoints(points)
+      setTraceStatus('loaded')
+    } catch (error) {
+      if (isCancelledRef.current) return
+      setTraceStatus('error')
+      setTraceError(error instanceof Error ? error.message : 'Failed to load pedal trace')
+    }
+  }
+
+  const load = useCallback(async () => {
     if (sessionUid == null) {
       setStatus('error')
       setErrorMessage('Session ID is missing in URL')
@@ -69,31 +84,17 @@ export function SessionDetailPage() {
         error instanceof Error ? error.message : 'Failed to load session details',
       )
     }
-  }
-
-  async function loadTrace(currentSessionUid: string, lapNumber: number) {
-    setTraceStatus('loading')
-    setTraceError(null)
-    try {
-      const points = await getLapTrace(currentSessionUid, lapNumber)
-      if (isCancelledRef.current) return
-      setTracePoints(points)
-      setTraceStatus('loaded')
-    } catch (error) {
-      if (isCancelledRef.current) return
-      setTraceStatus('error')
-      setTraceError(error instanceof Error ? error.message : 'Failed to load pedal trace')
-    }
-  }
+  }, [sessionUid])
 
   useEffect(() => {
     isCancelledRef.current = false
-    load()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load()
 
     return () => {
       isCancelledRef.current = true
     }
-  }, [sessionUid])
+  }, [load])
 
   const bestLapNumber = summary?.bestLapNumber ?? null
 

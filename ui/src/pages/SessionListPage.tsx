@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getSessions } from '../api/client'
 import type { Session } from '../api/types'
@@ -13,7 +13,7 @@ export function SessionListPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const isCancelledRef = useRef(false)
 
-  async function load() {
+  const load = useCallback(async () => {
     setStatus('loading')
     setErrorMessage(null)
     try {
@@ -26,16 +26,17 @@ export function SessionListPage() {
       setStatus('error')
       setErrorMessage(error instanceof Error ? error.message : 'Failed to load sessions')
     }
-  }
+  }, [])
 
   useEffect(() => {
     isCancelledRef.current = false
-    load()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load()
 
     return () => {
       isCancelledRef.current = true
     }
-  }, [])
+  }, [load])
 
   const hasSessions = sessions.length > 0
 

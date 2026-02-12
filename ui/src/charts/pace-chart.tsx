@@ -1,4 +1,5 @@
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from 'recharts'
+import type { TooltipProps } from 'recharts'
 import type { PacePoint } from './types'
 
 interface PaceChartProps {
@@ -60,7 +61,7 @@ function formatLapTimeFromMs(ms: number): string {
   return `${minutes}:${secondsStr}.${millisStr}`
 }
 
-function PaceTooltip(props: any) {
+function PaceTooltip(props: TooltipProps<number, string>) {
   const { active, payload, label } = props
   if (!active || !payload || !payload.length) return null
 
