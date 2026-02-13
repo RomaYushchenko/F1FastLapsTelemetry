@@ -1,15 +1,25 @@
+import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveTelemetry } from '../ws/useLiveTelemetry'
 
 export function LiveDashboardPage() {
   const { status, session, snapshot, sessionEnded, errorMessage, connectionMessage } =
     useLiveTelemetry()
-
   const hasActiveSession = status !== 'no-active-session' && session != null
+
+  const handleRetry = useCallback(() => {
+    window.location.reload()
+  }, [])
 
   return (
     <div>
       <h1 className="heading-page">Live Telemetry</h1>
+
+      {status === 'idle' && (
+        <div className="card" style={{ padding: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+          <p className="text-muted">Loading…</p>
+        </div>
+      )}
 
       {status === 'loading-active-session' && (
         <div className="card" style={{ padding: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
@@ -17,11 +27,68 @@ export function LiveDashboardPage() {
         </div>
       )}
 
-      {status === 'no-active-session' && (
-        <div>
-          <p className="text-muted" style={{ marginBottom: 'var(--space-3)' }}>
-            No active session. Start a session in F1 25 or view past sessions.
+      {status === 'error' && (
+        <div className="card" style={{ padding: 'var(--space-4)', marginTop: 'var(--space-3)' }}>
+          <p style={{ color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>
+            Cannot connect to the telemetry service
           </p>
+          <p className="text-muted" style={{ marginBottom: 'var(--space-3)' }}>
+            {errorMessage ?? 'The server may be stopped or unreachable.'}
+          </p>
+          <p className="text-muted" style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--text-sm)' }}>
+            Make sure the backend is running and, if you use telemetry, that the game or UDP ingest is connected.
+          </p>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleRetry}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-md)',
+                border: 'none',
+                backgroundColor: 'var(--accent)',
+                color: 'white',
+                fontWeight: 'var(--font-weight-medium)',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+            <Link
+              to="/sessions"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--bg-elevated)',
+                color: 'var(--text-primary)',
+                textDecoration: 'none',
+                fontWeight: 'var(--font-weight-medium)',
+              }}
+            >
+              View sessions
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {status === 'no-active-session' && (
+        <div className="card" style={{ padding: 'var(--space-5)', marginTop: 'var(--space-3)' }}>
+          <p style={{ color: 'var(--text-primary)', marginBottom: 'var(--space-2)', fontSize: 'var(--text-lg)' }}>
+            Welcome to F1 FastLaps Telemetry
+          </p>
+          <p className="text-muted" style={{ marginBottom: 'var(--space-4)' }}>
+            This app shows live telemetry from F1 25 and lets you browse recorded sessions, laps and charts.
+          </p>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-2)', fontSize: 'var(--text-sm)' }}>
+            Right now there is no active session and the app is not receiving live data.
+          </p>
+          <ul className="text-muted" style={{ marginBottom: 'var(--space-4)', paddingLeft: 'var(--space-5)', fontSize: 'var(--text-sm)' }}>
+            <li>Start a session in F1 25 and ensure the telemetry backend (UDP ingest) is running and connected.</li>
+            <li>Or open <Link to="/sessions">Sessions</Link> to view and analyse past sessions.</li>
+          </ul>
           <Link
             to="/sessions"
             style={{

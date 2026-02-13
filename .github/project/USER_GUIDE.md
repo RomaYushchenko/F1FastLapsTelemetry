@@ -1,7 +1,7 @@
 # F1 FastLaps Telemetry - User Guide
 
 > **Quick Start Guide** for running F1 FastLaps Telemetry application locally  
-> **Last Updated:** February 1, 2026
+> **Last Updated:** February 13, 2026
 
 ---
 
@@ -27,6 +27,14 @@ Before starting, ensure you have installed:
 
 4. **F1 2024/2025 Game** (PC version)
    - Telemetry UDP output must be enabled in game settings
+
+5. **Node.js 20.19+ or 22.12+ and npm** (for running the Frontend locally)
+   ```powershell
+   node -v
+   npm -v
+   # Should show: Node v20.19+ or v22.12+ (Vite 7 requires this)
+   ```
+   On macOS you can upgrade via [nodejs.org](https://nodejs.org/) or: `brew install node@22` then use that version.
 
 ---
 
@@ -158,7 +166,46 @@ mvn spring-boot:run
 
 ---
 
-### Step 6: Configure F1 Game Settings
+### Step 6: Start the Frontend (React UI)
+
+**Terminal 3:**
+```powershell
+cd C:\Users\<YourUsername>\Work\F1FastLapsTelemetry\ui
+
+# Install dependencies (first time only)
+npm install
+
+# Start the development server
+npm run dev
+```
+
+**Expected Output:**
+```
+  VITE v7.x.x  ready in xxx ms
+  ➜  Local:   http://localhost:5173/
+  ➜  press h + enter to show help
+```
+
+✅ **Frontend is ready** when you see the local URL (default: `http://localhost:5173`).
+
+**Leave this terminal running!**
+
+**Optional — override API/WebSocket URLs** (if your backend runs on a different host/port):
+
+Create a `.env` file in the `ui/` directory:
+```env
+# Backend REST API base URL (default: http://localhost:8080)
+VITE_API_BASE_URL=http://localhost:8080
+
+# WebSocket URL for live telemetry (default: same as API)
+VITE_WS_URL=http://localhost:8080
+```
+
+Then open **http://localhost:5173** in your browser to use the Session list, Live dashboard, and lap analysis.
+
+---
+
+### Step 7: Configure F1 Game Settings
 
 1. **Start F1 2024/2025 Game**
 
@@ -176,7 +223,7 @@ mvn spring-boot:run
 
 ---
 
-### Step 7: Start a Racing Session
+### Step 8: Start a Racing Session
 
 1. **Start any game mode:**
    - Practice Session
@@ -220,6 +267,19 @@ INFO --- [scheduling-1] LiveDataBroadcaster: Broadcast snapshot for session 1234
 ---
 
 ## Accessing the Application
+
+### Web UI (Frontend)
+
+**URL:** `http://localhost:5173` (when the frontend is running via `npm run dev` in the `ui/` directory)
+
+The React UI provides:
+- **Session list** — view and select telemetry sessions
+- **Live dashboard** — real-time speed, RPM, gear, throttle/brake via WebSocket
+- **Lap analysis** — historical laps and sector times with charts
+
+Ensure the **Telemetry Processing Service** (port 8080) is running so the UI can call the REST API and connect to the WebSocket.
+
+---
 
 ### REST API Endpoints
 
@@ -377,6 +437,9 @@ WHERE session_uid = 123456789 AND car_index = 0;
 
 ### 1. Stop Services (in order)
 
+**Stop Frontend (Terminal 3, if running):**
+- Press `Ctrl+C`
+
 **Stop Processing Service (Terminal 2):**
 - Press `Ctrl+C`
 
@@ -398,6 +461,25 @@ docker-compose down -v
 ---
 
 ## Troubleshooting
+
+### Problem: Frontend fails with `crypto.hash is not a function` or "Vite requires Node.js 20.19+ or 22.12+"
+
+**Cause:** Node.js 18 or older is in use. Vite 7 needs Node 20.19+ or 22.12+.
+
+**Solution — upgrade Node.js:**
+
+- **macOS (Homebrew):**
+  ```bash
+  brew install node@22
+  brew link --overwrite node@22
+  ```
+  Or use [nvm](https://github.com/nvm-sh/nvm): `nvm install 22` then `nvm use 22`.
+
+- **Windows:** Install the LTS build (20.x or 22.x) from [nodejs.org](https://nodejs.org/).
+
+Then in the project root: `node -v` (should show v20.19+ or v22.12+), then run `npm run dev` again in `ui/`.
+
+---
 
 ### Problem: UDP Ingest Service won't start
 
@@ -538,10 +620,9 @@ docker-compose restart postgres
    - Access metrics: `http://localhost:8080/actuator/metrics`
    - Health checks: `http://localhost:8080/actuator/health`
 
-2. **Build React UI** (Stage 11)
-   - Session list screen
-   - Live dashboard with WebSocket
-   - Historical lap analysis
+2. **Run React UI locally**
+   - From `ui/`: `npm install` then `npm run dev`
+   - Open http://localhost:5173 for Session list, Live dashboard, and lap analysis
 
 3. **Production Deployment**
    - Package as Docker images
@@ -556,6 +637,7 @@ docker-compose restart postgres
 
 | Service | Port | Protocol |
 |---------|------|----------|
+| Frontend (Vite) | 5173 | HTTP |
 | UDP Ingest | 20777 | UDP |
 | Processing API | 8080 | HTTP |
 | WebSocket | 8080 | WS |
@@ -574,6 +656,7 @@ docker-compose restart postgres
 
 | Path | Purpose |
 |------|---------|
+| `ui/` | React frontend (Vite + TypeScript) |
 | `infra/` | Docker Compose, init SQL scripts |
 | `udp-ingest-service/` | UDP listener service |
 | `telemetry-processing-api-service/` | Main backend API |
@@ -596,6 +679,7 @@ docker-compose restart postgres
 - ✅ Infrastructure running (Kafka + PostgreSQL)
 - ✅ UDP Ingest Service listening on port 20777
 - ✅ Processing Service running on port 8080
+- ✅ Frontend running at http://localhost:5173 (optional; run `npm run dev` in `ui/`)
 - ✅ F1 game sending telemetry data
 - ✅ Data flowing: Game → UDP → Kafka → Processing → Database
 - ✅ REST API accessible at http://localhost:8080/api

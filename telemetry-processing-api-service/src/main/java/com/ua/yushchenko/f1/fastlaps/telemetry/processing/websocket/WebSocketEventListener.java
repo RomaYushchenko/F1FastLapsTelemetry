@@ -23,8 +23,8 @@ public class WebSocketEventListener {
     public void handleWebSocketConnectListener(SessionConnectedEvent event) {
         StompHeaderAccessor headerAccessor = StompHeaderAccessor.wrap(event.getMessage());
         String sessionId = headerAccessor.getSessionId();
-        
-        log.info("WebSocket client connected: sessionId={}", sessionId);
+
+        log.info("Live telemetry: client connected, sessionId={}", sessionId);
     }
 
     @EventListener
@@ -35,6 +35,6 @@ public class WebSocketEventListener {
         // Auto-unsubscribe on disconnect
         wsSessionManager.unsubscribe(sessionId);
 
-        log.info("WebSocket client disconnected: sessionId={}", sessionId);
+        log.info("Live telemetry: client disconnected, sessionId={}", sessionId);
     }
 }
