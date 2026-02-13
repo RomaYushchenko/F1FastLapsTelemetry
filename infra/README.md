@@ -15,12 +15,7 @@ cd infra
 docker-compose up -d
 ```
 
-Після старту Kafka створіть topics (одноразово або після чистого volume):
-
-```bash
-chmod +x scripts/create-kafka-topics.sh
-./scripts/create-kafka-topics.sh
-```
+**Kafka topics:** Топіки створюються автоматично брокером при першій публікації (`KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"` у docker-compose). Скрипт `scripts/create-kafka-topics.sh` опціональний (наприклад, якщо потрібні топіки до першого запуску сервісів або інші параметри).
 
 ## Підключення
 

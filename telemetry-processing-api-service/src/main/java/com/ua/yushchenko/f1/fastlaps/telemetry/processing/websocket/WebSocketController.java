@@ -39,7 +39,7 @@ public class WebSocketController {
         String wsSessionId = headerAccessor.getSessionId();
         Long sessionUid = message.getSessionUID();
 
-        log.debug("SUBSCRIBE request: wsSession={}, telemetrySession={}", wsSessionId, sessionUid);
+        log.info("Live telemetry: SUBSCRIBE request from wsSession={}, telemetrySession={}", wsSessionId, sessionUid);
 
         // Validate session exists and is active
         SessionRuntimeState state = sessionStateManager.get(sessionUid);
@@ -52,7 +52,7 @@ public class WebSocketController {
         // Subscribe client
         wsSessionManager.subscribe(wsSessionId, sessionUid);
 
-        log.info("WebSocket client {} subscribed to session {}", wsSessionId, sessionUid);
+        log.info("Live telemetry: client {} subscribed to session {}", wsSessionId, sessionUid);
     }
 
     /**
@@ -71,7 +71,7 @@ public class WebSocketController {
         // Unsubscribe client
         wsSessionManager.unsubscribe(wsSessionId);
 
-        log.info("WebSocket client {} unsubscribed", wsSessionId);
+        log.info("Live telemetry: client {} unsubscribed", wsSessionId);
     }
 
     /**

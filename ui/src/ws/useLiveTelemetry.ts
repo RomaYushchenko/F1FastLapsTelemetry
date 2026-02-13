@@ -71,6 +71,7 @@ export function useLiveTelemetry() {
         return
       }
 
+      // WebSocket is only opened when there is an active session; otherwise server shows 0 connections
       if (!activeSession) {
         if (isCancelled) return
         setState(prev => ({

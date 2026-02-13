@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Етап 2.12: Створення Kafka topics для F1 Telemetry
-# Джерело: kafka_contracts, implementation_steps_plan — topics: telemetry.session, .lap, .carTelemetry, .carStatus
-# Запуск: після docker-compose up -d (з директорії infra): ./scripts/create-kafka-topics.sh
+# Етап 2.12: Опціональне ручне створення Kafka topics для F1 Telemetry
+# Топіки за замовчуванням створюються автоматично брокером (KAFKA_AUTO_CREATE_TOPICS_ENABLE: true).
+# Цей скрипт потрібен лише якщо потрібно створити топіки до запуску сервісів або з особливими параметрами.
+# Topics: telemetry.session, .lap, .carTelemetry, .carStatus
+# Запуск (з директорії infra): ./scripts/create-kafka-topics.sh
 
 set -e
 
