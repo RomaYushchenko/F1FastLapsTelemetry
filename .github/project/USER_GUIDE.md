@@ -92,38 +92,11 @@ xxxxx          timescale/timescaledb        Up
 
 **Wait 30 seconds** for services to fully initialize.
 
----
-
-### Step 3: Create Kafka Topics
-
-```powershell
-# Still in infra directory
-# On Windows with Git Bash or WSL:
-bash scripts/create-kafka-topics.sh
-
-# OR manually with Docker:
-docker exec -it <kafka-container-id> kafka-topics --create --topic telemetry.session --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
-docker exec -it <kafka-container-id> kafka-topics --create --topic telemetry.lap --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
-docker exec -it <kafka-container-id> kafka-topics --create --topic telemetry.carTelemetry --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
-docker exec -it <kafka-container-id> kafka-topics --create --topic telemetry.carStatus --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
-```
-
-**Verify topics:**
-```powershell
-docker exec -it <kafka-container-id> kafka-topics --list --bootstrap-server localhost:9092
-```
-
-**Expected Output:**
-```
-telemetry.session
-telemetry.lap
-telemetry.carTelemetry
-telemetry.carStatus
-```
+**Kafka topics:** Топіки створюються автоматично брокером Kafka при першій публікації (у `docker-compose.yml` ввімкнено `KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"`). Ручне створення не потрібне.
 
 ---
 
-### Step 4: Start UDP Ingest Service
+### Step 3: Start UDP Ingest Service
 
 **Terminal 1:**
 ```powershell
@@ -144,7 +117,7 @@ mvn spring-boot:run
 
 ---
 
-### Step 5: Start Telemetry Processing Service
+### Step 4: Start Telemetry Processing Service
 
 **Terminal 2:**
 ```powershell
@@ -166,7 +139,7 @@ mvn spring-boot:run
 
 ---
 
-### Step 6: Start the Frontend (React UI)
+### Step 5: Start the Frontend (React UI)
 
 **Terminal 3:**
 ```powershell
@@ -205,7 +178,7 @@ Then open **http://localhost:5173** in your browser to use the Session list, Liv
 
 ---
 
-### Step 7: Configure F1 Game Settings
+### Step 6: Configure F1 Game Settings
 
 1. **Start F1 2024/2025 Game**
 
@@ -223,7 +196,7 @@ Then open **http://localhost:5173** in your browser to use the Session list, Liv
 
 ---
 
-### Step 8: Start a Racing Session
+### Step 7: Start a Racing Session
 
 1. **Start any game mode:**
    - Practice Session
@@ -552,7 +525,7 @@ docker-compose restart postgres
 ### Scenario 1: Complete a Practice Session
 
 1. Start services (Steps 1-5)
-2. Configure F1 game (Step 6)
+2. Configure F1 game (Step 5)
 3. Start Practice session in F1 game
 4. Complete 5-10 laps
 5. Return to menu (triggers SEND event)

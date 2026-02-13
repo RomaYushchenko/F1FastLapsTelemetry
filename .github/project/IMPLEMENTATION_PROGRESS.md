@@ -101,7 +101,7 @@
 | 2.9 | laps table | ✅ | `init-db/07-laps.sql` |
 | 2.10 | session_summary table | ✅ | `init-db/08-session-summary.sql` |
 | 2.11 | Retention policy | ✅ | `init-db/09-retention.sql` |
-| 2.12 | Kafka topics script | ✅ | `scripts/create-kafka-topics.sh` |
+| 2.12 | Kafka topics script (optional) | ✅ | `scripts/create-kafka-topics.sh`; топіки створюються автоматично брокером (KAFKA_AUTO_CREATE_TOPICS_ENABLE: true) |
 
 **Notes:**
 - Docker Compose tested, but PostgreSQL had network timeout (transient issue)

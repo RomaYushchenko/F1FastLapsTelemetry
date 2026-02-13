@@ -263,6 +263,8 @@ Processing Scheduler
 - telemetry.carTelemetry
 - telemetry.carStatus
 
+Топіки створюються автоматично брокером Kafka при першій публікації (у інфраструктурі ввімкнено `KAFKA_AUTO_CREATE_TOPICS_ENABLE: true`). Ручне створення не потрібне.
+
 ### 6.2 Key strategy
 - Kafka key = sessionUID
 
