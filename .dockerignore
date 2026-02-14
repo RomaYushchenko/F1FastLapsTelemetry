@@ -1,0 +1,53 @@
+# Maven build artifacts
+**/target/
+*.jar
+*.war
+*.ear
+
+# Node.js
+**/node_modules/
+**/dist/
+**/build/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Logs
+*.log
+logs/
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+*.md
+LICENSE
+.github/
+
+# UI specific (for root context)
+ui/node_modules/
+ui/dist/
+
+# Cursor
+.cursor/
