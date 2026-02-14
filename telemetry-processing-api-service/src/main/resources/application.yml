@@ -3,9 +3,9 @@ spring:
     name: telemetry-processing-api-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/telemetry
-    username: telemetry
-    password: telemetry
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/telemetry}
+    username: ${SPRING_DATASOURCE_USERNAME:telemetry}
+    password: ${SPRING_DATASOURCE_PASSWORD:telemetry}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -18,7 +18,7 @@ spring:
     show-sql: false
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: telemetry-processing-group
       auto-offset-reset: earliest

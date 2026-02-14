@@ -1,0 +1,214 @@
+# F1 FastLaps Telemetry — Production Docker Compose
+# Запуск: docker-compose up -d
+# Збірка: docker-compose build
+
+version: "3.9"
+
+services:
+  # ============================================
+  # Infrastructure Services
+  # ============================================
+  
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.3
+    container_name: f1-telemetry-zookeeper
+    hostname: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc localhost 2181 | grep -q 'Zookeeper version'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - f1-net
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.3
+    container_name: f1-telemetry-kafka
+    hostname: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"   # external (host)
+      - "29092:29092" # internal (docker)
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      # listeners
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      # single-node safe defaults
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      # ENABLE auto topic creation
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      # retention
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-topics --bootstrap-server kafka:29092 --list >/dev/null 2>&1"
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    networks:
+      - f1-net
+    restart: unless-stopped
+
+  postgres:
+    image: timescale/timescaledb:2.14.2-pg16
+    container_name: f1-telemetry-postgres
+    hostname: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: telemetry
+      POSTGRES_PASSWORD: telemetry
+      POSTGRES_DB: telemetry
+      TIMESCALEDB_TELEMETRY: "off"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/init-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry -d telemetry"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    networks:
+      - f1-net
+    restart: unless-stopped
+
+  # ============================================
+  # Backend Services
+  # ============================================
+
+  udp-ingest-service:
+    build:
+      context: .
+      dockerfile: udp-ingest-service/Dockerfile
+    image: f1-telemetry/udp-ingest-service:latest
+    container_name: f1-telemetry-udp-ingest
+    hostname: udp-ingest-service
+    ports:
+      - "20777:20777/udp"  # UDP для F1 25 Game
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - f1-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    restart: unless-stopped
+
+  telemetry-processing-api-service:
+    build:
+      context: .
+      dockerfile: telemetry-processing-api-service/Dockerfile
+    image: f1-telemetry/telemetry-processing-api-service:latest
+    container_name: f1-telemetry-api
+    hostname: telemetry-processing-api-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/telemetry
+      SPRING_DATASOURCE_USERNAME: telemetry
+      SPRING_DATASOURCE_PASSWORD: telemetry
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - f1-net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    restart: unless-stopped
+
+  # ============================================
+  # Frontend Service
+  # ============================================
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    image: f1-telemetry/ui:latest
+    container_name: f1-telemetry-ui
+    hostname: ui
+    ports:
+      - "80:80"
+    depends_on:
+      - telemetry-processing-api-service
+    networks:
+      - f1-net
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    restart: unless-stopped
+
+# ============================================
+# Networks
+# ============================================
+
+networks:
+  f1-net:
+    driver: bridge
+    name: f1-telemetry-network
+
+# ============================================
+# Volumes
+# ============================================
+
+volumes:
+  zookeeper-data:
+    name: f1-telemetry-zookeeper-data
+  kafka-data:
+    name: f1-telemetry-kafka-data
+  postgres-data:
+    name: f1-telemetry-postgres-data
