@@ -45,10 +45,10 @@ class CarTelemetryPacketHandlerTest {
         handler.handleCarTelemetryPacket(header, payload);
         
         // Then
-        ArgumentCaptor<KafkaEnvelope> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<KafkaEnvelope<CarTelemetryDto>> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
         verify(publisher).publish(eq("telemetry.carTelemetry"), anyString(), envelopeCaptor.capture());
         
-        @SuppressWarnings("unchecked")
         KafkaEnvelope<CarTelemetryDto> envelope = envelopeCaptor.getValue();
         assertThat(envelope.getSessionUID()).isEqualTo(123456789L);
         assertThat(envelope.getPayload().getSpeedKph()).isEqualTo(285);
