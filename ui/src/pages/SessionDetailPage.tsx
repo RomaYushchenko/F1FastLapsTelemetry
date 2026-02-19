@@ -84,6 +84,7 @@ export function SessionDetailPage() {
         setSelectedLapForTrace(initialLapForTrace)
         void loadTrace(id, initialLapForTrace)
       }
+      prevLapsLengthRef.current = lapsRes.length
 
       // Pace and tyre wear APIs are optional: load separately so failures do not block core session details.
       void (async () => {
@@ -119,7 +120,7 @@ export function SessionDetailPage() {
         error instanceof Error ? error.message : 'Failed to load session details',
       )
     }
-  }, [sessionUid])
+  }, [sessionUid, loadTrace])
 
   /** Background refresh: updates data without loading state or re-mount feel. */
   const refreshInBackground = useCallback(async () => {
@@ -139,6 +140,20 @@ export function SessionDetailPage() {
       setLaps(lapsRes)
       setSummary(summaryRes)
 
+      // When a new lap appears, auto-switch pedal trace to that lap (avoid setState in effect)
+      const currentLength = lapsRes.length
+      if (currentLength > prevLapsLengthRef.current && currentLength > 0) {
+        const lastLap = lapsRes[currentLength - 1]
+        const newLapNumber = lastLap?.lapNumber
+        if (newLapNumber != null) {
+          prevLapsLengthRef.current = currentLength
+          setSelectedLapForTrace(newLapNumber)
+          void loadTrace(id, newLapNumber)
+        }
+      } else {
+        prevLapsLengthRef.current = currentLength
+      }
+
       try {
         const paceRes = await getSessionPace(id)
         if (!isCancelledRef.current) setPacePoints(paceRes)
@@ -154,7 +169,7 @@ export function SessionDetailPage() {
     } catch {
       // Keep current data on refresh failure; do not show error or loading.
     }
-  }, [sessionUid])
+  }, [sessionUid, loadTrace])
 
   /** Quiet refresh of pedal trace for current lap (no loading state) so chart updates in real time. */
   const refreshTraceInBackground = useCallback(
@@ -178,22 +193,6 @@ export function SessionDetailPage() {
       isCancelledRef.current = true
     }
   }, [load])
-
-  // When a new lap appears (e.g. after background refresh), auto-switch pedal trace to that lap
-  useEffect(() => {
-    if (status !== 'loaded' || laps.length === 0 || sessionUid == null) return
-    const currentLength = laps.length
-    if (currentLength <= prevLapsLengthRef.current) {
-      prevLapsLengthRef.current = currentLength
-      return
-    }
-    const lastLap = laps[currentLength - 1]
-    const newLapNumber = lastLap?.lapNumber
-    if (newLapNumber == null) return
-    prevLapsLengthRef.current = currentLength
-    setSelectedLapForTrace(newLapNumber)
-    void loadTrace(sessionUid, newLapNumber)
-  }, [status, laps, sessionUid, loadTrace])
 
   // Background refresh while session is active: update data without loading state or full reload
   const isActiveSession = session?.state === 'ACTIVE'
