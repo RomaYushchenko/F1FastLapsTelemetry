@@ -11,3 +11,11 @@ export interface PedalTracePoint {
   brake: number
 }
 
+export interface TyreWearPoint {
+  lapNumber: number
+  wearFL: number | null
+  wearFR: number | null
+  wearRL: number | null
+  wearRR: number | null
+}
+

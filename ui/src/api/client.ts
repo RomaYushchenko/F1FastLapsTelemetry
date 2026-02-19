@@ -1,7 +1,7 @@
 import { API_BASE_URL } from './config'
 import { HttpError } from './types'
 import type { ApiErrorBody, Lap, Session, SessionSummary } from './types'
-import type { PacePoint, PedalTracePoint } from '../charts/types'
+import type { PacePoint, PedalTracePoint, TyreWearPoint } from '../charts/types'
 
 async function parseJsonOrNull(response: Response): Promise<unknown | null> {
   const contentType = response.headers.get('content-type')
@@ -42,12 +42,12 @@ export async function getSessions(): Promise<Session[]> {
   return requestJson<Session[]>('/api/sessions')
 }
 
-export async function getSession(sessionUid: number | string | undefined): Promise<Session> {
+export async function getSession(sessionUid: string | undefined): Promise<Session> {
   return requestJson<Session>(`/api/sessions/${sessionUid}`)
 }
 
 export async function getSessionLaps(
-  sessionUid: number | string | undefined,
+  sessionUid: string | undefined,
   carIndex = 0,
 ): Promise<Lap[]> {
   const search = new URLSearchParams()
@@ -57,7 +57,7 @@ export async function getSessionLaps(
 }
 
 export async function getSessionSummary(
-  sessionUid: number | string | undefined,
+  sessionUid: string | undefined,
   carIndex = 0,
 ): Promise<SessionSummary> {
   const search = new URLSearchParams()
@@ -91,16 +91,26 @@ export async function getActiveSession(options?: RequestOptions): Promise<Sessio
 }
 
 export async function getSessionPace(
-  sessionUid: number | string | undefined,
+  sessionUid: string | undefined,
 ): Promise<PacePoint[]> {
   return requestJson<PacePoint[]>(`/api/sessions/${sessionUid}/pace`)
 }
 
 export async function getLapTrace(
-  sessionUid: number | string | undefined,
+  sessionUid: string | undefined,
   lapNum: number,
 ): Promise<PedalTracePoint[]> {
   return requestJson<PedalTracePoint[]>(`/api/sessions/${sessionUid}/laps/${lapNum}/trace`)
+}
+
+export async function getSessionTyreWear(
+  sessionUid: string | undefined,
+  carIndex = 0,
+): Promise<TyreWearPoint[]> {
+  const search = new URLSearchParams()
+  if (carIndex !== 0) search.set('carIndex', String(carIndex))
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  return requestJson<TyreWearPoint[]>(`/api/sessions/${sessionUid}/tyre-wear${suffix}`)
 }
 
 
