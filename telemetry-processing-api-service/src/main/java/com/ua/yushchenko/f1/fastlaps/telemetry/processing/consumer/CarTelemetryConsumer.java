@@ -45,8 +45,8 @@ public class CarTelemetryConsumer {
             short packetId = (short) envelope.getPacketId().ordinal();
             short carIndex = (short) envelope.getCarIndex();
 
-            // Implicit session start: if no SSTA was received, create session on first data packet
-            lifecycleService.ensureSessionActive(sessionUid);
+            // Ensure runtime state exists (implicit session start when ensureSessionActive is available)
+            stateManager.getOrCreate(sessionUid);
 
             // Check if session should process packets
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
