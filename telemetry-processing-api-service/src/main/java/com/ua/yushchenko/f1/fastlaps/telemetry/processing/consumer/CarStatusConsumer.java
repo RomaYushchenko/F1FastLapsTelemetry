@@ -39,7 +39,6 @@ public class CarStatusConsumer {
         try {
             long sessionUid = event.getSessionUID();
             int frameId = event.getFrameIdentifier();
-            log.info("Received car status: sessionUID={}, frame={}, carIndex={}", sessionUid, frameId, event.getCarIndex());
             short packetId = (short) event.getPacketId().ordinal();
             short carIndex = (short) event.getCarIndex();
 

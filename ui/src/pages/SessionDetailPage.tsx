@@ -140,9 +140,13 @@ export function SessionDetailPage() {
       setLaps(lapsRes)
       setSummary(summaryRes)
 
-      // When a new lap appears, auto-switch pedal trace to that lap (avoid setState in effect)
+      // When a new lap appears, auto-switch pedal trace to that lap (avoid setState in effect).
+      // Do not auto-switch on first data load: ref starts at 0, so existing laps would be
+      // treated as "new lap" and override the initial best-lap selection.
       const currentLength = lapsRes.length
-      if (currentLength > prevLapsLengthRef.current && currentLength > 0) {
+      if (prevLapsLengthRef.current === 0) {
+        prevLapsLengthRef.current = currentLength
+      } else if (currentLength > prevLapsLengthRef.current && currentLength > 0) {
         const lastLap = lapsRes[currentLength - 1]
         const newLapNumber = lastLap?.lapNumber
         if (newLapNumber != null) {

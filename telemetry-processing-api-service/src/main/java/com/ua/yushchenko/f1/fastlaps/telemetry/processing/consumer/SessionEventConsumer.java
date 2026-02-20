@@ -47,16 +47,13 @@ public class SessionEventConsumer {
             SessionEventDto payload = event.getPayload();
             EventCode eventCode = payload.getEventCode();
 
-            log.info("Received session event: sessionUid={}, eventCode={}, frame={}",
-                    sessionUid, eventCode, frameId);
-
-            // Handle event
+            // Handle event (no per-packet info logging; exceptional cases logged in lifecycle or at debug)
             switch (eventCode) {
                 case SSTA -> lifecycleService.onSessionStarted(sessionUid, payload);
                 case SEND -> lifecycleService.onSessionEnded(sessionUid, payload, EndReason.EVENT_SEND);
                 case SESSION_INFO -> lifecycleService.onSessionInfo(sessionUid, payload);
                 case SESSION_TIMEOUT -> lifecycleService.onSessionTimeout(sessionUid);
-                case FLBK -> log.info("Flashback event received for session {}, ignoring (MVP)", sessionUid);
+                case FLBK -> log.debug("Flashback event received for session {}, ignoring (MVP)", sessionUid);
                 default -> log.warn("Unknown event code: {}", eventCode);
             }
 

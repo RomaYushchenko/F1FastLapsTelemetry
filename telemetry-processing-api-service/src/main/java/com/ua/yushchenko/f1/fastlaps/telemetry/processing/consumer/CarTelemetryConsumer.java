@@ -23,6 +23,12 @@ import java.time.Instant;
  * telemetry-api-contracts. When CarTelemetryEvent and RawTelemetryWriter are available,
  * switch to CarTelemetryEvent and add pedal trace persistence with lap attribution
  * (lap distance wrap-around).
+ *
+ * <p><b>Lap attribution (P1):</b> Lap and telemetry topics are processed independently.
+ * When inferring lap number from distance wrap (e.g. lastLapNumber + 1), always use
+ * {@link #resolveLapForPedalTrace(int, Integer)} with {@code snapshot.getCurrentLap()}
+ * so that if LapDataConsumer already advanced the lap to N+1, we do not double-increment
+ * to N+2 (which would corrupt pedal-trace lap attribution).
  */
 @Slf4j
 @Component
@@ -96,5 +102,21 @@ public class CarTelemetryConsumer {
             log.error("Error processing car telemetry", e);
             throw e;
         }
+    }
+
+    /**
+     * Resolves lap number for pedal trace when lap is inferred from distance wrap.
+     * Prevents double-increment: LapDataConsumer may have already set snapshot to N+1
+     * before we process the telemetry packet with the wrap, so we must not add +1 again.
+     *
+     * @param inferredFromWrap lap inferred from wrap (e.g. lastLapNumber + 1)
+     * @param snapshotLap      current lap from snapshot (updated by LapDataConsumer), may be null
+     * @return lap number to use: snapshotLap if it is already >= inferredFromWrap, else inferredFromWrap
+     */
+    static short resolveLapForPedalTrace(int inferredFromWrap, Integer snapshotLap) {
+        if (snapshotLap != null && snapshotLap > 0 && snapshotLap >= inferredFromWrap) {
+            return snapshotLap.shortValue();
+        }
+        return (short) inferredFromWrap;
     }
 }
