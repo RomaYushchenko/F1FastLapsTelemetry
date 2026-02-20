@@ -91,15 +91,21 @@ class LapDataPacketHandlerTest {
         ByteBuffer buffer = ByteBuffer.allocate(1000).order(ByteOrder.LITTLE_ENDIAN);
         
         // Last lap time
-        buffer.putInt(84500);           // 84.5 seconds
+        buffer.putInt(84500);           // m_lastLapTimeInMS
         // Current lap time
-        buffer.putInt(85500);           // 85.5 seconds
+        buffer.putInt(85500);           // m_currentLapTimeInMS
         // Sector 1 time
-        buffer.putShort((short) 28500); // 28.5 seconds
-        buffer.put((byte) 0);           // minutes
+        buffer.putShort((short) 28500); // m_sector1TimeMSPart
+        buffer.put((byte) 0);           // m_sector1TimeMinutesPart
         // Sector 2 time
-        buffer.putShort((short) 30000); // 30 seconds
-        buffer.put((byte) 0);           // minutes
+        buffer.putShort((short) 30000); // m_sector2TimeMSPart
+        buffer.put((byte) 0);           // m_sector2TimeMinutesPart
+        // Delta to car in front
+        buffer.putShort((short) 0);     // m_deltaToCarInFrontMSPart
+        buffer.put((byte) 0);           // m_deltaToCarInFrontMinutesPart
+        // Delta to race leader
+        buffer.putShort((short) 0);     // m_deltaToRaceLeaderMSPart
+        buffer.put((byte) 0);           // m_deltaToRaceLeaderMinutesPart
         // Lap distance
         buffer.putFloat(2500.5f);
         // Total distance
@@ -138,6 +144,10 @@ class LapDataPacketHandlerTest {
         buffer.putShort((short) 28500);
         buffer.put((byte) 0);
         buffer.putShort((short) 30000);
+        buffer.put((byte) 0);
+        buffer.putShort((short) 0);
+        buffer.put((byte) 0);
+        buffer.putShort((short) 0);
         buffer.put((byte) 0);
         buffer.putFloat(2500.5f);
         buffer.putFloat(15000.0f);

@@ -46,8 +46,9 @@ public class SessionPacketHandler {
                 publisher.publish(TOPIC, key, event);
                 log.info("Published session event: eventCode={}, sessionType={}, sessionUID={}",
                         eventCode, sessionEvent.getSessionType(), header.getSessionUID());
-            } else if (sessionEvent.getSessionTypeId() != null || sessionEvent.getTrackId() != null) {
-                // Publish session metadata so processing can fill Type/Track for sessions created without SSTA
+            } else if (eventCode == EventCode.SESSION_TIMEOUT
+                    && (sessionEvent.getSessionTypeId() != null || sessionEvent.getTrackId() != null)) {
+                // Publish session metadata for unknown events that carry type/track (not for FLBK etc.)
                 SessionEventDto infoPayload = SessionEventDto.builder()
                         .eventCode(EventCode.SESSION_INFO)
                         .sessionType(sessionEvent.getSessionType())
