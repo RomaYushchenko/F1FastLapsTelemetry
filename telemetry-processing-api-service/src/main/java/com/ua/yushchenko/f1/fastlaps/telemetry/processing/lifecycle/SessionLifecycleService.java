@@ -1,6 +1,5 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle;
 
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.EventCode;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
@@ -28,8 +27,12 @@ public class SessionLifecycleService {
 
     private final SessionStateManager stateManager;
     private final SessionRepository sessionRepository;
+    private final SessionPersistenceService sessionPersistenceService;
     private final LapAggregator lapAggregator;
     private final LiveDataBroadcaster liveDataBroadcaster;
+
+    /** Serializes session persist so only one consumer inserts; others see the row after commit. */
+    private final Object sessionCreationLock = new Object();
 
     /**
      * Handle session started event (SSTA).
@@ -45,18 +48,17 @@ public class SessionLifecycleService {
             state.setStartedAt(Instant.now());
             state.transitionTo(SessionState.ACTIVE);
 
-            // Persist session to DB
             Session session = Session.builder()
                     .sessionUid(sessionUID)
                     .packetFormat((short) 1) // F1 2024/2025 format
                     .gameMajorVersion((short) 1)
                     .gameMinorVersion((short) 0)
-                    .sessionType(null) // Will be filled from session data packet
+                    .sessionType(event.getSessionTypeId() != null ? event.getSessionTypeId().shortValue() : null)
                     .trackId(event.getTrackId() != null ? event.getTrackId().shortValue() : null)
                     .totalLaps(event.getTotalLaps() != null ? event.getTotalLaps().shortValue() : null)
                     .startedAt(state.getStartedAt())
                     .build();
-            sessionRepository.save(session);
+            persistSessionUnderLock(session);
         } else {
             log.warn("Received SSTA for session in state {}, ignoring (sessionUID={})",
                     state.getState(), sessionUID);
@@ -115,6 +117,33 @@ public class SessionLifecycleService {
     }
 
     /**
+     * Handle session metadata (SESSION_INFO).
+     * Updates session type and track when session was created without SSTA (e.g. implicit start).
+     */
+    public void onSessionInfo(long sessionUID, SessionEventDto event) {
+        sessionRepository.findById(sessionUID).ifPresent(session -> {
+            boolean updated = false;
+            if (session.getSessionType() == null && event.getSessionTypeId() != null) {
+                session.setSessionType(event.getSessionTypeId().shortValue());
+                updated = true;
+            }
+            if (session.getTrackId() == null && event.getTrackId() != null) {
+                session.setTrackId(event.getTrackId().shortValue());
+                updated = true;
+            }
+            if (session.getTotalLaps() == null && event.getTotalLaps() != null) {
+                session.setTotalLaps(event.getTotalLaps().shortValue());
+                updated = true;
+            }
+            if (updated) {
+                sessionRepository.save(session);
+                log.info("Updated session metadata: sessionUID={}, sessionType={}, trackId={}",
+                        sessionUID, session.getSessionType(), session.getTrackId());
+            }
+        });
+    }
+
+    /**
      * Handle session timeout (no data received for timeout period).
      * Called by NoDataTimeoutWorker scheduler.
      */
@@ -123,6 +152,38 @@ public class SessionLifecycleService {
 
         // Simulate SEND event with NO_DATA_TIMEOUT reason
         onSessionEnded(sessionUID, null, EndReason.NO_DATA_TIMEOUT);
+    }
+
+    /**
+     * Ensure session has runtime state and is ACTIVE.
+     * If no SSTA was received, create state and transition to ACTIVE on first data packet (implicit session start).
+     * This allows processing when the game does not send session events or telemetry.session is empty.
+     * Persist is serialized per session so only one consumer inserts; others see the row after commit.
+     */
+    public void ensureSessionActive(long sessionUID) {
+        SessionRuntimeState state = stateManager.getOrCreate(sessionUID);
+        if (state.getState() == SessionState.INIT) {
+            log.info("Implicit session start: sessionUID={} (no SSTA received, starting on first data packet)", sessionUID);
+            state.setStartedAt(Instant.now());
+            state.transitionTo(SessionState.ACTIVE);
+            Session session = Session.builder()
+                    .sessionUid(sessionUID)
+                    .packetFormat((short) 1)
+                    .gameMajorVersion((short) 1)
+                    .gameMinorVersion((short) 0)
+                    .sessionType(null)
+                    .trackId(null)
+                    .totalLaps(null)
+                    .startedAt(state.getStartedAt())
+                    .build();
+            persistSessionUnderLock(session);
+        }
+    }
+
+    private void persistSessionUnderLock(Session session) {
+        synchronized (sessionCreationLock) {
+            sessionPersistenceService.persistSessionIfAbsent(session);
+        }
     }
 
     /**

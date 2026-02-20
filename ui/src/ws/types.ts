@@ -13,7 +13,7 @@ export interface WsSnapshotMessage {
 
 export interface WsSessionEndedMessage {
   type: 'SESSION_ENDED'
-  sessionUID: number
+  sessionId: string
   endReason: string
 }
 

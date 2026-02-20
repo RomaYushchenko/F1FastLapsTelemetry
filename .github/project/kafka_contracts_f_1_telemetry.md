@@ -50,6 +50,7 @@
 | `telemetry.lap` | Дані по колах | ingest | processing |
 | `telemetry.carTelemetry` | Live телеметрія авто | ingest | processing |
 | `telemetry.carStatus` | Статус авто | ingest | processing |
+| `telemetry.carDamage` | Пошкодження/знос шин (tyre wear % per wheel) | ingest | processing |
 
 ---
 
@@ -154,6 +155,23 @@ Topic: `telemetry.carStatus`
   "drsAllowed": true,
   "tyresCompound": 16,
   "ersStoreEnergy": 2.34
+}
+```
+
+---
+
+### 5.5 CarDamageDto
+
+Topic: `telemetry.carDamage`
+
+Payload: знос шин у відсотках (0..1) по колесах. F1 25 CarDamageData m_tyresWear[4] (order: RL, RR, FL, FR).
+
+```json
+{
+  "tyresWearFL": 0.08,
+  "tyresWearFR": 0.10,
+  "tyresWearRL": 0.12,
+  "tyresWearRR": 0.15
 }
 ```
 

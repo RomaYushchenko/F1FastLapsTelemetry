@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionSummaryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionSummaryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,26 +15,46 @@ import org.springframework.web.bind.annotation.*;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/sessions/{sessionUid}")
+@RequestMapping("/api/sessions/{id}")
 @RequiredArgsConstructor
 public class SessionSummaryController {
 
     private final SessionSummaryRepository summaryRepository;
+    private final SessionRepository sessionRepository;
 
     /**
-     * GET /api/sessions/{sessionUid}/summary - Get session summary.
+     * GET /api/sessions/{id}/summary - Get session summary.
+     * {@code id} can be the session UUID (public id) or the internal session_uid (Long).
      */
     @GetMapping("/summary")
     public ResponseEntity<SessionSummaryDto> getSummary(
-            @PathVariable("sessionUid") Long sessionUid,
+            @PathVariable("id") String id,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
-        log.debug("Get summary: sessionUid={}, carIndex={}", sessionUid, carIndex);
-        
-        return summaryRepository.findBySessionUidAndCarIndex(sessionUid, carIndex)
-                .map(this::toDto)
+        String trimmedId = id != null ? id.trim() : "";
+        if (trimmedId.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return sessionRepository.findByPublicIdOrSessionUid(trimmedId)
+                .map(session -> summaryRepository.findBySessionUidAndCarIndex(session.getSessionUid(), carIndex)
+                        .map(this::toDto)
+                        .orElse(emptySummaryDto()))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Empty summary when session exists but no laps have been aggregated yet.
+     */
+    private static SessionSummaryDto emptySummaryDto() {
+        return SessionSummaryDto.builder()
+                .totalLaps(0)
+                .bestLapTimeMs(null)
+                .bestLapNumber(null)
+                .bestSector1Ms(null)
+                .bestSector2Ms(null)
+                .bestSector3Ms(null)
+                .build();
     }
 
     /**

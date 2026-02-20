@@ -29,11 +29,21 @@ export function PaceChart(props: PaceChartProps) {
     lapTimeSeconds: point.lapTimeMs / 1000,
   }))
 
+  const yDomain = (() => {
+    const seconds = data.map(d => d.lapTimeSeconds).filter(Number.isFinite)
+    if (seconds.length === 0) return undefined
+    const min = Math.min(...seconds)
+    const max = Math.max(...seconds)
+    const span = max - min
+    const padding = Math.max(2, span * 0.15)
+    return [min - padding, max + padding]
+  })()
+
   return (
     <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data}>
         <XAxis dataKey="lapNumber" />
-        <YAxis tickFormatter={formatSecondsLabel} />
+        <YAxis tickFormatter={formatSecondsLabel} domain={yDomain} />
         <Tooltip content={<PaceTooltip />} />
         <Legend />
         <Line

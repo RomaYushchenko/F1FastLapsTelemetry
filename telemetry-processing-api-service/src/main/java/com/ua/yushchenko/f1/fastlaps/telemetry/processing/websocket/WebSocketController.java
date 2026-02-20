@@ -4,6 +4,8 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsErrorMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSubscribeMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsUnsubscribeMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErrorCode;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Controller;
 
 /**
  * WebSocket message handler for STOMP client messages.
+ * Session id in SUBSCRIBE must match REST: UUID (public_id) or numeric (session_uid).
  * See: implementation_steps_plan.md § Етап 9.3.
  */
 @Slf4j
@@ -25,11 +28,12 @@ public class WebSocketController {
 
     private final WebSocketSessionManager wsSessionManager;
     private final SessionStateManager sessionStateManager;
+    private final SessionRepository sessionRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
      * Handle SUBSCRIBE message from client.
-     * Client sends to /app/subscribe, we process and track subscription.
+     * Client sends session id (same as REST: UUID or session_uid string). We resolve and subscribe.
      */
     @MessageMapping("/subscribe")
     public void handleSubscribe(
@@ -37,11 +41,21 @@ public class WebSocketController {
             SimpMessageHeaderAccessor headerAccessor
     ) {
         String wsSessionId = headerAccessor.getSessionId();
-        Long sessionUid = message.getSessionUID();
+        String sessionIdStr = message.getSessionId();
+        if (sessionIdStr == null || sessionIdStr.isBlank()) {
+            sendError(wsSessionId, ErrorCode.SESSION_NOT_ACTIVE, "Missing session id");
+            return;
+        }
+        String trimmed = sessionIdStr.trim();
+        Session session = sessionRepository.findByPublicIdOrSessionUid(trimmed).orElse(null);
+        if (session == null) {
+            sendError(wsSessionId, ErrorCode.SESSION_NOT_ACTIVE, "Session not found");
+            return;
+        }
+        Long sessionUid = session.getSessionUid();
 
-        log.info("Live telemetry: SUBSCRIBE request from wsSession={}, telemetrySession={}", wsSessionId, sessionUid);
+        log.info("Live telemetry: SUBSCRIBE request from wsSession={}, sessionId={}", wsSessionId, trimmed);
 
-        // Validate session exists and is active
         SessionRuntimeState state = sessionStateManager.get(sessionUid);
         if (state == null || !state.isActive()) {
             log.warn("Invalid subscription: session {} is not active", sessionUid);
@@ -49,9 +63,7 @@ public class WebSocketController {
             return;
         }
 
-        // Subscribe client
         wsSessionManager.subscribe(wsSessionId, sessionUid);
-
         log.info("Live telemetry: client {} subscribed to session {}", wsSessionId, sessionUid);
     }
 

@@ -127,6 +127,77 @@ Response:
 
 ---
 
+### 3.4 Pace (діаграма темпу по колах)
+
+```
+GET /api/sessions/{sessionUid}/pace
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: масив точок для графіка «час кола vs номер кола».
+```json
+[
+  { "lapNumber": 1, "lapTimeMs": 87321 },
+  { "lapNumber": 2, "lapTimeMs": 86210 }
+]
+```
+
+- Якщо сесії немає — 404.
+- Якщо сесія є, але кіл з часом немає — 200 і порожній масив `[]`.
+
+Джерело даних: агреговані кола (таблиця `lap`); лише кола з `lapTimeMs > 0`.
+
+---
+
+### 3.5 Pedal trace (профіль газ/гальмо по колу)
+
+```
+GET /api/sessions/{sessionUid}/laps/{lapNum}/trace
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: масив семплів по дистанції кола (distance, throttle, brake).
+```json
+[
+  { "distance": 123.4, "throttle": 0.85, "brake": 0.0 },
+  { "distance": 130.2, "throttle": 0.90, "brake": 0.0 }
+]
+```
+
+- Джерело даних: таблиця `telemetry.car_telemetry_raw` (семпли throttle/brake з прив'язкою до кола через `lap_number`, `lap_distance_m`). Під час активної сесії CarTelemetryConsumer записує семпли разом із поточним lap_number та lap_distance з LapData.
+- Якщо для обраного кола записів немає — 200 і порожній масив `[]`. 404 якщо сесії немає.
+
+---
+
+### 3.6 Tyre wear (діаграма зносу шин по колах)
+
+```
+GET /api/sessions/{sessionUid}/tyre-wear
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: масив точок для графіка «знос шин (% по колесах FL, FR, RL, RR) vs номер кола».
+```json
+[
+  { "lapNumber": 1, "wearFL": 0.02, "wearFR": 0.02, "wearRL": 0.03, "wearRR": 0.03 },
+  { "lapNumber": 2, "wearFL": 0.05, "wearFR": 0.05, "wearRL": 0.07, "wearRR": 0.07 }
+]
+```
+
+- Значення wear — float у діапазоні 0..1 (відповідає 0–100%).
+- Якщо сесії немає — 404.
+- Якщо даних зносу немає (наприклад, у грі вимкнено пошкодження/знос) — 200 і порожній масив `[]`.
+
+Джерело даних: таблиця `telemetry.tyre_wear_per_lap`; записується при фіналізації кола з останнього семплу Car Damage (packet 10) для цього session+car. Для появи даних у F1 25 потрібно увімкнене відображення пошкоджень/зносу шин.
+
+---
+
 ## 4. WebSocket API
 
 ### 4.1 Endpoint

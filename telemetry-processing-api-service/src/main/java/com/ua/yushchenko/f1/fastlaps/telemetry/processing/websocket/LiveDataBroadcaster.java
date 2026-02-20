@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.websocket;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSessionEndedMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,7 @@ public class LiveDataBroadcaster {
 
     private final SessionStateManager sessionStateManager;
     private final WebSocketSessionManager wsSessionManager;
+    private final SessionRepository sessionRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
@@ -47,8 +49,14 @@ public class LiveDataBroadcaster {
                 continue; // No data yet
             }
 
-            // Broadcast to /topic/live/{sessionUID}
-            String destination = "/topic/live/" + sessionUid;
+            // Use same id as REST (public_id or session_uid) so client topic matches SessionDto.id
+            String topicId = sessionRepository.findById(sessionUid)
+                    .map(s -> s.getPublicId() != null ? s.getPublicId().toString() : String.valueOf(s.getSessionUid()))
+                    .orElse(null);
+            if (topicId == null) {
+                continue;
+            }
+            String destination = "/topic/live/" + topicId;
             messagingTemplate.convertAndSend(destination, snapshot);
 
             log.trace("Broadcast snapshot for session {}: {} subscribers", 
@@ -67,13 +75,19 @@ public class LiveDataBroadcaster {
             return; // No subscribers, skip
         }
 
+        String topicId = sessionRepository.findById(sessionUid)
+                .map(s -> s.getPublicId() != null ? s.getPublicId().toString() : String.valueOf(s.getSessionUid()))
+                .orElse(null);
+        if (topicId == null) {
+            return;
+        }
         WsSessionEndedMessage message = WsSessionEndedMessage.builder()
                 .type(WsSessionEndedMessage.TYPE)
-                .sessionUID(sessionUid)
+                .sessionId(topicId)
                 .endReason(reason)
                 .build();
 
-        String destination = "/topic/live/" + sessionUid;
+        String destination = "/topic/live/" + topicId;
         messagingTemplate.convertAndSend(destination, message);
 
         log.info("Sent SESSION_ENDED notification for session {} to {} subscribers (reason: {})",

@@ -1,9 +1,10 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.consumer;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarStatusDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarStatusEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle.SessionLifecycleService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.CarStatusRawWriter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
+
+import java.time.Instant;
 
 /**
  * Kafka consumer for telemetry.carStatus topic.
@@ -25,18 +28,27 @@ public class CarStatusConsumer {
     private final IdempotencyService idempotencyService;
     private final SessionLifecycleService lifecycleService;
     private final SessionStateManager stateManager;
+    private final CarStatusRawWriter carStatusRawWriter;
 
     @KafkaListener(
             topics = "telemetry.carStatus",
             groupId = "${spring.kafka.consumer.group-id}",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consume(KafkaEnvelope<CarStatusDto> envelope, Acknowledgment acknowledgment) {
+    public void consume(CarStatusEvent event, Acknowledgment acknowledgment) {
+        if (event == null) {
+            log.warn("Skipping record: deserialization failed (e.g. old format without @type)");
+            acknowledgment.acknowledge();
+            return;
+        }
         try {
-            long sessionUid = envelope.getSessionUID();
-            int frameId = envelope.getFrameIdentifier();
-            short packetId = (short) envelope.getPacketId().ordinal();
-            short carIndex = (short) envelope.getCarIndex();
+            long sessionUid = event.getSessionUID();
+            int frameId = event.getFrameIdentifier();
+            short packetId = (short) event.getPacketId().ordinal();
+            short carIndex = (short) event.getCarIndex();
+
+            // Implicit session start: if no SSTA was received, create session on first data packet
+            lifecycleService.ensureSessionActive(sessionUid);
 
             // Check if session should process packets
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
@@ -63,7 +75,7 @@ public class CarStatusConsumer {
             // Update watermark
             state.updateWatermark(carIndex, frameId);
 
-            CarStatusDto status = envelope.getPayload();
+            CarStatusDto status = event.getPayload();
             log.debug("Car status: sessionUid={}, carIndex={}, fuel={}, drsAllowed={}",
                     sessionUid, carIndex, status.getFuelInTank(), status.getDrsAllowed());
 
@@ -76,7 +88,16 @@ public class CarStatusConsumer {
             }
             snapshot.setDrs(Boolean.TRUE.equals(status.getDrsAllowed()));
 
-            // TODO (Етап 6): Pass to RawTelemetryWriter for batch insert into car_status_raw
+            if (state.isActive()) {
+                carStatusRawWriter.write(
+                        Instant.now(),
+                        sessionUid,
+                        frameId,
+                        carIndex,
+                        status,
+                        event.getSessionTime()
+                );
+            }
 
             acknowledgment.acknowledge();
         } catch (Exception e) {

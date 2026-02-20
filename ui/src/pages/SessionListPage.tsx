@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getSessions } from '../api/client'
+import { isValidSessionId, toSessionIdString } from '../api/sessionId'
 import type { Session } from '../api/types'
 import { getTrackName } from '../constants/tracks'
 
@@ -94,7 +95,9 @@ export function SessionListPage() {
             </thead>
             <tbody>
               {sessions.map(session => {
-                const shortId = String(session.sessionUID)
+                const sessionId = toSessionIdString(session.id)
+                const shortId = sessionId.slice(0, 8)
+                const validId = isValidSessionId(sessionId)
                 const startedAt = new Date(session.startedAt)
                 const endedAt = session.endedAt ? new Date(session.endedAt) : null
 
@@ -106,17 +109,24 @@ export function SessionListPage() {
 
                 return (
                   <tr
-                    key={session.sessionUID}
-                    onClick={() => navigate(`/sessions/${session.sessionUID}`)}
+                    key={sessionId}
+                    onClick={() => validId && navigate(`/sessions/${sessionId}`)}
+                    style={{ cursor: validId ? 'pointer' : undefined }}
                   >
                     <td>
-                      <Link
-                        to={`/sessions/${session.sessionUID}`}
-                        className="text-mono"
-                        onClick={event => event.stopPropagation()}
-                      >
-                        {shortId.slice(0, 10)}…
-                      </Link>
+                      {validId ? (
+                        <Link
+                          to={`/sessions/${sessionId}`}
+                          className="text-mono"
+                          onClick={event => event.stopPropagation()}
+                        >
+                          {shortId}…
+                        </Link>
+                      ) : (
+                        <span className="text-mono" title="Invalid session ID (use Sessions list)">
+                          {shortId}… (unavailable)
+                        </span>
+                      )}
                     </td>
                     <td className="text-muted">{session.sessionType ?? '—'}</td>
                     <td className="text-muted">{getTrackName(session.trackId)}</td>

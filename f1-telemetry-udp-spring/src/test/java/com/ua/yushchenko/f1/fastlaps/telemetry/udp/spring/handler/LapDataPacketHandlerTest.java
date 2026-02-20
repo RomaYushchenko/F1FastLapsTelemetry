@@ -1,7 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.handler;
 
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDataEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.publisher.TelemetryPublisher;
 import org.junit.jupiter.api.Test;
@@ -44,15 +43,17 @@ class LapDataPacketHandlerTest {
         handler.handleLapDataPacket(header, payload);
         
         // Then
-        ArgumentCaptor<KafkaEnvelope> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
-        verify(publisher).publish(eq("telemetry.lap"), anyString(), envelopeCaptor.capture());
+        ArgumentCaptor<LapDataEvent> eventCaptor = ArgumentCaptor.forClass(LapDataEvent.class);
+        verify(publisher).publish(eq("telemetry.lap"), anyString(), eventCaptor.capture());
         
-        @SuppressWarnings("unchecked")
-        KafkaEnvelope<LapDto> envelope = envelopeCaptor.getValue();
-        assertThat(envelope.getSessionUID()).isEqualTo(123456789L);
-        assertThat(envelope.getPayload().getLapNumber()).isEqualTo(5);
-        assertThat(envelope.getPayload().getCurrentLapTimeMs()).isEqualTo(85500);
-        assertThat(envelope.getPayload().isInvalid()).isFalse();
+        LapDataEvent event = eventCaptor.getValue();
+        assertThat(event.getSessionUID()).isEqualTo(123456789L);
+        assertThat(event.getPayload().getLapNumber()).isEqualTo(5);
+        assertThat(event.getPayload().getLastLapTimeMs()).isEqualTo(84500);
+        assertThat(event.getPayload().getCurrentLapTimeMs()).isEqualTo(85500);
+        assertThat(event.getPayload().getSector1TimeMs()).isEqualTo(28500);
+        assertThat(event.getPayload().getSector2TimeMs()).isEqualTo(30000);
+        assertThat(event.getPayload().isInvalid()).isFalse();
     }
     
     @Test
@@ -82,27 +83,32 @@ class LapDataPacketHandlerTest {
         handler.handleLapDataPacket(header, payload);
         
         // Then
-        ArgumentCaptor<KafkaEnvelope> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
-        verify(publisher).publish(eq("telemetry.lap"), anyString(), envelopeCaptor.capture());
+        ArgumentCaptor<LapDataEvent> eventCaptor = ArgumentCaptor.forClass(LapDataEvent.class);
+        verify(publisher).publish(eq("telemetry.lap"), anyString(), eventCaptor.capture());
         
-        @SuppressWarnings("unchecked")
-        KafkaEnvelope<LapDto> envelope = envelopeCaptor.getValue();
-        assertThat(envelope.getPayload().isInvalid()).isTrue();
+        LapDataEvent event = eventCaptor.getValue();
+        assertThat(event.getPayload().isInvalid()).isTrue();
     }
     
     private ByteBuffer createLapDataPayload() {
         ByteBuffer buffer = ByteBuffer.allocate(1000).order(ByteOrder.LITTLE_ENDIAN);
         
         // Last lap time
-        buffer.putInt(84500);           // 84.5 seconds
+        buffer.putInt(84500);           // m_lastLapTimeInMS
         // Current lap time
-        buffer.putInt(85500);           // 85.5 seconds
+        buffer.putInt(85500);           // m_currentLapTimeInMS
         // Sector 1 time
-        buffer.putShort((short) 28500); // 28.5 seconds
-        buffer.put((byte) 0);           // minutes
+        buffer.putShort((short) 28500); // m_sector1TimeMSPart
+        buffer.put((byte) 0);           // m_sector1TimeMinutesPart
         // Sector 2 time
-        buffer.putShort((short) 30000); // 30 seconds
-        buffer.put((byte) 0);           // minutes
+        buffer.putShort((short) 30000); // m_sector2TimeMSPart
+        buffer.put((byte) 0);           // m_sector2TimeMinutesPart
+        // Delta to car in front
+        buffer.putShort((short) 0);     // m_deltaToCarInFrontMSPart
+        buffer.put((byte) 0);           // m_deltaToCarInFrontMinutesPart
+        // Delta to race leader
+        buffer.putShort((short) 0);     // m_deltaToRaceLeaderMSPart
+        buffer.put((byte) 0);           // m_deltaToRaceLeaderMinutesPart
         // Lap distance
         buffer.putFloat(2500.5f);
         // Total distance
@@ -141,6 +147,10 @@ class LapDataPacketHandlerTest {
         buffer.putShort((short) 28500);
         buffer.put((byte) 0);
         buffer.putShort((short) 30000);
+        buffer.put((byte) 0);
+        buffer.putShort((short) 0);
+        buffer.put((byte) 0);
+        buffer.putShort((short) 0);
         buffer.put((byte) 0);
         buffer.putFloat(2500.5f);
         buffer.putFloat(15000.0f);

@@ -1,8 +1,8 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.consumer;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.EventCode;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionLifecycleEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle.SessionLifecycleService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.EndReason;
@@ -30,12 +30,17 @@ public class SessionEventConsumer {
             groupId = "${spring.kafka.consumer.group-id}",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consume(KafkaEnvelope<SessionEventDto> envelope, Acknowledgment acknowledgment) {
+    public void consume(SessionLifecycleEvent event, Acknowledgment acknowledgment) {
+        if (event == null) {
+            log.warn("Skipping record: deserialization failed (e.g. old format without @type)");
+            acknowledgment.acknowledge();
+            return;
+        }
         try {
-            long sessionUid = envelope.getSessionUID();
-            int frameId = envelope.getFrameIdentifier();
-            short packetId = (short) envelope.getPacketId().ordinal();
-            short carIndex = (short) envelope.getCarIndex();
+            long sessionUid = event.getSessionUID();
+            int frameId = event.getFrameIdentifier();
+            short packetId = (short) event.getPacketId().ordinal();
+            short carIndex = (short) event.getCarIndex();
 
             // Idempotency check
             if (!idempotencyService.markAsProcessed(sessionUid, frameId, packetId, carIndex)) {
@@ -44,18 +49,16 @@ public class SessionEventConsumer {
                 return;
             }
 
-            SessionEventDto event = envelope.getPayload();
-            EventCode eventCode = event.getEventCode();
+            SessionEventDto payload = event.getPayload();
+            EventCode eventCode = payload.getEventCode();
 
-            log.info("Received session event: sessionUid={}, eventCode={}, frame={}",
-                    sessionUid, eventCode, frameId);
-
-            // Handle event
+            // Handle event (no per-packet info logging; exceptional cases logged in lifecycle or at debug)
             switch (eventCode) {
-                case SSTA -> lifecycleService.onSessionStarted(sessionUid, event);
-                case SEND -> lifecycleService.onSessionEnded(sessionUid, event, EndReason.EVENT_SEND);
+                case SSTA -> lifecycleService.onSessionStarted(sessionUid, payload);
+                case SEND -> lifecycleService.onSessionEnded(sessionUid, payload, EndReason.EVENT_SEND);
+                case SESSION_INFO -> lifecycleService.onSessionInfo(sessionUid, payload);
                 case SESSION_TIMEOUT -> lifecycleService.onSessionTimeout(sessionUid);
-                case FLBK -> log.info("Flashback event received for session {}, ignoring (MVP)", sessionUid);
+                case FLBK -> log.debug("Flashback event received for session {}, ignoring (MVP)", sessionUid);
                 default -> log.warn("Unknown event code: {}", eventCode);
             }
 

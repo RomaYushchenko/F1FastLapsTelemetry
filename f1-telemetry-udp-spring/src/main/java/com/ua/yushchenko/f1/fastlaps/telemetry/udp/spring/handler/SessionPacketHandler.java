@@ -1,9 +1,9 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.handler;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.EventCode;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.PacketId;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionLifecycleEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.annotation.F1PacketHandler;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.annotation.F1UdpListener;
@@ -38,18 +38,29 @@ public class SessionPacketHandler {
         
         try {
             SessionEventDto sessionEvent = parseSessionPacket(payload);
-            
-            // Only publish SSTA/SEND events
-            if (sessionEvent.getEventCode() == EventCode.SSTA || 
-                sessionEvent.getEventCode() == EventCode.SEND) {
-                
-                KafkaEnvelope<SessionEventDto> envelope = buildEnvelope(header, sessionEvent);
+            EventCode eventCode = sessionEvent.getEventCode();
+
+            if (eventCode == EventCode.SSTA || eventCode == EventCode.SEND) {
+                SessionLifecycleEvent event = buildEvent(header, sessionEvent);
                 String key = String.valueOf(header.getSessionUID());
-                
-                publisher.publish(TOPIC, key, envelope);
-                
-                log.info("Published session event: eventCode={}, sessionType={}, sessionUID={}", 
-                        sessionEvent.getEventCode(), sessionEvent.getSessionType(), header.getSessionUID());
+                publisher.publish(TOPIC, key, event);
+                log.info("Published session event: eventCode={}, sessionType={}, sessionUID={}",
+                        eventCode, sessionEvent.getSessionType(), header.getSessionUID());
+            } else if (eventCode == EventCode.SESSION_TIMEOUT
+                    && (sessionEvent.getSessionTypeId() != null || sessionEvent.getTrackId() != null)) {
+                // Publish session metadata for unknown events that carry type/track (not for FLBK etc.)
+                SessionEventDto infoPayload = SessionEventDto.builder()
+                        .eventCode(EventCode.SESSION_INFO)
+                        .sessionType(sessionEvent.getSessionType())
+                        .sessionTypeId(sessionEvent.getSessionTypeId())
+                        .trackId(sessionEvent.getTrackId())
+                        .totalLaps(sessionEvent.getTotalLaps())
+                        .build();
+                SessionLifecycleEvent event = buildEvent(header, infoPayload);
+                String key = String.valueOf(header.getSessionUID());
+                publisher.publish(TOPIC, key, event);
+                log.debug("Published SESSION_INFO: sessionType={}, trackId={}, sessionUID={}",
+                        infoPayload.getSessionType(), infoPayload.getTrackId(), header.getSessionUID());
             }
         } catch (Exception e) {
             log.error("Failed to parse session packet: sessionUID={}, frame={}", 
@@ -80,6 +91,7 @@ public class SessionPacketHandler {
         return SessionEventDto.builder()
                 .eventCode(eventCode)
                 .sessionType(sessionType)
+                .sessionTypeId(Byte.toUnsignedInt(sessionTypeId))
                 .trackId(trackId)
                 .totalLaps(totalLaps)
                 .build();
@@ -113,8 +125,8 @@ public class SessionPacketHandler {
         };
     }
     
-    private KafkaEnvelope<SessionEventDto> buildEnvelope(PacketHeader header, SessionEventDto payload) {
-        return KafkaEnvelope.<SessionEventDto>builder()
+    private SessionLifecycleEvent buildEvent(PacketHeader header, SessionEventDto payload) {
+        return SessionLifecycleEvent.builder()
                 .schemaVersion(1)
                 .packetId(PacketId.SESSION)
                 .sessionUID(header.getSessionUID())

@@ -138,7 +138,7 @@ export function LiveDashboardPage() {
 
           <div className="card" style={{ padding: 'var(--space-4)' }}>
             <p className="text-muted" style={{ marginBottom: 'var(--space-2)' }}>
-              Session UID: <code className="text-mono">{session.sessionUID}</code>
+              Session: <code className="text-mono">{session.id}</code>
             </p>
             <p className="text-muted" style={{ marginBottom: 'var(--space-2)' }}>
               Connection status: <strong>{status}</strong>
@@ -335,9 +335,14 @@ export function LiveDashboardPage() {
                   fontFamily: 'var(--font-mono)',
                 }}
               >
-                {snapshot?.currentLap != null ? `Lap ${snapshot.currentLap}` : 'Lap —'} ·{' '}
-                {snapshot?.currentSector != null && snapshot.currentSector > 0
-                  ? `Sector ${snapshot.currentSector}`
+                {snapshot?.currentLap != null && snapshot.currentLap > 0
+                  ? `Lap ${snapshot.currentLap}`
+                  : 'Lap —'}{' '}
+                ·{' '}
+                {snapshot?.currentSector != null &&
+                snapshot.currentSector >= 0 &&
+                snapshot.currentSector <= 2
+                  ? `Sector ${snapshot.currentSector + 1}`
                   : 'Sector —'}
               </div>
             </div>

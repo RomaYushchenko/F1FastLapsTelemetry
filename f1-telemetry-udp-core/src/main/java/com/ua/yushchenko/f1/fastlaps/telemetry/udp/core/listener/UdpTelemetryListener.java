@@ -113,8 +113,9 @@ public class UdpTelemetryListener {
             log.trace("Received packet: id={}, session={}, frame={}", 
                       header.getPacketId(), header.getSessionUID(), header.getFrameIdentifier());
             
-            // Remaining buffer contains packet-specific payload
-            dispatcher.dispatch(header, buffer);
+            // Remaining buffer is packet-specific payload; slice so dispatcher rewind() sees payload from position 0
+            ByteBuffer payload = buffer.slice();
+            dispatcher.dispatch(header, payload);
             
         } catch (Exception e) {
             log.error("Error processing packet: {}", e.getMessage(), e);

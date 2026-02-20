@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 /**
  * WebSocket server → client: session ended notification.
+ * Uses session id (UUID string) for consistency with REST API.
  * See: rest_web_socket_api_contracts_f_1_telemetry.md § 4.5.2.
  */
 @Data
@@ -18,7 +19,8 @@ public class WsSessionEndedMessage {
     public static final String TYPE = "SESSION_ENDED";
 
     private String type;
-    private long sessionUID;
+    /** Session public id (UUID string). Same as REST GET /api/sessions/{id}. */
+    private String sessionId;
     /** EVENT_SEND, NO_DATA_TIMEOUT, MANUAL */
     private String endReason;
 }

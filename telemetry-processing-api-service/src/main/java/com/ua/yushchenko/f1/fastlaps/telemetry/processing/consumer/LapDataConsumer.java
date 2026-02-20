@@ -1,6 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.consumer;
 
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDataEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
@@ -33,12 +33,20 @@ public class LapDataConsumer {
             groupId = "${spring.kafka.consumer.group-id}",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consume(KafkaEnvelope<LapDto> envelope, Acknowledgment acknowledgment) {
+    public void consume(LapDataEvent event, Acknowledgment acknowledgment) {
+        if (event == null) {
+            log.warn("Skipping record: deserialization failed (e.g. old format without @type)");
+            acknowledgment.acknowledge();
+            return;
+        }
         try {
-            long sessionUid = envelope.getSessionUID();
-            int frameId = envelope.getFrameIdentifier();
-            short packetId = (short) envelope.getPacketId().ordinal();
-            short carIndex = (short) envelope.getCarIndex();
+            long sessionUid = event.getSessionUID();
+            int frameId = event.getFrameIdentifier();
+            short packetId = (short) event.getPacketId().ordinal();
+            short carIndex = (short) event.getCarIndex();
+
+            // Implicit session start: if no SSTA was received, create session on first data packet
+            lifecycleService.ensureSessionActive(sessionUid);
 
             // Check if session should process packets
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
@@ -65,7 +73,7 @@ public class LapDataConsumer {
             // Update watermark
             state.updateWatermark(carIndex, frameId);
 
-            LapDto lap = envelope.getPayload();
+            LapDto lap = event.getPayload();
             log.debug("Lap data: sessionUid={}, carIndex={}, lap={}, sector={}, lapTime={}ms",
                     sessionUid, carIndex, lap.getLapNumber(), lap.getSector(), lap.getCurrentLapTimeMs());
 
@@ -81,6 +89,7 @@ public class LapDataConsumer {
             }
             snapshot.setCurrentLap(lap.getLapNumber());
             snapshot.setCurrentSector(lap.getSector() != null ? lap.getSector() : 0);
+            snapshot.setLapDistanceM(lap.getLapDistance());
 
             acknowledgment.acknowledge();
         } catch (Exception e) {

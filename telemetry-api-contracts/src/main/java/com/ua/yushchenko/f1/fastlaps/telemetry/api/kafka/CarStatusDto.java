@@ -21,5 +21,7 @@ public class CarStatusDto {
     private Integer fuelMix;
     private Boolean drsAllowed;
     private Integer tyresCompound;
+    /** Age in laps of the current set of tyres (from F1 25 CarStatusData m_tyresAgeLaps). */
+    private Integer tyresAgeLaps;
     private Float ersStoreEnergy;
 }

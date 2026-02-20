@@ -1,7 +1,8 @@
 export interface Session {
-  sessionUID: number
-  sessionType: string
-  trackId: number
+  /** Session public id (UUID). Use in URLs and WebSocket subscribe. */
+  id: string
+  sessionType?: string | null
+  trackId?: number | null
   trackLengthM?: number
   totalLaps?: number
   aiDifficulty?: number

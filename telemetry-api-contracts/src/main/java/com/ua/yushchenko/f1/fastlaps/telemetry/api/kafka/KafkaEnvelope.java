@@ -11,12 +11,14 @@ import java.time.Instant;
  * Envelope for Kafka messages (Kafka contract).
  * See: kafka_contracts_f_1_telemetry.md § 4.
  *
- * @param <T> payload type (SessionEventDto, LapDto, CarTelemetryDto, CarStatusDto)
+ * @param <T> payload (DTO) type.
+ * @deprecated Use event entities ({@link LapDataEvent}, {@link CarTelemetryEvent}, etc.) that include the DTO instead.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@Deprecated
 public class KafkaEnvelope<T> {
 
     private int schemaVersion;

@@ -9,6 +9,8 @@ public enum EventCode {
     SSTA,
     /** Session ended */
     SEND,
+    /** Session metadata (type, track) for existing session (e.g. after implicit start) */
+    SESSION_INFO,
     /** Session timeout (no data) */
     SESSION_TIMEOUT,
     /** Flashback / rewind */

@@ -95,7 +95,7 @@ export function useLiveTelemetry() {
           connectionMessage: null,
       }))
 
-      const sessionUid = activeSession.sessionUID
+      const sessionId = activeSession.id
 
       stompClient.onConnect = () => {
         if (isCancelled) {
@@ -103,9 +103,9 @@ export function useLiveTelemetry() {
           return
         }
 
-        // Subscribe to live snapshots
+        // Subscribe to live snapshots (topic uses session UUID)
         liveSubscription = stompClient.subscribe(
-          `/topic/live/${sessionUid}`,
+          `/topic/live/${sessionId}`,
           (message: IMessage) => {
             try {
               const payload = JSON.parse(message.body) as WsServerMessage
@@ -151,12 +151,12 @@ export function useLiveTelemetry() {
           }
         })
 
-        // Send subscribe command
+        // Send subscribe command (session id = UUID)
         stompClient.publish({
           destination: '/app/subscribe',
           body: JSON.stringify({
             type: 'SUBSCRIBE',
-            sessionUID: sessionUid,
+            sessionId,
             carIndex: 0,
           }),
         })

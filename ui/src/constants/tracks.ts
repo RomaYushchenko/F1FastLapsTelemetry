@@ -31,7 +31,8 @@ const TRACK_NAMES: Record<number, string> = {
   30: 'Jeddah',
 }
 
-export function getTrackName(trackId: number): string {
+export function getTrackName(trackId: number | null | undefined): string {
+  if (trackId == null) return '—'
   const name = TRACK_NAMES[trackId]
   if (name) return name
   return `Track #${trackId}`

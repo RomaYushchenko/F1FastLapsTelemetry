@@ -37,5 +37,7 @@ docker-compose up -d
 - `07-laps.sql` — `laps`
 - `08-session-summary.sql` — `session_summary`
 - `09-retention.sql` — retention policy 14 днів для raw
+- `10-sessions-public-id.sql` — public_id для sessions (якщо є)
+- `11-pedal-trace.sql` — колонки `lap_number`, `lap_distance_m` у `car_telemetry_raw` для pedal trace
 
 Документація DDL: [f_1_telemetry_project_architecture.md](../.github/project/f_1_telemetry_project_architecture.md) § 9.

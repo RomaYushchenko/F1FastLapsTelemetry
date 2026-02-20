@@ -61,7 +61,7 @@ react_spa_ui_architecture.md
 
 - **Kafka key:** `sessionUID`
 - **Idempotency key:** `(sessionUID, frameIdentifier, packetId, carIndex)`
-- **Topics:** `telemetry.session`, `telemetry.lap`, `telemetry.carTelemetry`, `telemetry.carStatus`
+- **Topics:** `telemetry.session`, `telemetry.lap`, `telemetry.carTelemetry`, `telemetry.carStatus`, `telemetry.carDamage`
 - **Session FSM:** `INIT → ACTIVE → ENDING → TERMINAL`
 - **Lap FSM:** `NOT_STARTED → IN_PROGRESS → SECTOR_COMPLETED → COMPLETED`
 - **MVP:** тільки player car (`carIndex = 0`)
@@ -241,6 +241,7 @@ react_spa_ui_architecture.md
 - ✅ LapDataPacketHandler (packetId=2) → Kafka topic: `telemetry.lap`
 - ✅ CarTelemetryPacketHandler (packetId=6) → Kafka topic: `telemetry.carTelemetry`
 - ✅ CarStatusPacketHandler (packetId=7) → Kafka topic: `telemetry.carStatus`
+- ✅ CarDamagePacketHandler (packetId=10) → Kafka topic: `telemetry.carDamage` (tyre wear для графіка зносу шин)
 
 **udp-ingest-service:**
 - ✅ Spring Boot application з dependency на UDP starter
@@ -326,7 +327,7 @@ react_spa_ui_architecture.md
 | 5.4 | Consumer telemetry.session | Deserialize envelope, виклик SessionLifecycleService.onSessionStarted/onSessionEnded по eventCode | State змінюється |
 | 5.5 | Consumer telemetry.lap | Deserialize, idempotency check, передача в LapAggregator (етап 6) | Laps оновлюються |
 | 5.6 | Consumer telemetry.carTelemetry | Idempotency, передача в RawTelemetryWriter + оновлення SessionRuntimeState (snapshot для WS) | Raw + state |
-| 5.7 | Consumer telemetry.carStatus | Idемпотентність, RawTelemetryWriter (car_status_raw) | Raw записується |
+| 5.7 | Consumer telemetry.carStatus | Idемпотентність, CarStatusRawWriter (car_status_raw) | Raw записується |
 | 5.8 | Watermark: оновлювати lastSeenFrame; агрегувати тільки frame ≥ watermark | За state_machines_spec | Out-of-order не ламає агрегати |
 
 ---
@@ -340,7 +341,7 @@ react_spa_ui_architecture.md
 | 6.3 | Lap finalization rules | При старті наступного кола або при завершенні сесії — запис lap у DB | За FSM |
 | 6.4 | SessionSummaryAggregator | При фіналізації lap — оновлення best_lap_time_ms, best_sector_*_ms, best_lap_number, total_laps | session_summary upsert |
 | 6.5 | RawTelemetryWriter: batch insert car_telemetry_raw | Batch з N записів, ts від sessionTime (або derived), тільки для ACTIVE | Записи в TimescaleDB |
-| 6.6 | RawTelemetryWriter: batch insert car_status_raw | Аналогічно | Записи в TimescaleDB |
+| 6.6 | CarStatusRawWriter: insert car_status_raw | CarStatusConsumer викликає writer при активній сесії; entity CarStatusRaw, tyres_age_laps | Записи в TimescaleDB |
 | 6.7 | Confidence flag (опційно MVP) | При packet_loss > 5% встановлювати confidence = LOW у session_summary | За observability contract |
 
 ---
@@ -374,10 +375,13 @@ react_spa_ui_architecture.md
 | 8.5 | GET /api/sessions/{sessionUid}/summary | SessionSummaryDto | Відповідь за контрактом | ✅ |
 | 8.6 | Поле state в відповідях | ACTIVE / FINISHED (TERMINAL) завжди присутнє де потрібно | За REST contract | ✅ |
 | 8.7 | (Опційно) GET /api/sessions/{uid}/telemetry?from=&to=&metric= | Читання з car_telemetry_raw | Для графіків | ⚠️ Skipped (MVP) |
+| 8.8 | GET /api/sessions/{uid}/pace | Список { lapNumber, lapTimeMs } для графіка темпу (з laps) | 200 + [] якщо немає кіл; 404 якщо немає сесії | ✅ |
+| 8.9 | GET /api/sessions/{uid}/laps/{lapNum}/trace | Профіль throttle/brake по колу (MVP: 200 + []) | Контракт § 3.5; MVP без raw telemetry | ✅ |
+| 8.10 | GET /api/sessions/{uid}/tyre-wear | Знос шин по колах (wear FL/FR/RL/RR %), з таблиці tyre_wear_per_lap | Контракт § 3.6; 200 + [] якщо немає даних | ✅ |
 
 **Реалізовано:**
 - ✅ SessionController з endpoints: list, get by ID, get active
-- ✅ LapController з endpoints: laps, sectors
+- ✅ LapController з endpoints: laps, sectors, pace, laps/{lapNum}/trace, tyre-wear
 - ✅ SessionSummaryController з endpoint: summary
 - ✅ RestExceptionHandler для стандартизованих помилок
 - ✅ Entity-to-DTO конвертація

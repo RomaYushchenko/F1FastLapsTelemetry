@@ -281,6 +281,36 @@ F1FastLapsTelemetry/
         └── ...
 ```
 
+## 🆘 Troubleshooting
+
+### Kafka: `InconsistentClusterIdException` — cluster ID doesn't match
+
+**Symptom:** Kafka container exits with:
+```text
+InconsistentClusterIdException: The Cluster ID ... doesn't match stored clusterId ... in meta.properties.
+The broker is trying to join the wrong cluster.
+```
+
+**Cause:** Zookeeper was recreated (new container or volume) and has a new cluster ID, but Kafka's data volume still has the old cluster ID in `meta.properties`. This often happens after `docker-compose down -v` on Zookeeper only, or after removing/recreating the Zookeeper container.
+
+**Fix:** Remove Kafka's data volume so Kafka starts fresh and creates new data that matches the current Zookeeper. **This deletes all Kafka topics and messages.**
+
+```bash
+docker-compose down
+docker volume rm f1-telemetry-kafka-data
+docker-compose up -d
+```
+
+If the volume name differs, list volumes and remove the Kafka one:
+```bash
+docker volume ls | grep kafka
+docker volume rm <kafka-volume-name>
+```
+
+Then start again: `docker-compose up -d`.
+
+---
+
 ## 🆘 Support
 
 If you encounter issues:

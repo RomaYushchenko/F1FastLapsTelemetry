@@ -39,7 +39,7 @@ public class SimpleUdpPacketDispatcher implements UdpPacketDispatcher {
         
         for (UdpPacketConsumer consumer : handlers) {
             try {
-                // Reset buffer position for each consumer so they all see the same data
+                // Contract: payload is packet data only (no header). Rewind so each consumer sees from start.
                 payload.rewind();
                 consumer.handle(header, payload);
             } catch (Exception e) {

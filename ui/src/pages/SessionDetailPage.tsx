@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary } from '../api/client'
+import { getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
+import { isValidSessionId } from '../api/sessionId'
 import type { Lap, Session, SessionSummary } from '../api/types'
 import { HttpError } from '../api/types'
 import { getTrackName } from '../constants/tracks'
-import type { PacePoint, PedalTracePoint } from '../charts/types'
+import type { PacePoint, PedalTracePoint, TyreWearPoint } from '../charts/types'
 import { PaceChart } from '../charts/pace-chart'
 import { ThrottleBrakeChart } from '../charts/throttle-brake-chart'
+import { TyreWearChart } from '../charts/tyre-wear-chart'
 
 type LoadStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -18,13 +20,16 @@ export function SessionDetailPage() {
   const [status, setStatus] = useState<LoadStatus>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const isCancelledRef = useRef(false)
+  /** Track laps length so we can auto-switch pedal trace to the newly completed lap. */
+  const prevLapsLengthRef = useRef(0)
   const [pacePoints, setPacePoints] = useState<PacePoint[]>([])
+  const [tyreWearPoints, setTyreWearPoints] = useState<TyreWearPoint[]>([])
   const [selectedLapForTrace, setSelectedLapForTrace] = useState<number | null>(null)
   const [tracePoints, setTracePoints] = useState<PedalTracePoint[] | null>(null)
   const [traceStatus, setTraceStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
   const [traceError, setTraceError] = useState<string | null>(null)
 
-  async function loadTrace(currentSessionUid: string, lapNumber: number) {
+  const loadTrace = useCallback(async (currentSessionUid: string, lapNumber: number) => {
     setTraceStatus('loading')
     setTraceError(null)
     try {
@@ -37,12 +42,20 @@ export function SessionDetailPage() {
       setTraceStatus('error')
       setTraceError(error instanceof Error ? error.message : 'Failed to load pedal trace')
     }
-  }
+  }, [])
 
+  /** Full load: shows loading state, used on mount and retry. */
   const load = useCallback(async () => {
     if (sessionUid == null) {
       setStatus('error')
       setErrorMessage('Session ID is missing in URL')
+      return
+    }
+    if (!isValidSessionId(sessionUid)) {
+      setStatus('error')
+      setErrorMessage(
+        'Invalid session ID. Use a session link from the Sessions list.',
+      )
       return
     }
 
@@ -63,22 +76,33 @@ export function SessionDetailPage() {
       setLaps(lapsRes)
       setSummary(summaryRes)
 
-      const initialLapForTrace = summaryRes.bestLapNumber ?? (lapsRes[0]?.lapNumber ?? null)
+      const initialSummary = (summaryRes.totalLaps != null && summaryRes.totalLaps > 0) || summaryRes.bestLapTimeMs != null
+        ? summaryRes
+        : deriveSummaryFromLaps(lapsRes)
+      const initialLapForTrace = initialSummary.bestLapNumber ?? (lapsRes[0]?.lapNumber ?? null)
       if (initialLapForTrace != null) {
         setSelectedLapForTrace(initialLapForTrace)
         void loadTrace(id, initialLapForTrace)
       }
+      prevLapsLengthRef.current = lapsRes.length
 
-      // Pace API is optional: load it separately so that failures (e.g. 404/501)
-      // do not block the core session details from rendering.
+      // Pace and tyre wear APIs are optional: load separately so failures do not block core session details.
       void (async () => {
         try {
           const paceRes = await getSessionPace(id)
           if (isCancelledRef.current) return
           setPacePoints(paceRes)
         } catch {
-          // Ignore pace errors for now; core session data is still usable.
-          // We intentionally do not change page `status` here.
+          // ignore
+        }
+      })()
+      void (async () => {
+        try {
+          const tyreWearRes = await getSessionTyreWear(id)
+          if (isCancelledRef.current) return
+          setTyreWearPoints(tyreWearRes)
+        } catch {
+          // ignore
         }
       })()
 
@@ -96,7 +120,73 @@ export function SessionDetailPage() {
         error instanceof Error ? error.message : 'Failed to load session details',
       )
     }
-  }, [sessionUid])
+  }, [sessionUid, loadTrace])
+
+  /** Background refresh: updates data without loading state or re-mount feel. */
+  const refreshInBackground = useCallback(async () => {
+    if (sessionUid == null || !isValidSessionId(sessionUid)) return
+
+    const id = sessionUid
+    try {
+      const [sessionRes, lapsRes, summaryRes] = await Promise.all([
+        getSession(id),
+        getSessionLaps(id, 0),
+        getSessionSummary(id, 0),
+      ])
+
+      if (isCancelledRef.current) return
+
+      setSession(sessionRes)
+      setLaps(lapsRes)
+      setSummary(summaryRes)
+
+      // When a new lap appears, auto-switch pedal trace to that lap (avoid setState in effect).
+      // Do not auto-switch on first data load: ref starts at 0, so existing laps would be
+      // treated as "new lap" and override the initial best-lap selection.
+      const currentLength = lapsRes.length
+      if (prevLapsLengthRef.current === 0) {
+        prevLapsLengthRef.current = currentLength
+      } else if (currentLength > prevLapsLengthRef.current && currentLength > 0) {
+        const lastLap = lapsRes[currentLength - 1]
+        const newLapNumber = lastLap?.lapNumber
+        if (newLapNumber != null) {
+          prevLapsLengthRef.current = currentLength
+          setSelectedLapForTrace(newLapNumber)
+          void loadTrace(id, newLapNumber)
+        }
+      } else {
+        prevLapsLengthRef.current = currentLength
+      }
+
+      try {
+        const paceRes = await getSessionPace(id)
+        if (!isCancelledRef.current) setPacePoints(paceRes)
+      } catch {
+        // ignore
+      }
+      try {
+        const tyreWearRes = await getSessionTyreWear(id)
+        if (!isCancelledRef.current) setTyreWearPoints(tyreWearRes)
+      } catch {
+        // ignore
+      }
+    } catch {
+      // Keep current data on refresh failure; do not show error or loading.
+    }
+  }, [sessionUid, loadTrace])
+
+  /** Quiet refresh of pedal trace for current lap (no loading state) so chart updates in real time. */
+  const refreshTraceInBackground = useCallback(
+    async (currentSessionUid: string, lapNumber: number) => {
+      try {
+        const points = await getLapTrace(currentSessionUid, lapNumber)
+        if (!isCancelledRef.current) setTracePoints(points)
+      } catch {
+        // keep current trace on error
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     isCancelledRef.current = false
@@ -108,21 +198,45 @@ export function SessionDetailPage() {
     }
   }, [load])
 
-  const bestLapNumber = summary?.bestLapNumber ?? null
+  // Background refresh while session is active: update data without loading state or full reload
+  const isActiveSession = session?.state === 'ACTIVE'
+  useEffect(() => {
+    if (!isActiveSession || status !== 'loaded') return
+    const intervalMs = 5000
+    const t = setInterval(() => {
+      void refreshInBackground()
+      if (sessionUid != null && selectedLapForTrace != null) {
+        void refreshTraceInBackground(sessionUid, selectedLapForTrace)
+      }
+    }, intervalMs)
+    return () => clearInterval(t)
+  }, [isActiveSession, status, refreshInBackground, refreshTraceInBackground, sessionUid, selectedLapForTrace])
+
+  // Always derive best lap and best sectors from current laps so table and summary show real best per column
+  const effectiveSummary = useMemo((): SessionSummary | null => {
+    if (!summary) return null
+    if (laps.length > 0) {
+      const derived = deriveSummaryFromLaps(laps)
+      return { ...summary, ...derived }
+    }
+    return summary
+  }, [summary, laps])
+
+  const bestLapNumber = effectiveSummary?.bestLapNumber ?? null
 
   const bestSectors = useMemo(() => {
-    if (!summary) {
+    if (!effectiveSummary) {
       return { s1: null as number | null, s2: null as number | null, s3: null as number | null }
     }
     return {
-      s1: summary.bestSector1Ms,
-      s2: summary.bestSector2Ms,
-      s3: summary.bestSector3Ms,
+      s1: effectiveSummary.bestSector1Ms,
+      s2: effectiveSummary.bestSector2Ms,
+      s3: effectiveSummary.bestSector3Ms,
     }
-  }, [summary])
+  }, [effectiveSummary])
 
   const bestSectorLapNumbers = useMemo(() => {
-    if (!summary || laps.length === 0) {
+    if (!effectiveSummary || laps.length === 0) {
       return { s1: null as number | null, s2: null as number | null, s3: null as number | null }
     }
 
@@ -134,11 +248,11 @@ export function SessionDetailPage() {
     }
 
     return {
-      s1: findLapNumberForSector(summary.bestSector1Ms, lap => lap.sector1Ms),
-      s2: findLapNumberForSector(summary.bestSector2Ms, lap => lap.sector2Ms),
-      s3: findLapNumberForSector(summary.bestSector3Ms, lap => lap.sector3Ms),
+      s1: findLapNumberForSector(effectiveSummary.bestSector1Ms, lap => lap.sector1Ms),
+      s2: findLapNumberForSector(effectiveSummary.bestSector2Ms, lap => lap.sector2Ms),
+      s3: findLapNumberForSector(effectiveSummary.bestSector3Ms, lap => lap.sector3Ms),
     }
-  }, [laps, summary])
+  }, [laps, effectiveSummary])
 
   const titleIdPart =
     sessionUid != null && sessionUid.length > 0 ? `${sessionUid.slice(0, 12)}…` : '—'
@@ -149,7 +263,7 @@ export function SessionDetailPage() {
 
       {session && (
         <p className="text-muted" style={{ marginBottom: 'var(--space-4)' }}>
-          {session.sessionType} · {getTrackName(session.trackId)}{' '}
+          {session.sessionType ?? '—'} · {getTrackName(session.trackId)}{' '}
           {session.startedAt && (
             <>
               ·{' '}
@@ -223,7 +337,7 @@ export function SessionDetailPage() {
         </div>
       )}
 
-      {status === 'loaded' && session && summary && (
+      {status === 'loaded' && session && effectiveSummary && (
         <>
           {/* Summary block */}
           <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
@@ -240,25 +354,25 @@ export function SessionDetailPage() {
               <SummaryItem
                 label="Best lap"
                 value={
-                  summary.bestLapTimeMs != null
-                    ? formatLapTime(summary.bestLapTimeMs)
+                  effectiveSummary.bestLapTimeMs != null
+                    ? formatLapTime(effectiveSummary.bestLapTimeMs)
                     : undefined
                 }
                 extra={
-                  summary.bestLapNumber != null
-                    ? `Lap ${summary.bestLapNumber}`
+                  effectiveSummary.bestLapNumber != null
+                    ? `Lap ${effectiveSummary.bestLapNumber}`
                     : undefined
                 }
               />
               <SummaryItem
                 label="Total laps"
-                value={summary.totalLaps != null ? String(summary.totalLaps) : undefined}
+                value={effectiveSummary.totalLaps != null ? String(effectiveSummary.totalLaps) : undefined}
               />
               <SummaryItem
                 label="Best S1"
                 value={
-                  summary.bestSector1Ms != null
-                    ? formatSectorTime(summary.bestSector1Ms)
+                  effectiveSummary.bestSector1Ms != null
+                    ? formatSectorTime(effectiveSummary.bestSector1Ms)
                     : undefined
                 }
                 extra={
@@ -270,8 +384,8 @@ export function SessionDetailPage() {
               <SummaryItem
                 label="Best S2"
                 value={
-                  summary.bestSector2Ms != null
-                    ? formatSectorTime(summary.bestSector2Ms)
+                  effectiveSummary.bestSector2Ms != null
+                    ? formatSectorTime(effectiveSummary.bestSector2Ms)
                     : undefined
                 }
                 extra={
@@ -283,8 +397,8 @@ export function SessionDetailPage() {
               <SummaryItem
                 label="Best S3"
                 value={
-                  summary.bestSector3Ms != null
-                    ? formatSectorTime(summary.bestSector3Ms)
+                  effectiveSummary.bestSector3Ms != null
+                    ? formatSectorTime(effectiveSummary.bestSector3Ms)
                     : undefined
                 }
                 extra={
@@ -300,6 +414,16 @@ export function SessionDetailPage() {
           <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
             <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-3)' }}>Lap pace</h2>
             <PaceChart points={pacePoints} />
+          </div>
+
+          <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
+            <h2 id="tyre-wear" style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-1)' }}>
+              Tyre wear
+            </h2>
+            <p className="text-muted" style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
+              Якість гуми по колах (FL, FR, RL, RR). Увімкніть car damage у налаштуваннях F1 25 для запису.
+            </p>
+            <TyreWearChart points={tyreWearPoints} />
           </div>
 
           {/* Pedal trace chart */}
@@ -412,25 +536,35 @@ export function SessionDetailPage() {
                     <tr
                       key={lap.lapNumber}
                       style={{
-                        backgroundColor: isBestLap ? 'rgba(34,197,94,0.06)' : 'transparent',
+                        backgroundColor: isBestLap ? 'rgba(34, 197, 94, 0.12)' : 'transparent',
                       }}
                     >
                       <td
                         style={{
                           textAlign: 'left',
                           fontWeight: isBestLap ? 'var(--font-weight-medium)' : undefined,
+                          color: isBestLap ? 'var(--success)' : undefined,
                         }}
                       >
                         {lap.lapNumber}
                       </td>
                       <td>
-                        {lap.lapTimeMs != null ? formatLapTime(lap.lapTimeMs) : '—'}
+                        <span
+                          style={{
+                            fontFamily: 'var(--font-mono)',
+                            color: isBestLap ? 'var(--success)' : undefined,
+                            fontWeight: isBestLap ? 'var(--font-weight-medium)' : undefined,
+                          }}
+                        >
+                          {lap.lapTimeMs != null ? formatLapTime(lap.lapTimeMs) : '—'}
+                        </span>
                         {isBestLap && (
                           <span
                             style={{
                               marginLeft: 'var(--space-1)',
                               fontSize: 'var(--text-xs)',
-                              color: 'var(--accent-muted)',
+                              color: 'var(--success)',
+                              fontWeight: 'var(--font-weight-medium)',
                             }}
                           >
                             BEST
@@ -546,7 +680,7 @@ function SectorCell(props: SectorCellProps) {
     <span
       style={{
         fontFamily: 'var(--font-mono)',
-        color: props.isBest ? 'var(--accent-muted)' : 'inherit',
+        color: props.isBest ? 'var(--success)' : 'inherit',
         fontWeight: props.isBest ? 'var(--font-weight-medium)' : undefined,
       }}
     >
@@ -556,6 +690,7 @@ function SectorCell(props: SectorCellProps) {
           style={{
             marginLeft: 'var(--space-1)',
             fontSize: 'var(--text-xs)',
+            color: 'var(--success)',
           }}
         >
           *
@@ -580,5 +715,42 @@ function formatSectorTime(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return '—'
   const totalSeconds = ms / 1000
   return totalSeconds.toFixed(3)
+}
+
+/** Derive session summary from laps when API summary is missing or empty. */
+function deriveSummaryFromLaps(laps: Lap[]): SessionSummary {
+  const validLaps = laps.filter(lap => !lap.isInvalid)
+  let bestLapTimeMs: number | null = null
+  let bestLapNumber: number | null = null
+  let bestSector1Ms: number | null = null
+  let bestSector2Ms: number | null = null
+  let bestSector3Ms: number | null = null
+
+  for (const lap of validLaps) {
+    if (lap.lapTimeMs != null && lap.lapTimeMs > 0) {
+      if (bestLapTimeMs == null || lap.lapTimeMs < bestLapTimeMs) {
+        bestLapTimeMs = lap.lapTimeMs
+        bestLapNumber = lap.lapNumber
+      }
+    }
+    if (lap.sector1Ms != null && (bestSector1Ms == null || lap.sector1Ms < bestSector1Ms)) {
+      bestSector1Ms = lap.sector1Ms
+    }
+    if (lap.sector2Ms != null && (bestSector2Ms == null || lap.sector2Ms < bestSector2Ms)) {
+      bestSector2Ms = lap.sector2Ms
+    }
+    if (lap.sector3Ms != null && (bestSector3Ms == null || lap.sector3Ms < bestSector3Ms)) {
+      bestSector3Ms = lap.sector3Ms
+    }
+  }
+
+  return {
+    totalLaps: laps.length,
+    bestLapTimeMs,
+    bestLapNumber,
+    bestSector1Ms,
+    bestSector2Ms,
+    bestSector3Ms,
+  }
 }
 
