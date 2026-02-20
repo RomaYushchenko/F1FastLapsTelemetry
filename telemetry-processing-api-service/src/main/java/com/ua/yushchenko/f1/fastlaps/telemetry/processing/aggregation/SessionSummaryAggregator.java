@@ -1,5 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.SessionSummaryBuilder;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionSummaryRepository;
@@ -25,11 +26,7 @@ public class SessionSummaryAggregator {
     @Transactional
     public void updateWithLap(long sessionUid, short carIndex, Lap lap) {
         SessionSummary summary = summaryRepository.findBySessionUidAndCarIndex(sessionUid, carIndex)
-                .orElse(SessionSummary.builder()
-                        .sessionUid(sessionUid)
-                        .carIndex(carIndex)
-                        .totalLaps((short) 0)
-                        .build());
+                .orElse(SessionSummaryBuilder.empty(sessionUid, carIndex));
 
         // Update total laps
         summary.setTotalLaps((short) (summary.getTotalLaps() + 1));

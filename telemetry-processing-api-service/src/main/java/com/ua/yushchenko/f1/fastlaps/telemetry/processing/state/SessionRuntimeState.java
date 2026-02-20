@@ -108,21 +108,7 @@ public class SessionRuntimeState {
         }
         // For MVP, return first available snapshot (carIndex 0 typically)
         CarSnapshot snapshot = snapshots.get(0);
-        if (snapshot == null) {
-            return null;
-        }
-        return com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage.builder()
-                .type(com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage.TYPE)
-                .timestamp(snapshot.getTimestamp())
-                .speedKph(snapshot.getSpeedKph())
-                .gear(snapshot.getGear())
-                .engineRpm(snapshot.getEngineRpm())
-                .throttle(snapshot.getThrottle())
-                .brake(snapshot.getBrake())
-                .drs(snapshot.getDrs())
-                .currentLap(snapshot.getCurrentLap())
-                .currentSector(snapshot.getCurrentSector())
-                .build();
+        return com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.WsSnapshotMessageBuilder.build(snapshot);
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.TyreWearPerLapBuilder;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TyreWearPerLap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TyreWearPerLapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TyreWearSnapshot;
@@ -28,19 +29,11 @@ public class TyreWearRecorder {
     @Transactional
     public void recordForLap(long sessionUid, short carIndex, short lapNumber) {
         TyreWearSnapshot snapshot = tyreWearState.get(sessionUid, carIndex);
-        if (snapshot == null) {
+        TyreWearPerLap entity = TyreWearPerLapBuilder.fromSnapshot(sessionUid, carIndex, lapNumber, snapshot);
+        if (entity == null) {
             log.debug("No tyre wear snapshot for sessionUid={}, carIndex={}, lap={}", sessionUid, carIndex, lapNumber);
             return;
         }
-        TyreWearPerLap entity = TyreWearPerLap.builder()
-                .sessionUid(sessionUid)
-                .carIndex(carIndex)
-                .lapNumber(lapNumber)
-                .wearFL(snapshot.getWearFL())
-                .wearFR(snapshot.getWearFR())
-                .wearRL(snapshot.getWearRL())
-                .wearRR(snapshot.getWearRR())
-                .build();
         tyreWearPerLapRepository.save(entity);
         log.debug("Recorded tyre wear for sessionUid={}, carIndex={}, lap={}", sessionUid, carIndex, lapNumber);
     }
