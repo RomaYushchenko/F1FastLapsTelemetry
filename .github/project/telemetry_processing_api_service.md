@@ -172,7 +172,19 @@ telemetry-processing-api-service
 
 ---
 
-## 7. Індекс документації
+## 7. Тестування
+
+Юніт-тести модуля підпорядковані [unit_testing_policy.md](unit_testing_policy.md):
+
+- **Стек:** JUnit Jupiter + Mockito; тестові дані — з централізованого класу **TestData**.
+- **Структура:** AAA (Arrange–Act–Assert), `@DisplayName` на тестовий клас і кожен тест-метод.
+- **Покриття:** мінімум **85%** line coverage; перевірка при `mvn -pl telemetry-processing-api-service verify`.
+
+План покриття по фазах: [unit_test_coverage_plan.md](../../.cursor/plans/unit_test_coverage_plan.md).
+
+---
+
+## 8. Індекс документації
 
 - [documentation_index.md](documentation_index.md) — індекс усієї документації проєкту.
 - [ARCHITECTURE_CLARIFICATION.md](ARCHITECTURE_CLARIFICATION.md) — розмежування UDP Library, udp-ingest-service та telemetry-processing-api-service.

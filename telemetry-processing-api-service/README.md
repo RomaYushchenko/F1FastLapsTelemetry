@@ -21,3 +21,17 @@ cd telemetry-processing-api-service && mvn spring-boot:run
 ```
 
 Перед запуском мають бути доступні Kafka та PostgreSQL/TimescaleDB (наприклад через `infra/docker-compose`).
+
+## Тестування
+
+Юніт-тести пишуться згідно [політики тестування](../.github/project/unit_testing_policy.md): **JUnit Jupiter + Mockito**, статичні дані з класу **TestData**, структура **AAA**, **@DisplayName**. Покриття коду має бути **не менше 85%** (line coverage).
+
+```bash
+# Запуск тестів
+mvn -pl telemetry-processing-api-service test
+
+# Тести + перевірка покриття (85%)
+mvn -pl telemetry-processing-api-service verify
+```
+
+Звіт JaCoCo: `target/site/jacoco/index.html`.

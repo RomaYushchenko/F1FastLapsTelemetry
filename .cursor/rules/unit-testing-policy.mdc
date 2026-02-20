@@ -1,0 +1,45 @@
+---
+name: unit-testing-policy
+description: Політика юніт-тестування — JUnit Jupiter, Mockito, TestData, AAA, @DisplayName; покриття не менше 85%. Застосовувати при написанні, рев’ю або зміні тестів, при питаннях про coverage або тестові дані.
+globs: **/*Test.java
+---
+
+# Unit testing — інструкція для агента
+
+При будь-якій роботі з юніт-тестами (написання, доповнення, рефакторинг, перевірка покриття) дотримуйся цієї політики. Повний текст: `.github/project/unit_testing_policy.md`.
+
+## Покриття
+
+- **Мінімум 85%** line coverage для коду, що враховується JaCoCo (маппери, сервіси, контролери, state, exception handler, білдери).
+- Перевірка: `mvn -pl telemetry-processing-api-service verify`. Якщо падає через coverage — додай або онови тести.
+
+## Стек
+
+- **JUnit 5 (Jupiter)** — фреймворк тестів.
+- **Mockito** — моки залежностей: `@ExtendWith(MockitoExtension.class)`, `@Mock` для полів; тестований об’єкт створювати в `@BeforeEach` і передавати йому моки (або нові маппери/білдери без моків).
+- **AssertJ** — `assertThat(...)`, для винятків — `assertThatThrownBy(...)`.
+
+## Статичні тестові дані (TestData)
+
+- У проєкті є централізований клас **TestData** (або аналог) з константами та фабриками: `session()`, `lap()`, `sessionSummary()`, `carTelemetryRaw()`, `tyreWearPerLap()`, `runtimeStateActive()`, `SESSION_UID`, `SESSION_PUBLIC_ID_STR` тощо.
+- **Не створюй** тестові сутності inline у тестах — використовуй `TestData.*`. Якщо потрібні нові дані — спочатку додай їх у TestData, потім використовуй у тестах.
+
+## AAA та @DisplayName
+
+- Кожен тест: **Arrange** (дані з TestData, `when(...).thenReturn(...)`), **Act** (виклик методу під тест), **Assert** (`assertThat`, `verify`). Відділяй блоки коментарями `// Arrange`, `// Act`, `// Assert` або порожніми рядками.
+- **@DisplayName** на тестовий клас (наприклад `@DisplayName("SessionMapper")`) і на **кожен** тест-метод — короткий опис сценарію українською (наприклад `@DisplayName("toDto повертає null коли session null")`).
+
+## Правила
+
+- Один production-клас — один тестовий клас; залежності мокати, без реальної БД/Kafka.
+- Мок-дані та константи — тільки з TestData.
+- Для класів із залежностями: `@ExtendWith(MockitoExtension.class)`, `@Mock`, ініціалізація в `@BeforeEach`.
+- Перевірки: AssertJ; при потребі — `verify(mock).method(...)`.
+
+## Команди
+
+- Запуск тестів: `mvn -pl telemetry-processing-api-service test`
+- Тести + перевірка 85%: `mvn -pl telemetry-processing-api-service verify`
+- Звіт покриття: `telemetry-processing-api-service/target/site/jacoco/index.html`
+
+План покриття по фазах: `.cursor/plans/unit_test_coverage_plan.md`.

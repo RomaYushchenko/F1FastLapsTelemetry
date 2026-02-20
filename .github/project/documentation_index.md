@@ -21,6 +21,18 @@
 
 ---
 
+## Unit testing (юніт-тести)
+
+**Політика тестування:** [unit_testing_policy.md](unit_testing_policy.md) — обов'язковий референс при написанні та зміні тестів.
+
+- **Стек:** JUnit Jupiter + Mockito; статичні тестові дані з централізованого класу (TestData).
+- **Структура тесту:** AAA (Arrange–Act–Assert), `@DisplayName` на клас і кожен тест-метод.
+- **Покриття:** мінімум **85%** line coverage; перевірка — `mvn -pl telemetry-processing-api-service verify`.
+
+Детальний план покриття по фазах: [unit_test_coverage_plan.md](../../.cursor/plans/unit_test_coverage_plan.md).
+
+---
+
 ## Which document to read first
 
 ### Рекомендований порядок читання
