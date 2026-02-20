@@ -50,6 +50,8 @@ MVP реалізується як **один інстанс** (Docker Compose), 
 
 ### 3.2 Telemetry Processing & API Service
 
+**Детальна документація сервісу:** [telemetry_processing_api_service.md](telemetry_processing_api_service.md)
+
 **Відповідальність:**
 - споживає Kafka‑події;
 - агрегує телеметрію;

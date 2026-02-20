@@ -90,6 +90,8 @@ public class UdpIngestApplication {
 ---
 
 ### 3. telemetry-processing-api-service
+**Детальна документація:** [telemetry_processing_api_service.md](telemetry_processing_api_service.md)
+
 **What it is:** Completely separate Spring Boot application (microservice)
 
 **What it does:**
@@ -246,7 +248,8 @@ pom.xml
 
 **Total lines of business code:** ~10 lines
 
-### telemetry-processing-api-service (LOTS OF CODE)
+### telemetry-processing-api-service (LOTS OF CODE)  
+**Актуальна структура та опис після рефакторингу:** [telemetry_processing_api_service.md](telemetry_processing_api_service.md)
 ```
 src/main/java/
   └── com.ua.yushchenko.f1.fastlaps.telemetry.processing/

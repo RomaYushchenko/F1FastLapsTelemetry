@@ -40,7 +40,7 @@
     - нормалізує DTO,
     - публікує події у Kafka.
 
-2. **Telemetry Processing + API Service**
+2. **Telemetry Processing + API Service** ([документація сервісу](telemetry_processing_api_service.md))
     - Kafka consumer(и),
     - персистить raw дані (Timescale),
     - рахує агрегати (laps/sectors/best),

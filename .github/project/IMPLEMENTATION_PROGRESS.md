@@ -27,7 +27,7 @@
 | Stage 10: Observability | ❌ Not Started | 0% | — | Після MVP — metrics, health |
 
 **Key Metrics:**
-- ✅ **36 Java files** in telemetry-processing-api-service
+- ✅ **36 Java files** in telemetry-processing-api-service ([документація сервісу](telemetry_processing_api_service.md))
 - ✅ **19 Java files** in telemetry-api-contracts
 - ✅ **BUILD SUCCESS** - All code compiles
 - ✅ **Backend data pipeline complete**: UDP → Kafka → Processing → Database

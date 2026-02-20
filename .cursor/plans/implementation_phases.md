@@ -17,7 +17,7 @@
 | [.github/project/telemetry_error_and_lifecycle_contract.md](../../.github/project/telemetry_error_and_lifecycle_contract.md) | Lifecycle та помилки між шарами, endReason, timeout mapping |
 | [.github/project/rest_web_socket_api_contracts_f_1_telemetry.md](../../.github/project/rest_web_socket_api_contracts_f_1_telemetry.md) | **REST та WebSocket API** — контракти read-model та live-stream |
 | [.github/project/f_1_telemetry_project_architecture.md](../../.github/project/f_1_telemetry_project_architecture.md) | Архітектура, data flow, сервіси |
-| [.github/project/code_skeleton_java_packages_interfaces.md](../../.github/project/code_skeleton_java_packages_interfaces.md) | Пакети, інтерфейси, межі відповідальності модуля telemetry-processing-api-service |
+| [.github/project/code_skeleton_java_packages_interfaces.md](../../.github/project/code_skeleton_java_packages_interfaces.md) | Пакети, інтерфейси; **детальна документація модуля:** [telemetry_processing_api_service.md](../../.github/project/telemetry_processing_api_service.md) |
 
 **Правило:** зміни в контрактах (REST/WS відповіді, коди помилок, форматування) узгоджувати з `rest_web_socket_api_contracts_f_1_telemetry.md`; зміни в обробці подій Kafka та lifecycle — з `state_machines_specification_f_1_telemetry.md` та `kafka_contracts_f_1_telemetry.md`.
 

@@ -32,7 +32,7 @@
    Дає high-level уявлення про архітектуру, сервіси, data flow та зони відповідальності. Пояснює *як* система побудована.
 
 3. **ARCHITECTURE_CLARIFICATION.md** ⭐ NEW  
-   Детальне роз'яснення: чому UDP Library, udp-ingest-service та telemetry-processing-api-service — це три різні речі. Обов'язково до прочитання для розуміння архітектури.
+   Детальне роз'яснення: чому UDP Library, udp-ingest-service та telemetry-processing-api-service — це три різні речі. Обов'язково до прочитання для розуміння архітектури. Детальна документація processing-сервісу: [telemetry_processing_api_service.md](telemetry_processing_api_service.md).
 
 4. **kafka_contracts_f_1_telemetry.md**  
    Нормативний контракт взаємодії між сервісами. Фіксує message-level API та правила доставки, ordering і еволюції.
@@ -322,7 +322,8 @@
 
 ### 3. Service Decomposition
 #### 3.1 UDP Ingest Service
-#### 3.2 Telemetry Processing & API Service
+#### 3.2 Telemetry Processing & API Service  
+**Детальна документація сервісу:** [telemetry_processing_api_service.md](telemetry_processing_api_service.md)
 #### 3.3 UI (Web)
 #### 3.4 Service Layout (MVP)
 
@@ -402,6 +403,31 @@
 ### 24. UDP Packet Loss Formalization
 
 ### 25. Observability Contract
+
+---
+
+## telemetry_processing_api_service.md ⭐ (документація сервісу)
+
+**Призначення документа**  
+Окрема документація модуля **telemetry-processing-api-service**: призначення, архітектура після рефакторингу, структура пакетів, шари (REST, WebSocket, Kafka, resolve, маппери, білдери) та зв’язки з контрактами.
+
+**Роль в архітектурі:**
+- *Service reference* для processing-сервісу;
+- актуальна структура пакетів та відповідальність класів після implementation_phases;
+- посилання на контракти (REST/WS, Kafka, FSM).
+
+**Використовується для:**
+- онбордингу в модуль telemetry-processing-api-service;
+- перевірки відповідальності класів після рефакторингу;
+- навігації з інших документів, де згадується цей сервіс.
+
+### 1. Призначення
+### 2. Архітектура після рефакторингу
+### 3. Структура пакетів
+### 4. Шари та відповідальність
+### 5. Контракти та суміжні документи
+### 6. Збірка та запуск
+### 7. Індекс документації
 
 ---
 
@@ -717,6 +743,7 @@
 ### 4. f1-telemetry-udp-spring (Spring integration)
 ### 5. f1-telemetry-udp-starter (Spring Boot autoconfiguration)
 ### 6. udp-ingest-service (business logic)
-### 7. telemetry-processing-api-service
+### 7. telemetry-processing-api-service  
+**Повна документація:** [telemetry_processing_api_service.md](telemetry_processing_api_service.md)
 
 ---
