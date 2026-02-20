@@ -1,10 +1,8 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.consumer;
 
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarDamageDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarDamageEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle.SessionLifecycleService;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TyreWearSnapshot;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TyreWearState;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor.CarDamageProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -12,8 +10,8 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
 /**
- * Kafka consumer for telemetry.carDamage topic.
- * Updates in-memory tyre wear state per session+car; TyreWearRecorder persists it when a lap is finalized.
+ * Kafka consumer for telemetry.carDamage topic. Thin: deserialize, ensureSession, shouldProcess, then CarDamageProcessor.
+ * See: implementation_phases.md Phase 5.1.
  */
 @Slf4j
 @Component
@@ -21,7 +19,7 @@ import org.springframework.stereotype.Component;
 public class CarDamageConsumer {
 
     private final SessionLifecycleService lifecycleService;
-    private final TyreWearState tyreWearState;
+    private final CarDamageProcessor carDamageProcessor;
 
     @KafkaListener(
             topics = "telemetry.carDamage",
@@ -36,30 +34,16 @@ public class CarDamageConsumer {
         }
         try {
             long sessionUid = event.getSessionUID();
-            int carIndex = event.getCarIndex();
+            short carIndex = (short) event.getCarIndex();
 
             lifecycleService.ensureSessionActive(sessionUid);
-
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
                 acknowledgment.acknowledge();
                 return;
             }
 
-            CarDamageDto dto = event.getPayload();
-            if (dto == null) {
-                acknowledgment.acknowledge();
-                return;
-            }
+            carDamageProcessor.process(sessionUid, carIndex, event.getPayload());
 
-            TyreWearSnapshot snapshot = new TyreWearSnapshot(
-                    dto.getTyresWearFL(),
-                    dto.getTyresWearFR(),
-                    dto.getTyresWearRL(),
-                    dto.getTyresWearRR()
-            );
-            tyreWearState.update(sessionUid, carIndex, snapshot);
-
-            log.debug("Updated tyre wear state: sessionUid={}, carIndex={}", sessionUid, carIndex);
             acknowledgment.acknowledge();
         } catch (Exception e) {
             log.error("Error processing car damage", e);
