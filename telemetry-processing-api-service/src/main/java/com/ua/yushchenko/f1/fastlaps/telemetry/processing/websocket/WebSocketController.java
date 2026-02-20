@@ -4,8 +4,9 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsErrorMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSubscribeMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsUnsubscribeMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErrorCode;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFoundException;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionResolveService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +29,7 @@ public class WebSocketController {
 
     private final WebSocketSessionManager wsSessionManager;
     private final SessionStateManager sessionStateManager;
-    private final SessionRepository sessionRepository;
+    private final SessionResolveService sessionResolveService;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
@@ -43,18 +44,19 @@ public class WebSocketController {
         String wsSessionId = headerAccessor.getSessionId();
         String sessionIdStr = message.getSessionId();
         if (sessionIdStr == null || sessionIdStr.isBlank()) {
-            sendError(wsSessionId, ErrorCode.SESSION_NOT_ACTIVE, "Missing session id");
+            sendError(wsSessionId, ErrorCode.INVALID_SUBSCRIPTION, "Missing session id");
             return;
         }
-        String trimmed = sessionIdStr.trim();
-        Session session = sessionRepository.findByPublicIdOrSessionUid(trimmed).orElse(null);
-        if (session == null) {
-            sendError(wsSessionId, ErrorCode.SESSION_NOT_ACTIVE, "Session not found");
+        Session session;
+        try {
+            session = sessionResolveService.getSessionByPublicIdOrUid(sessionIdStr.trim());
+        } catch (SessionNotFoundException e) {
+            sendError(wsSessionId, ErrorCode.SESSION_NOT_FOUND, e.getMessage());
             return;
         }
         Long sessionUid = session.getSessionUid();
 
-        log.info("Live telemetry: SUBSCRIBE request from wsSession={}, sessionId={}", wsSessionId, trimmed);
+        log.info("Live telemetry: SUBSCRIBE request from wsSession={}, sessionId={}", wsSessionId, sessionIdStr.trim());
 
         SessionRuntimeState state = sessionStateManager.get(sessionUid);
         if (state == null || !state.isActive()) {

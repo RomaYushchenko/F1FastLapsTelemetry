@@ -4,13 +4,12 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TyreWearPerLap;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.LapMapper;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarTelemetryRawRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TyreWearPerLapRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionResolveService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -30,9 +29,10 @@ import java.util.stream.Collectors;
 public class LapController {
 
     private final LapRepository lapRepository;
-    private final SessionRepository sessionRepository;
+    private final SessionResolveService sessionResolveService;
     private final CarTelemetryRawRepository carTelemetryRawRepository;
     private final TyreWearPerLapRepository tyreWearPerLapRepository;
+    private final LapMapper lapMapper;
 
     /**
      * GET /api/sessions/{id}/laps - Get laps for session.
@@ -43,17 +43,12 @@ public class LapController {
             @PathVariable("id") String id,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
-        String trimmedId = id != null ? id.trim() : "";
-        if (trimmedId.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        return sessionRepository.findByPublicIdOrSessionUid(trimmedId)
-                .map(session -> lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(session.getSessionUid(), carIndex)
-                        .stream()
-                        .map(LapController::toDto)
-                        .collect(Collectors.toList()))
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        Session session = sessionResolveService.getSessionByPublicIdOrUid(id != null ? id.trim() : "");
+        List<LapResponseDto> list = lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(session.getSessionUid(), carIndex)
+                .stream()
+                .map(lapMapper::toLapResponseDto)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
     }
 
     /**
@@ -65,21 +60,13 @@ public class LapController {
             @PathVariable("id") String id,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
-        String trimmedId = id != null ? id.trim() : "";
-        if (trimmedId.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        return sessionRepository.findByPublicIdOrSessionUid(trimmedId)
-                .map(session -> lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(session.getSessionUid(), carIndex)
-                        .stream()
-                        .filter(lap -> lap.getLapTimeMs() != null && lap.getLapTimeMs() > 0)
-                        .map(lap -> PacePointDto.builder()
-                                .lapNumber(lap.getLapNumber())
-                                .lapTimeMs(lap.getLapTimeMs())
-                                .build())
-                        .collect(Collectors.toList()))
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        Session session = sessionResolveService.getSessionByPublicIdOrUid(id != null ? id.trim() : "");
+        List<PacePointDto> list = lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(session.getSessionUid(), carIndex)
+                .stream()
+                .map(lapMapper::toPacePointDto)
+                .filter(p -> p != null)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
     }
 
     /**
@@ -91,17 +78,12 @@ public class LapController {
             @PathVariable("id") String id,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
-        String trimmedId = id != null ? id.trim() : "";
-        if (trimmedId.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        return sessionRepository.findByPublicIdOrSessionUid(trimmedId)
-                .map(session -> tyreWearPerLapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(session.getSessionUid(), carIndex)
-                        .stream()
-                        .map(LapController::toTyreWearPointDto)
-                        .collect(Collectors.toList()))
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        Session session = sessionResolveService.getSessionByPublicIdOrUid(id != null ? id.trim() : "");
+        List<TyreWearPointDto> list = tyreWearPerLapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(session.getSessionUid(), carIndex)
+                .stream()
+                .map(lapMapper::toTyreWearPointDto)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(list);
     }
 
     /**
@@ -114,33 +96,17 @@ public class LapController {
             @PathVariable("lapNum") Integer lapNum,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
-        String trimmedId = id != null ? id.trim() : "";
-        if (trimmedId.isEmpty() || lapNum == null) {
-            return ResponseEntity.notFound().build();
+        if (lapNum == null) {
+            throw new IllegalArgumentException("lapNum is required");
         }
-        Short lapNumShort = lapNum.shortValue();
-        return sessionRepository.findByPublicIdOrSessionUid(trimmedId)
-                .map(session -> {
-                    List<CarTelemetryRaw> rows = carTelemetryRawRepository
-                            .findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
-                                    session.getSessionUid(), carIndex, lapNumShort);
-                    List<TracePointDto> trace = rows.stream()
-                            .map(LapController::toTracePointDto)
-                            .collect(Collectors.toList());
-                    return ResponseEntity.<List<TracePointDto>>ok(trace);
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    private static TracePointDto toTracePointDto(CarTelemetryRaw row) {
-        double distance = row.getLapDistanceM() != null ? row.getLapDistanceM().doubleValue() : 0.0;
-        double throttle = row.getThrottle() != null ? row.getThrottle().doubleValue() : 0.0;
-        double brake = row.getBrake() != null ? row.getBrake().doubleValue() : 0.0;
-        return TracePointDto.builder()
-                .distance(distance)
-                .throttle(throttle)
-                .brake(brake)
-                .build();
+        Session session = sessionResolveService.getSessionByPublicIdOrUid(id != null ? id.trim() : "");
+        List<TracePointDto> trace = carTelemetryRawRepository
+                .findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
+                        session.getSessionUid(), carIndex, lapNum.shortValue())
+                .stream()
+                .map(lapMapper::toTracePointDto)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(trace);
     }
 
     /**
@@ -154,27 +120,4 @@ public class LapController {
         return getLaps(id, carIndex);
     }
 
-    private static TyreWearPointDto toTyreWearPointDto(TyreWearPerLap row) {
-        return TyreWearPointDto.builder()
-                .lapNumber(row.getLapNumber() != null ? row.getLapNumber().intValue() : 0)
-                .wearFL(row.getWearFL())
-                .wearFR(row.getWearFR())
-                .wearRL(row.getWearRL())
-                .wearRR(row.getWearRR())
-                .build();
-    }
-
-    /**
-     * Convert Lap entity to REST DTO.
-     */
-    private static LapResponseDto toDto(Lap lap) {
-        return LapResponseDto.builder()
-                .lapNumber(lap.getLapNumber())
-                .lapTimeMs(lap.getLapTimeMs())
-                .sector1Ms(lap.getSector1TimeMs())
-                .sector2Ms(lap.getSector2TimeMs())
-                .sector3Ms(lap.getSector3TimeMs())
-                .isInvalid(lap.getIsInvalid() != null && lap.getIsInvalid())
-                .build();
-    }
 }

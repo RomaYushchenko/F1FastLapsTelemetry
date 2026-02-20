@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErrorCode;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.RestErrorResponse;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class RestExceptionHandler {
+
+    @ExceptionHandler(SessionNotFoundException.class)
+    public ResponseEntity<RestErrorResponse> handleSessionNotFound(SessionNotFoundException e) {
+        log.warn("Session not found: {}", e.getMessage());
+        RestErrorResponse error = RestErrorResponse.builder()
+                .error(ErrorCode.SESSION_NOT_FOUND.name())
+                .message(e.getMessage())
+                .build();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<RestErrorResponse> handleIllegalArgument(IllegalArgumentException e) {
