@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.time.Instant;
 
 /**
@@ -65,6 +66,8 @@ public class LapDataPacketHandler {
     }
     
     private LapDto parseLapData(ByteBuffer buffer) {
+        // F1 UDP is little-endian; ensure we read as LE (other handlers or slice may have changed order)
+        buffer.order(ByteOrder.LITTLE_ENDIAN);
         // F1 25 LapData — exact layout from .github/docs/F1 25 Telemetry Output Structures.txt
         buffer.getInt();                                  // uint32 m_lastLapTimeInMS
         int currentLapTimeMs = buffer.getInt();          // uint32 m_currentLapTimeInMS

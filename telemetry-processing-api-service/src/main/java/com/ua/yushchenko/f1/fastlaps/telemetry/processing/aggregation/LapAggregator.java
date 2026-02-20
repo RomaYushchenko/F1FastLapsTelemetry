@@ -37,7 +37,9 @@ public class LapAggregator {
             k -> new LapRuntimeState(sessionUid, carIndex));
 
         short lapNumber = (short) lapDto.getLapNumber();
-        int sector = lapDto.getSector() != null ? lapDto.getSector() : 0;
+        // F1 game m_sector = current sector: 0=in S1, 1=in S2, 2=in S3. So sector=1 means we just completed S1, sector=2 means we just completed S2.
+        int gameSector = lapDto.getSector() != null ? lapDto.getSector() : -1;
+        int sectorJustCompleted = (gameSector == 1 || gameSector == 2) ? gameSector : -1;
 
         // Detect lap change
         if (lapNumber != state.getCurrentLapNumber()) {
@@ -53,9 +55,9 @@ public class LapAggregator {
         state.setInvalid(lapDto.isInvalid());
         state.setPenaltiesSeconds(lapDto.getPenaltiesSeconds() != null ? lapDto.getPenaltiesSeconds().shortValue() : (short) 0);
 
-        // Track sector completion
-        if (sector > state.getCurrentSector() && sector <= 3) {
-            completeSector(state, sector, lapDto.getCurrentLapTimeMs());
+        // Track sector completion: game sends 1 when S1 done, 2 when S2 done; S3 is derived in finalizeLap
+        if (sectorJustCompleted > 0 && sectorJustCompleted > state.getCurrentSector()) {
+            completeSector(state, sectorJustCompleted, lapDto.getCurrentLapTimeMs());
         }
 
         // Check if lap is complete
@@ -95,8 +97,8 @@ public class LapAggregator {
 
     /**
      * Finalize lap and persist to database.
-     * F1 game sends m_sector 0=S1, 1=S2, 2=S3 and never sends 3, so sector3 is not set
-     * by completeSector. Derive sector3 from lap time when we have s1 and s2 so the lap can be saved.
+     * F1 game m_sector is current sector (0/1/2); we only get completion for S1 and S2.
+     * Derive sector3 from lap time when we have s1 and s2 so the lap can be saved.
      */
     @Transactional
     public void finalizeLap(LapRuntimeState state) {

@@ -1,7 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.handler;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarTelemetryDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarTelemetryEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.publisher.TelemetryPublisher;
 import org.junit.jupiter.api.Test;
@@ -45,18 +45,17 @@ class CarTelemetryPacketHandlerTest {
         handler.handleCarTelemetryPacket(header, payload);
         
         // Then
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<KafkaEnvelope<CarTelemetryDto>> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
-        verify(publisher).publish(eq("telemetry.carTelemetry"), anyString(), envelopeCaptor.capture());
+        ArgumentCaptor<CarTelemetryEvent> eventCaptor = ArgumentCaptor.forClass(CarTelemetryEvent.class);
+        verify(publisher).publish(eq("telemetry.carTelemetry"), anyString(), eventCaptor.capture());
         
-        KafkaEnvelope<CarTelemetryDto> envelope = envelopeCaptor.getValue();
-        assertThat(envelope.getSessionUID()).isEqualTo(123456789L);
-        assertThat(envelope.getPayload().getSpeedKph()).isEqualTo(285);
-        assertThat(envelope.getPayload().getThrottle()).isEqualTo(1.0f);
-        assertThat(envelope.getPayload().getBrake()).isEqualTo(0.0f);
-        assertThat(envelope.getPayload().getGear()).isEqualTo(7);
-        assertThat(envelope.getPayload().getEngineRpm()).isEqualTo(11500);
-        assertThat(envelope.getPayload().getDrs()).isEqualTo(1);
+        CarTelemetryEvent event = eventCaptor.getValue();
+        assertThat(event.getSessionUID()).isEqualTo(123456789L);
+        assertThat(event.getPayload().getSpeedKph()).isEqualTo(285);
+        assertThat(event.getPayload().getThrottle()).isEqualTo(1.0f);
+        assertThat(event.getPayload().getBrake()).isEqualTo(0.0f);
+        assertThat(event.getPayload().getGear()).isEqualTo(7);
+        assertThat(event.getPayload().getEngineRpm()).isEqualTo(11500);
+        assertThat(event.getPayload().getDrs()).isEqualTo(1);
     }
     
     private ByteBuffer createCarTelemetryPayload() {

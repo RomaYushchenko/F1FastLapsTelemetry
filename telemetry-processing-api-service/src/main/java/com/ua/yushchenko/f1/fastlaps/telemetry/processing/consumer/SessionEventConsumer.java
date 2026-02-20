@@ -31,6 +31,11 @@ public class SessionEventConsumer {
             containerFactory = "kafkaListenerContainerFactory"
     )
     public void consume(SessionLifecycleEvent event, Acknowledgment acknowledgment) {
+        if (event == null) {
+            log.warn("Skipping record: deserialization failed (e.g. old format without @type)");
+            acknowledgment.acknowledge();
+            return;
+        }
         try {
             long sessionUid = event.getSessionUID();
             int frameId = event.getFrameIdentifier();

@@ -11,6 +11,7 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 import java.util.HashMap;
@@ -42,14 +43,16 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
-        JsonDeserializer<AbstractTelemetryEvent> deserializer =
+        JsonDeserializer<AbstractTelemetryEvent> jsonDeserializer =
                 new JsonDeserializer<>(AbstractTelemetryEvent.class, false)
                         .trustedPackages("com.ua.yushchenko.f1.fastlaps.telemetry.api.*");
+        ErrorHandlingDeserializer<AbstractTelemetryEvent> valueDeserializer =
+                new ErrorHandlingDeserializer<>(jsonDeserializer);
 
         return new DefaultKafkaConsumerFactory<>(
                 props,
                 new StringDeserializer(),
-                deserializer);
+                valueDeserializer);
     }
 
     @Bean

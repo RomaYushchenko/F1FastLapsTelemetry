@@ -29,6 +29,11 @@ public class CarDamageConsumer {
             containerFactory = "kafkaListenerContainerFactory"
     )
     public void consume(CarDamageEvent event, Acknowledgment acknowledgment) {
+        if (event == null) {
+            log.warn("Skipping record: deserialization failed (e.g. old format without @type)");
+            acknowledgment.acknowledge();
+            return;
+        }
         try {
             long sessionUid = event.getSessionUID();
             int carIndex = event.getCarIndex();

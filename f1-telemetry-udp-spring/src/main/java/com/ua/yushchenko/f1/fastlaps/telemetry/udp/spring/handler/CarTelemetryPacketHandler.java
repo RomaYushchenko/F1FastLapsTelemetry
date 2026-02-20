@@ -1,7 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.handler;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarTelemetryDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarTelemetryEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.PacketId;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.annotation.F1PacketHandler;
@@ -13,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.time.Instant;
 
 /**
@@ -51,10 +52,10 @@ public class CarTelemetryPacketHandler {
             
             CarTelemetryDto telemetry = parseCarTelemetry(payload);
             
-            KafkaEnvelope<CarTelemetryDto> envelope = buildEnvelope(header, telemetry);
+            CarTelemetryEvent event = buildEvent(header, telemetry);
             String key = header.getSessionUID() + "-" + header.getPlayerCarIndex();
             
-            publisher.publish(TOPIC, key, envelope);
+            publisher.publish(TOPIC, key, event);
             
             log.trace("Published car telemetry: speed={}kph, gear={}, rpm={}", 
                     telemetry.getSpeedKph(), telemetry.getGear(), telemetry.getEngineRpm());
@@ -65,6 +66,8 @@ public class CarTelemetryPacketHandler {
     }
     
     private CarTelemetryDto parseCarTelemetry(ByteBuffer buffer) {
+        // F1 UDP is little-endian; ensure we read as LE (other handlers or slice may have changed order)
+        buffer.order(ByteOrder.LITTLE_ENDIAN);
         // F1 25 CarTelemetryData — docs: .github/docs/F1 25 Telemetry Output Structures.txt
         int speed = buffer.getShort() & 0xFFFF;         // uint16 — speed in km/h
         float throttle = buffer.getFloat();             // float 0.0–1.0
@@ -94,8 +97,8 @@ public class CarTelemetryPacketHandler {
                 .build();
     }
     
-    private KafkaEnvelope<CarTelemetryDto> buildEnvelope(PacketHeader header, CarTelemetryDto payload) {
-        return KafkaEnvelope.<CarTelemetryDto>builder()
+    private CarTelemetryEvent buildEvent(PacketHeader header, CarTelemetryDto payload) {
+        return CarTelemetryEvent.builder()
                 .schemaVersion(1)
                 .packetId(PacketId.CAR_TELEMETRY)
                 .sessionUID(header.getSessionUID())
