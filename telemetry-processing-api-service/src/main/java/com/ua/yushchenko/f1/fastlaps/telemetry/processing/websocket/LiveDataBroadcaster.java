@@ -2,8 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.websocket;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSessionEndedMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionMapper;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,7 @@ public class LiveDataBroadcaster {
 
     private final SessionStateManager sessionStateManager;
     private final WebSocketSessionManager wsSessionManager;
-    private final SessionRepository sessionRepository;
+    private final SessionQueryService sessionQueryService;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
@@ -51,9 +50,7 @@ public class LiveDataBroadcaster {
             }
 
             // Use same id as REST (public_id or session_uid) so client topic matches SessionDto.id
-            String topicId = sessionRepository.findById(sessionUid)
-                    .map(SessionMapper::toPublicIdString)
-                    .orElse(null);
+            String topicId = sessionQueryService.getTopicIdForSession(sessionUid).orElse(null);
             if (topicId == null) {
                 continue;
             }
@@ -76,9 +73,7 @@ public class LiveDataBroadcaster {
             return; // No subscribers, skip
         }
 
-        String topicId = sessionRepository.findById(sessionUid)
-                .map(SessionMapper::toPublicIdString)
-                .orElse(null);
+        String topicId = sessionQueryService.getTopicIdForSession(sessionUid).orElse(null);
         if (topicId == null) {
             return;
         }

@@ -69,4 +69,16 @@ public class SessionQueryService {
                     return sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
                 });
     }
+
+    /**
+     * Resolve topic id (public_id or session_uid string) for a session by its UID.
+     * Used by LiveDataBroadcaster so topic matches REST/WebSocket client id.
+     */
+    public Optional<String> getTopicIdForSession(Long sessionUid) {
+        if (sessionUid == null) {
+            return Optional.empty();
+        }
+        return sessionRepository.findById(sessionUid)
+                .map(SessionMapper::toPublicIdString);
+    }
 }
