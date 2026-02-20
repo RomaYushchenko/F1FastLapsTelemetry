@@ -69,12 +69,14 @@ public class LapDataPacketHandler {
         // F1 UDP is little-endian; ensure we read as LE (other handlers or slice may have changed order)
         buffer.order(ByteOrder.LITTLE_ENDIAN);
         // F1 25 LapData — exact layout from .github/docs/F1 25 Telemetry Output Structures.txt
-        buffer.getInt();                                  // uint32 m_lastLapTimeInMS
+        int lastLapTimeMs = buffer.getInt();             // uint32 m_lastLapTimeInMS (official lap time, shown in game)
         int currentLapTimeMs = buffer.getInt();          // uint32 m_currentLapTimeInMS
-        buffer.getShort();                               // uint16 m_sector1TimeMSPart
-        buffer.get();                                    // uint8 m_sector1TimeMinutesPart
-        buffer.getShort();                               // uint16 m_sector2TimeMSPart
-        buffer.get();                                    // uint8 m_sector2TimeMinutesPart
+        int sector1MsPart = buffer.getShort() & 0xFFFF;  // uint16 m_sector1TimeMSPart
+        int sector1MinPart = buffer.get() & 0xFF;       // uint8 m_sector1TimeMinutesPart
+        int sector2MsPart = buffer.getShort() & 0xFFFF; // uint16 m_sector2TimeMSPart
+        int sector2MinPart = buffer.get() & 0xFF;       // uint8 m_sector2TimeMinutesPart
+        int sector1TimeMs = sector1MinPart * 60_000 + sector1MsPart;
+        int sector2TimeMs = sector2MinPart * 60_000 + sector2MsPart;
         buffer.getShort();                               // uint16 m_deltaToCarInFrontMSPart
         buffer.get();                                    // uint8 m_deltaToCarInFrontMinutesPart
         buffer.getShort();                               // uint16 m_deltaToRaceLeaderMSPart
@@ -106,7 +108,10 @@ public class LapDataPacketHandler {
         return LapDto.builder()
                 .lapNumber(currentLapNum)
                 .lapDistance(lapDistance)
+                .lastLapTimeMs(lastLapTimeMs > 0 ? lastLapTimeMs : null)
                 .currentLapTimeMs(currentLapTimeMs > 0 ? currentLapTimeMs : null)
+                .sector1TimeMs(sector1TimeMs > 0 ? sector1TimeMs : null)
+                .sector2TimeMs(sector2TimeMs > 0 ? sector2TimeMs : null)
                 .sector(sector)
                 .isInvalid(currentLapInvalid == 1)
                 .penaltiesSeconds(penalties > 0 ? penalties : null)

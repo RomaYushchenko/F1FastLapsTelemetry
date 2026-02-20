@@ -41,11 +41,10 @@ public class LapAggregator {
         int gameSector = lapDto.getSector() != null ? lapDto.getSector() : -1;
         int sectorJustCompleted = (gameSector == 1 || gameSector == 2) ? gameSector : -1;
 
-        // Detect lap change
+        // Detect lap change: incoming packet is first packet of new lap; its lastLapTimeMs and sector times are for the lap we're finalizing
         if (lapNumber != state.getCurrentLapNumber()) {
             if (state.getCurrentLapNumber() > 0) {
-                // Finalize previous lap before moving to next
-                finalizeLap(state);
+                finalizeLap(state, lapDto.getLastLapTimeMs(), lapDto.getSector1TimeMs(), lapDto.getSector2TimeMs());
             }
             state.reset(lapNumber);
         }
@@ -60,9 +59,9 @@ public class LapAggregator {
             completeSector(state, sectorJustCompleted, lapDto.getCurrentLapTimeMs());
         }
 
-        // Check if lap is complete
+        // Check if lap is complete (all 3 sectors); no lastLapTimeMs yet, use current state
         if (state.isComplete()) {
-            finalizeLap(state);
+            finalizeLap(state, null, null, null);
             state.reset((short) (lapNumber + 1)); // Prepare for next lap
         }
     }
@@ -97,27 +96,30 @@ public class LapAggregator {
 
     /**
      * Finalize lap and persist to database.
-     * F1 game m_sector is current sector (0/1/2); we only get completion for S1 and S2.
-     * Derive sector3 from lap time when we have s1 and s2 so the lap can be saved.
+     * Prefer official times from game (m_lastLapTimeInMS, m_sector1*, m_sector2* from first packet of next lap).
      */
     @Transactional
-    public void finalizeLap(LapRuntimeState state) {
+    public void finalizeLap(LapRuntimeState state, Integer officialLapTimeMs, Integer officialSector1Ms, Integer officialSector2Ms) {
         if (state.getCurrentLapNumber() == 0) {
             return;
         }
-        // Derive sector 3 time when game only sent sectors 0,1,2 (no "sector 3" transition)
-        if (state.getSector3TimeMs() == null
-                && state.getSector1TimeMs() != null
-                && state.getSector2TimeMs() != null
-                && state.getCurrentLapTimeMs() != null) {
-            int s3 = state.getCurrentLapTimeMs() - state.getSector1TimeMs() - state.getSector2TimeMs();
-            if (s3 >= 0) {
-                state.setSector3TimeMs(s3);
+        int lapTimeMs = (officialLapTimeMs != null && officialLapTimeMs > 0)
+                ? officialLapTimeMs
+                : (state.getCurrentLapTimeMs() != null ? state.getCurrentLapTimeMs() : 0);
+
+        // Prefer game sector times when available; otherwise use state (from currentLapTime at sector boundaries)
+        Integer s1 = (officialSector1Ms != null && officialSector1Ms > 0) ? officialSector1Ms : state.getSector1TimeMs();
+        Integer s2 = (officialSector2Ms != null && officialSector2Ms > 0) ? officialSector2Ms : state.getSector2TimeMs();
+        Integer s3 = state.getSector3TimeMs();
+        if (s3 == null && s1 != null && s2 != null && lapTimeMs > 0) {
+            int derived = lapTimeMs - s1 - s2;
+            if (derived >= 0) {
+                s3 = derived;
                 log.debug("Derived sector3: sessionUid={}, lap={}, sector3Ms={}",
-                        state.getSessionUid(), state.getCurrentLapNumber(), s3);
+                        state.getSessionUid(), state.getCurrentLapNumber(), derived);
             }
         }
-        if (!state.isComplete()) {
+        if (s1 == null || s2 == null || s3 == null) {
             return; // Still missing sector times
         }
 
@@ -125,10 +127,10 @@ public class LapAggregator {
                 .sessionUid(state.getSessionUid())
                 .carIndex(state.getCarIndex())
                 .lapNumber(state.getCurrentLapNumber())
-                .lapTimeMs(state.getCurrentLapTimeMs())
-                .sector1TimeMs(state.getSector1TimeMs())
-                .sector2TimeMs(state.getSector2TimeMs())
-                .sector3TimeMs(state.getSector3TimeMs())
+                .lapTimeMs(lapTimeMs)
+                .sector1TimeMs(s1)
+                .sector2TimeMs(s2)
+                .sector3TimeMs(s3)
                 .isInvalid(state.isInvalid())
                 .penaltiesSeconds(state.getPenaltiesSeconds())
                 .endedAt(Instant.now())
@@ -140,7 +142,7 @@ public class LapAggregator {
 
         log.info("Lap finalized: sessionUid={}, carIndex={}, lap={}, time={}ms, invalid={}",
                 state.getSessionUid(), state.getCarIndex(), state.getCurrentLapNumber(),
-                state.getCurrentLapTimeMs(), state.isInvalid());
+                lapTimeMs, state.isInvalid());
 
         // Update session summary
         if (!state.isInvalid()) {
@@ -154,6 +156,6 @@ public class LapAggregator {
     public void finalizeAllLaps(long sessionUid) {
         lapStates.entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith(sessionUid + "-"))
-                .forEach(entry -> finalizeLap(entry.getValue()));
+                .forEach(entry -> finalizeLap(entry.getValue(), null, null, null));
     }
 }

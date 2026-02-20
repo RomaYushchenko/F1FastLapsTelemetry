@@ -49,7 +49,10 @@ class LapDataPacketHandlerTest {
         LapDataEvent event = eventCaptor.getValue();
         assertThat(event.getSessionUID()).isEqualTo(123456789L);
         assertThat(event.getPayload().getLapNumber()).isEqualTo(5);
+        assertThat(event.getPayload().getLastLapTimeMs()).isEqualTo(84500);
         assertThat(event.getPayload().getCurrentLapTimeMs()).isEqualTo(85500);
+        assertThat(event.getPayload().getSector1TimeMs()).isEqualTo(28500);
+        assertThat(event.getPayload().getSector2TimeMs()).isEqualTo(30000);
         assertThat(event.getPayload().isInvalid()).isFalse();
     }
     

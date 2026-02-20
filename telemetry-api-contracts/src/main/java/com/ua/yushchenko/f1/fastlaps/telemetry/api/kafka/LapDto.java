@@ -17,7 +17,13 @@ public class LapDto {
 
     private int lapNumber;
     private float lapDistance;
+    /** Official last lap time (m_lastLapTimeInMS). Present on first packet of new lap. */
+    private Integer lastLapTimeMs;
     private Integer currentLapTimeMs;
+    /** Sector 1 time in ms from game (m_sector1TimeMinutesPart * 60000 + m_sector1TimeMSPart). */
+    private Integer sector1TimeMs;
+    /** Sector 2 time in ms from game (m_sector2TimeMinutesPart * 60000 + m_sector2TimeMSPart). */
+    private Integer sector2TimeMs;
     private Integer sector;
     private boolean isInvalid;
     private Integer penaltiesSeconds;

@@ -138,7 +138,9 @@ public class CarTelemetryConsumer {
     /**
      * Resolve lap number for storing pedal trace. Uses lap distance wrap-around so that
      * telemetry is attributed to the correct lap even when CarTelemetry is processed
-     * before LapData (different Kafka topics).
+     * before LapData (different Kafka topics). When both wrap and LapData-derived lap
+     * are present, we never exceed the snapshot lap to avoid double-increment (LapData
+     * may have already advanced the lap before we see the distance wrap).
      */
     private Short resolveLapNumberForTrace(long sessionUid, short carIndex, SessionRuntimeState.CarSnapshot snapshot) {
         String key = sessionUid + "-" + carIndex;
@@ -151,7 +153,14 @@ public class CarTelemetryConsumer {
         if (lapDistanceM != null) {
             float distance = lapDistanceM;
             if (traceState.lastLapDistanceM > LAP_DISTANCE_DROP_THRESHOLD_M && distance < traceState.lastLapDistanceM - LAP_DISTANCE_DROP_THRESHOLD_M) {
-                lapNum = (short) (traceState.lastLapNumber + 1);
+                short inferredFromWrap = (short) (traceState.lastLapNumber + 1);
+                // Never exceed snapshot lap: LapData may have already advanced to N+1 before we
+                // see telemetry with wrapped distance; using inferred would yield N+2.
+                if (snapshotLap != null && snapshotLap > 0 && inferredFromWrap > snapshotLap) {
+                    lapNum = snapshotLap.shortValue();
+                } else {
+                    lapNum = inferredFromWrap;
+                }
             } else if (snapshotLap != null && snapshotLap > 0) {
                 lapNum = snapshotLap.shortValue();
             } else {
