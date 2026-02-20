@@ -1,7 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.handler;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarStatusDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarStatusEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.PacketId;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.annotation.F1PacketHandler;
@@ -18,6 +18,7 @@ import java.time.Instant;
 /**
  * Handles Car Status packets (packetId=7).
  * Parses fuel, tyres, ERS, DRS status and publishes to telemetry.carStatus topic.
+ * Packet layout per docs: .github/docs/F1 25 Telemetry Output Structures.txt — CarStatusData (55 bytes per car).
  */
 @Slf4j
 @Component
@@ -25,29 +26,35 @@ import java.time.Instant;
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "f1.telemetry.udp.handlers.status.enabled", havingValue = "true", matchIfMissing = true)
 public class CarStatusPacketHandler {
-    
+
     private static final String TOPIC = "telemetry.carStatus";
-    private static final int STATUS_DATA_SIZE = 58; // Bytes per car in F1 2025
-    
+    /** CarStatusData size in bytes. From docs: (1239 - 29 header) / 22 cars = 55. */
+    private static final int CAR_STATUS_DATA_SIZE = 55;
+
     private final TelemetryPublisher publisher;
-    
+
     @F1PacketHandler(packetId = 7)
     public void handleCarStatusPacket(PacketHeader header, ByteBuffer payload) {
-        log.debug("Processing car status packet: sessionUID={}, frame={}", 
+        log.debug("Processing car status packet: sessionUID={}, frame={}",
                 header.getSessionUID(), header.getFrameIdentifier());
-        
+
         try {
             int playerCarIndex = header.getPlayerCarIndex();
-            
-            // Skip to player car data
-            payload.position(playerCarIndex * STATUS_DATA_SIZE);
-            
+
+            // Payload starts after 29-byte header; skip to player car data
+            int offset = playerCarIndex * CAR_STATUS_DATA_SIZE;
+            if (payload.position() + offset + CAR_STATUS_DATA_SIZE > payload.limit()) {
+                log.warn("Car status payload too short for car index {}: need {} bytes", playerCarIndex, offset + CAR_STATUS_DATA_SIZE);
+                return;
+            }
+            payload.position(payload.position() + offset);
+
             CarStatusDto status = parseCarStatus(payload);
             
-            KafkaEnvelope<CarStatusDto> envelope = buildEnvelope(header, status);
+            CarStatusEvent event = buildEvent(header, status);
             String key = header.getSessionUID() + "-" + header.getPlayerCarIndex();
             
-            publisher.publish(TOPIC, key, envelope);
+            publisher.publish(TOPIC, key, event);
             
             log.debug("Published car status: fuel={}, drs={}, ers={}", 
                     status.getFuelInTank(), status.getDrsAllowed(), status.getErsStoreEnergy());
@@ -58,7 +65,7 @@ public class CarStatusPacketHandler {
     }
     
     private CarStatusDto parseCarStatus(ByteBuffer buffer) {
-        // F1 2025 Car Status structure (per car)
+        // F1 25 CarStatusData — docs: .github/docs/F1 25 Telemetry Output Structures.txt
         int tractionControl = buffer.get() & 0xFF;      // uint8 (0 = off, 1-2 = level)
         int antiLockBrakes = buffer.get() & 0xFF;       // uint8 (0 = off, 1 = on)
         int fuelMix = buffer.get() & 0xFF;              // uint8
@@ -79,7 +86,11 @@ public class CarStatusPacketHandler {
         float enginePowerICE = buffer.getFloat();       // float
         float enginePowerMGUK = buffer.getFloat();      // float
         float ersStoreEnergy = buffer.getFloat();       // float (in Joules)
-        
+        // Skip rest of CarStatusData: ersDeployMode, ersHarvested*, ersDeployed*, networkPaused (14 bytes)
+        if (buffer.remaining() >= 14) {
+            buffer.position(buffer.position() + 14);
+        }
+
         return CarStatusDto.builder()
                 .tractionControl(tractionControl)
                 .abs(antiLockBrakes)
@@ -87,12 +98,13 @@ public class CarStatusPacketHandler {
                 .fuelMix(fuelMix)
                 .drsAllowed(drsAllowed == 1)
                 .tyresCompound(actualTyreCompound)
+                .tyresAgeLaps(tyresAgeLaps)
                 .ersStoreEnergy(ersStoreEnergy)
                 .build();
     }
     
-    private KafkaEnvelope<CarStatusDto> buildEnvelope(PacketHeader header, CarStatusDto payload) {
-        return KafkaEnvelope.<CarStatusDto>builder()
+    private CarStatusEvent buildEvent(PacketHeader header, CarStatusDto payload) {
+        return CarStatusEvent.builder()
                 .schemaVersion(1)
                 .packetId(PacketId.CAR_STATUS)
                 .sessionUID(header.getSessionUID())

@@ -4,6 +4,7 @@
 -- 2.4 telemetry.sessions
 CREATE TABLE IF NOT EXISTS telemetry.sessions (
   session_uid        BIGINT PRIMARY KEY,
+  public_id          UUID          NOT NULL DEFAULT gen_random_uuid() UNIQUE,
 
   packet_format      SMALLINT      NOT NULL,
   game_major_version SMALLINT      NOT NULL,

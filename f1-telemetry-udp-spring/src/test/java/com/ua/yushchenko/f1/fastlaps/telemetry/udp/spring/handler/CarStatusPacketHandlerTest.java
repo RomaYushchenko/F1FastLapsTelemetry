@@ -1,7 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.handler;
 
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarStatusDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarStatusEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.publisher.TelemetryPublisher;
 import org.junit.jupiter.api.Test;
@@ -45,19 +44,18 @@ class CarStatusPacketHandlerTest {
         handler.handleCarStatusPacket(header, payload);
         
         // Then
-        ArgumentCaptor<KafkaEnvelope> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
-        verify(publisher).publish(eq("telemetry.carStatus"), anyString(), envelopeCaptor.capture());
+        ArgumentCaptor<CarStatusEvent> eventCaptor = ArgumentCaptor.forClass(CarStatusEvent.class);
+        verify(publisher).publish(eq("telemetry.carStatus"), anyString(), eventCaptor.capture());
         
-        @SuppressWarnings("unchecked")
-        KafkaEnvelope<CarStatusDto> envelope = envelopeCaptor.getValue();
-        assertThat(envelope.getSessionUID()).isEqualTo(123456789L);
-        assertThat(envelope.getPayload().getTractionControl()).isEqualTo(1);
-        assertThat(envelope.getPayload().getAbs()).isEqualTo(1);
-        assertThat(envelope.getPayload().getFuelInTank()).isEqualTo(45.5f);
-        assertThat(envelope.getPayload().getFuelMix()).isEqualTo(2);
-        assertThat(envelope.getPayload().getDrsAllowed()).isTrue();
-        assertThat(envelope.getPayload().getTyresCompound()).isEqualTo(16);
-        assertThat(envelope.getPayload().getErsStoreEnergy()).isEqualTo(2500000.0f);
+        CarStatusEvent event = eventCaptor.getValue();
+        assertThat(event.getSessionUID()).isEqualTo(123456789L);
+        assertThat(event.getPayload().getTractionControl()).isEqualTo(1);
+        assertThat(event.getPayload().getAbs()).isEqualTo(1);
+        assertThat(event.getPayload().getFuelInTank()).isEqualTo(45.5f);
+        assertThat(event.getPayload().getFuelMix()).isEqualTo(2);
+        assertThat(event.getPayload().getDrsAllowed()).isTrue();
+        assertThat(event.getPayload().getTyresCompound()).isEqualTo(16);
+        assertThat(event.getPayload().getErsStoreEnergy()).isEqualTo(2500000.0f);
     }
     
     private ByteBuffer createCarStatusPayload() {

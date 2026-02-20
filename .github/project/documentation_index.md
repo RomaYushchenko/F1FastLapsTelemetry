@@ -153,7 +153,7 @@
 
 **Використовується для:**
 - реалізації Live Dashboard (Speed, RPM, Gear, Throttle, Brake, DRS, Lap/Sector);
-- реалізації Session Detail (summary, таблиця кіл, сектори, опційно графік);
+- реалізації Session Detail (summary, таблиця кіл, сектори, графік зносу шин, опційно графік по часу);
 - чеклисту готовності діаграм у Stage 11/12.
 
 ### 1. Призначення
@@ -619,6 +619,23 @@
 ### Technical Debt & Deviations
 ### Build & Compilation Status
 ### Next Steps
+
+---
+
+## PEDAL_TRACE_FEATURE_ANALYSIS_AND_PLAN.md
+
+**Призначення документа**  
+Аналіз функції Pedal trace (профіль газ/гальмо по колу), детальний план реалізації та узгодження з REST контрактом і документацією.
+
+**Роль в архітектурі:**
+- *Feature spec* для GET /api/sessions/{id}/laps/{lapNum}/trace;
+- джерело даних: car_telemetry_raw (lap_number, lap_distance_m, throttle, brake);
+- кореляція LapData ↔ CarTelemetry, запис через RawTelemetryWriter.
+
+**Використовується для:**
+- розуміння поточного стану та прогалин pedal trace;
+- реалізації запису raw telemetry та повернення trace з БД;
+- оновлення rest_web_socket_api_contracts § 3.5 та IMPLEMENTATION_GAPS_ANALYSIS.
 
 ---
 

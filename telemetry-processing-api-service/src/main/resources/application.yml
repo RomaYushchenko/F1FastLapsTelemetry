@@ -27,3 +27,17 @@ spring:
 
 server:
   port: 8081
+
+logging:
+  level:
+    org.springframework.kafka: INFO
+    com.ua.yushchenko.f1.fastlaps.telemetry.processing.consumer: INFO  # "Received ..." when messages are consumed
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized

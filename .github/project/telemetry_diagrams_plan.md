@@ -57,9 +57,10 @@
 | 4.1 | **Summary block** | `GET /api/sessions/{uid}/summary` | Best lap time + lap number; best S1/S2/S3 + lap number; total laps | Усі поля відповідають контракту |
 | 4.2 | **Таблиця кіл** | `GET /api/sessions/{uid}/laps` | Таблиця: Lap, Lap time, S1, S2, S3, Valid | Best lap row виділена; best sector у колонці виділений |
 | 4.3 | **Сектори** | З laps або `GET .../sectors` | Fastest S1/S2/S3 з прив'язкою до номера кола | Відповідно до REST контракту |
-| 4.4 | **(Опційно MVP) Графік по часу** | `GET /api/sessions/{uid}/telemetry?from=&to=&metric=` | Графік speed/rpm по часу (якщо endpoint реалізовано) | Вибір метрики та часового діапазону; відображення графіка |
+| 4.4 | **Графік зносу шин** | `GET /api/sessions/{uid}/tyre-wear` | Чотири криві (FL, FR, RL, RR) — wear % по колах | Дані з Car Damage (packet 10); порожній масив, якщо знос у грі вимкнено |
+| 4.5 | **(Опційно MVP) Графік по часу** | `GET /api/sessions/{uid}/telemetry?from=&to=&metric=` | Графік speed/rpm по часу (якщо endpoint реалізовано) | Вибір метрики та часового діапазону; відображення графіка |
 
-**Примітка:** Endpoint для raw telemetry (4.4) у поточному MVP пропущений; його реалізація — опційно або у наступній ітерації. Діаграми, що потребують лише laps/summary, реалізуються без нього.
+**Примітка:** Endpoint для raw telemetry (4.5) у поточному MVP пропущений; його реалізація — опційно або у наступній ітерації. Діаграми, що потребують лише laps/summary, реалізуються без нього.
 
 Деталі — у [react_spa_ui_architecture.md](react_spa_ui_architecture.md#43-session-detail-sessionssessionuid) та в PDF.
 

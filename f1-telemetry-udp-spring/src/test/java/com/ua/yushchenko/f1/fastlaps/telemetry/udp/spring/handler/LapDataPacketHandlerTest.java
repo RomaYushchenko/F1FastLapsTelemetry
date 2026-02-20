@@ -1,7 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.handler;
 
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDataEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.publisher.TelemetryPublisher;
 import org.junit.jupiter.api.Test;
@@ -44,15 +43,14 @@ class LapDataPacketHandlerTest {
         handler.handleLapDataPacket(header, payload);
         
         // Then
-        ArgumentCaptor<KafkaEnvelope> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
-        verify(publisher).publish(eq("telemetry.lap"), anyString(), envelopeCaptor.capture());
+        ArgumentCaptor<LapDataEvent> eventCaptor = ArgumentCaptor.forClass(LapDataEvent.class);
+        verify(publisher).publish(eq("telemetry.lap"), anyString(), eventCaptor.capture());
         
-        @SuppressWarnings("unchecked")
-        KafkaEnvelope<LapDto> envelope = envelopeCaptor.getValue();
-        assertThat(envelope.getSessionUID()).isEqualTo(123456789L);
-        assertThat(envelope.getPayload().getLapNumber()).isEqualTo(5);
-        assertThat(envelope.getPayload().getCurrentLapTimeMs()).isEqualTo(85500);
-        assertThat(envelope.getPayload().isInvalid()).isFalse();
+        LapDataEvent event = eventCaptor.getValue();
+        assertThat(event.getSessionUID()).isEqualTo(123456789L);
+        assertThat(event.getPayload().getLapNumber()).isEqualTo(5);
+        assertThat(event.getPayload().getCurrentLapTimeMs()).isEqualTo(85500);
+        assertThat(event.getPayload().isInvalid()).isFalse();
     }
     
     @Test
@@ -82,12 +80,11 @@ class LapDataPacketHandlerTest {
         handler.handleLapDataPacket(header, payload);
         
         // Then
-        ArgumentCaptor<KafkaEnvelope> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
-        verify(publisher).publish(eq("telemetry.lap"), anyString(), envelopeCaptor.capture());
+        ArgumentCaptor<LapDataEvent> eventCaptor = ArgumentCaptor.forClass(LapDataEvent.class);
+        verify(publisher).publish(eq("telemetry.lap"), anyString(), eventCaptor.capture());
         
-        @SuppressWarnings("unchecked")
-        KafkaEnvelope<LapDto> envelope = envelopeCaptor.getValue();
-        assertThat(envelope.getPayload().isInvalid()).isTrue();
+        LapDataEvent event = eventCaptor.getValue();
+        assertThat(event.getPayload().isInvalid()).isTrue();
     }
     
     private ByteBuffer createLapDataPayload() {

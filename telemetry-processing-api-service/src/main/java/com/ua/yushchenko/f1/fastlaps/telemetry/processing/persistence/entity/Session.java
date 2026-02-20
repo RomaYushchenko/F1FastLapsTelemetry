@@ -7,9 +7,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * Session entity (telemetry.sessions table).
+ * <p>
+ * <b>Link session_uid ↔ public_id:</b> One row has both identifiers; they are 1:1.
+ * - {@code session_uid}: PK from F1 game telemetry.
+ * - {@code public_id}: UUID generated at insert ({@link #onCreate()}) for REST/UI/WebSocket.
+ * REST and WebSocket use the same id: when present use {@code public_id}, else {@code session_uid}.
  * See: implementation_steps_plan.md § Етап 7.1.
  */
 @Entity
@@ -23,6 +29,10 @@ public class Session {
     @Id
     @Column(name = "session_uid", nullable = false)
     private Long sessionUid;
+
+    /** Public identifier for API/UI (UUID). Tied 1:1 to session_uid in this row. */
+    @Column(name = "public_id", nullable = false, unique = true, updatable = false)
+    private UUID publicId;
 
     @Column(name = "packet_format", nullable = false)
     private Short packetFormat;
@@ -65,6 +75,9 @@ public class Session {
 
     @PrePersist
     protected void onCreate() {
+        if (publicId == null) {
+            publicId = UUID.randomUUID();
+        }
         createdAt = Instant.now();
         updatedAt = Instant.now();
     }

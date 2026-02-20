@@ -8,5 +8,6 @@ public enum PacketId {
     CAR_TELEMETRY,
     LAP_DATA,
     CAR_STATUS,
+    CAR_DAMAGE,
     SESSION
 }

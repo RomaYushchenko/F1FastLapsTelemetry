@@ -23,6 +23,7 @@ public class LapAggregator {
 
     private final LapRepository lapRepository;
     private final SessionSummaryAggregator summaryAggregator;
+    private final TyreWearRecorder tyreWearRecorder;
 
     // Per session-car lap state
     private final Map<String, LapRuntimeState> lapStates = new ConcurrentHashMap<>();
@@ -94,11 +95,28 @@ public class LapAggregator {
 
     /**
      * Finalize lap and persist to database.
+     * F1 game sends m_sector 0=S1, 1=S2, 2=S3 and never sends 3, so sector3 is not set
+     * by completeSector. Derive sector3 from lap time when we have s1 and s2 so the lap can be saved.
      */
     @Transactional
     public void finalizeLap(LapRuntimeState state) {
-        if (state.getCurrentLapNumber() == 0 || !state.isComplete()) {
-            return; // Nothing to finalize
+        if (state.getCurrentLapNumber() == 0) {
+            return;
+        }
+        // Derive sector 3 time when game only sent sectors 0,1,2 (no "sector 3" transition)
+        if (state.getSector3TimeMs() == null
+                && state.getSector1TimeMs() != null
+                && state.getSector2TimeMs() != null
+                && state.getCurrentLapTimeMs() != null) {
+            int s3 = state.getCurrentLapTimeMs() - state.getSector1TimeMs() - state.getSector2TimeMs();
+            if (s3 >= 0) {
+                state.setSector3TimeMs(s3);
+                log.debug("Derived sector3: sessionUid={}, lap={}, sector3Ms={}",
+                        state.getSessionUid(), state.getCurrentLapNumber(), s3);
+            }
+        }
+        if (!state.isComplete()) {
+            return; // Still missing sector times
         }
 
         Lap lap = Lap.builder()
@@ -115,6 +133,8 @@ public class LapAggregator {
                 .build();
 
         lapRepository.save(lap);
+
+        tyreWearRecorder.recordForLap(state.getSessionUid(), state.getCarIndex(), state.getCurrentLapNumber());
 
         log.info("Lap finalized: sessionUid={}, carIndex={}, lap={}, time={}ms, invalid={}",
                 state.getSessionUid(), state.getCarIndex(), state.getCurrentLapNumber(),

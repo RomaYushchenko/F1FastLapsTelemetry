@@ -18,6 +18,8 @@ public class SessionEventDto {
     private EventCode eventCode;
     /** e.g. RACE, QUALIFYING */
     private String sessionType;
+    /** F1 game session type id (0–12). Used to persist Session.sessionType. */
+    private Integer sessionTypeId;
     private Integer trackId;
     private Integer totalLaps;
 }

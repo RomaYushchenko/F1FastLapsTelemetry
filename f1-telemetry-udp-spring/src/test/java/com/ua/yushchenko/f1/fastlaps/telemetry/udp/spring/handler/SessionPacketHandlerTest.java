@@ -1,8 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.handler;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.EventCode;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.KafkaEnvelope;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionLifecycleEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.publisher.TelemetryPublisher;
 import org.junit.jupiter.api.Test;
@@ -45,14 +44,13 @@ class SessionPacketHandlerTest {
         handler.handleSessionPacket(header, payload);
         
         // Then
-        ArgumentCaptor<KafkaEnvelope> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
-        verify(publisher).publish(eq("telemetry.session"), anyString(), envelopeCaptor.capture());
+        ArgumentCaptor<SessionLifecycleEvent> eventCaptor = ArgumentCaptor.forClass(SessionLifecycleEvent.class);
+        verify(publisher).publish(eq("telemetry.session"), anyString(), eventCaptor.capture());
         
-        @SuppressWarnings("unchecked")
-        KafkaEnvelope<SessionEventDto> envelope = envelopeCaptor.getValue();
-        assertThat(envelope.getSessionUID()).isEqualTo(123456789L);
-        assertThat(envelope.getPayload().getEventCode()).isEqualTo(EventCode.SSTA);
-        assertThat(envelope.getPayload().getSessionType()).isNotNull();
+        SessionLifecycleEvent event = eventCaptor.getValue();
+        assertThat(event.getSessionUID()).isEqualTo(123456789L);
+        assertThat(event.getPayload().getEventCode()).isEqualTo(EventCode.SSTA);
+        assertThat(event.getPayload().getSessionType()).isNotNull();
     }
     
     @Test
@@ -82,12 +80,11 @@ class SessionPacketHandlerTest {
         handler.handleSessionPacket(header, payload);
         
         // Then
-        ArgumentCaptor<KafkaEnvelope> envelopeCaptor = ArgumentCaptor.forClass(KafkaEnvelope.class);
-        verify(publisher).publish(eq("telemetry.session"), anyString(), envelopeCaptor.capture());
+        ArgumentCaptor<SessionLifecycleEvent> eventCaptor = ArgumentCaptor.forClass(SessionLifecycleEvent.class);
+        verify(publisher).publish(eq("telemetry.session"), anyString(), eventCaptor.capture());
         
-        @SuppressWarnings("unchecked")
-        KafkaEnvelope<SessionEventDto> envelope = envelopeCaptor.getValue();
-        assertThat(envelope.getPayload().getEventCode()).isEqualTo(EventCode.SEND);
+        SessionLifecycleEvent event = eventCaptor.getValue();
+        assertThat(event.getPayload().getEventCode()).isEqualTo(EventCode.SEND);
     }
     
     @Test

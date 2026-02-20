@@ -139,6 +139,8 @@ public class SessionRuntimeState {
         private Boolean drs;
         private Integer currentLap;
         private Integer currentSector;
+        /** Lap distance in metres (from LapData); used for pedal trace. */
+        private Float lapDistanceM;
         private Instant timestamp;
     }
 }

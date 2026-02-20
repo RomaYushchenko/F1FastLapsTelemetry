@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.dispatcher;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
+import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeaderDecoder;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.ByteBuffer;
@@ -39,8 +40,9 @@ public class SimpleUdpPacketDispatcher implements UdpPacketDispatcher {
         
         for (UdpPacketConsumer consumer : handlers) {
             try {
-                // Reset buffer position for each consumer so they all see the same data
-                payload.rewind();
+                // Position at start of packet-specific payload (after 29-byte header).
+                // Contract: payload is packet data only; rewind would wrongly include header (e.g. packetFormat 2025 read as speed).
+                payload.position(PacketHeaderDecoder.HEADER_SIZE);
                 consumer.handle(header, payload);
             } catch (Exception e) {
                 log.error("Error in consumer {} handling packetId={}: {}", 

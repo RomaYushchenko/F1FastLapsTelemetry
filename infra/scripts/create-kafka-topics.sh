@@ -2,7 +2,7 @@
 # Етап 2.12: Опціональне ручне створення Kafka topics для F1 Telemetry
 # Топіки за замовчуванням створюються автоматично брокером (KAFKA_AUTO_CREATE_TOPICS_ENABLE: true).
 # Цей скрипт потрібен лише якщо потрібно створити топіки до запуску сервісів або з особливими параметрами.
-# Topics: telemetry.session, .lap, .carTelemetry, .carStatus
+# Topics: telemetry.session, .lap, .carTelemetry, .carStatus, .carDamage
 # Запуск (з директорії infra): ./scripts/create-kafka-topics.sh
 
 set -e
@@ -28,6 +28,7 @@ create_topic "telemetry.session" 1 1
 create_topic "telemetry.lap" 1 1
 create_topic "telemetry.carTelemetry" 1 1
 create_topic "telemetry.carStatus" 1 1
+create_topic "telemetry.carDamage" 1 1
 
 echo "Done. Topics:"
 docker exec "$KAFKA_CONTAINER" kafka-topics --bootstrap-server "$BROKER" --list | grep -E '^telemetry\.'
