@@ -252,6 +252,10 @@ public class SessionLifecycleService {
                 log.debug("Player car index changed: sessionUID={}, previous={}, current={}", sessionUID, current, carIndex);
             }
         });
+        SessionRuntimeState state = stateManager.get(sessionUID);
+        if (state != null) {
+            state.setPlayerCarIndex(carIndex);
+        }
     }
 
     /**

@@ -113,12 +113,36 @@ class SessionRuntimeStateTest {
     @Test
     @DisplayName("getLatestSnapshot повертає snapshot гравця при carIndex != 0 (Practice)")
     void getLatestSnapshot_returnsPlayerSnapshot_whenCarIndexNotZero() {
-        // In Practice player can be carIndex 5; ingest sends only player car
-        SessionRuntimeState.CarSnapshot playerSnapshot = carSnapshot();
-        state.updateSnapshot(5, playerSnapshot);
+        // Arrange: In Practice player can be carIndex 5; set player index and snapshot
+        state.setPlayerCarIndex(5);
+        state.updateSnapshot(5, carSnapshot());
 
+        // Act
         WsSnapshotMessage msg = state.getLatestSnapshot();
 
+        // Assert
+        assertThat(msg).isNotNull();
+        assertThat(msg.getSpeedKph()).isEqualTo((int) SPEED_KPH);
+    }
+
+    @Test
+    @DisplayName("getLatestSnapshot повертає snapshot по playerCarIndex коли є кілька carIndex")
+    void getLatestSnapshot_returnsSnapshotByPlayerCarIndex_whenMultipleCars() {
+        // Arrange: two snapshots (e.g. stale car 0 and current player car 5)
+        SessionRuntimeState.CarSnapshot snapshot0 = carSnapshot();
+        snapshot0.setSpeedKph(100);
+        state.updateSnapshot(0, snapshot0);
+
+        SessionRuntimeState.CarSnapshot snapshot5 = carSnapshot();
+        snapshot5.setSpeedKph((int) SPEED_KPH);
+        state.updateSnapshot(5, snapshot5);
+
+        state.setPlayerCarIndex(5);
+
+        // Act
+        WsSnapshotMessage msg = state.getLatestSnapshot();
+
+        // Assert: must be player car (5), not arbitrary map order
         assertThat(msg).isNotNull();
         assertThat(msg.getSpeedKph()).isEqualTo((int) SPEED_KPH);
     }

@@ -3,6 +3,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.state;
 import lombok.Data;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,6 +37,9 @@ public class SessionRuntimeState {
     private final Map<Integer, AtomicInteger> lapWatermarks = new ConcurrentHashMap<>();
     private final Map<Integer, AtomicInteger> telemetryWatermarks = new ConcurrentHashMap<>();
     private final Map<Integer, AtomicInteger> statusWatermarks = new ConcurrentHashMap<>();
+
+    /** Current player car index (from packet headers); used to select correct snapshot when multiple exist. */
+    private volatile Integer playerCarIndex;
 
     // Snapshot for WebSocket (per carIndex)
     private final Map<Integer, CarSnapshot> snapshots = new ConcurrentHashMap<>();
@@ -129,15 +133,32 @@ public class SessionRuntimeState {
     }
 
     /**
+     * Set current player car index (from packet headers). Used to select the correct snapshot when
+     * multiple car indices exist (e.g. after mid-session car switch). Kept in sync with Session entity.
+     */
+    public void setPlayerCarIndex(int carIndex) {
+        this.playerCarIndex = carIndex;
+    }
+
+    /**
      * Get latest snapshot for WebSocket broadcast.
-     * Ingest sends only the player car; in Time Trial that is carIndex 0, in Practice/Quali/Race it can be any.
-     * Returns the first available snapshot (player car) or null if none.
+     * Selects by current player car index when set; otherwise by most recent timestamp to avoid
+     * undefined map iteration order (e.g. ConcurrentHashMap) when multiple snapshots exist.
      */
     public com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage getLatestSnapshot() {
         if (snapshots.isEmpty()) {
             return null;
         }
-        CarSnapshot snapshot = snapshots.values().stream().findFirst().orElse(null);
+        CarSnapshot snapshot = null;
+        if (playerCarIndex != null) {
+            snapshot = snapshots.get(playerCarIndex);
+        }
+        if (snapshot == null) {
+            snapshot = snapshots.entrySet().stream()
+                    .max(Comparator.comparing(e -> e.getValue().getTimestamp(), Comparator.nullsLast(Comparator.naturalOrder())))
+                    .map(Map.Entry::getValue)
+                    .orElse(null);
+        }
         return com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.WsSnapshotMessageBuilder.build(snapshot);
     }
 
