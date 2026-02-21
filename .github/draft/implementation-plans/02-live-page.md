@@ -16,6 +16,7 @@
 | **Дельта** | Немає. Немає даних "best lap time" або "current lap time so far" у live snapshot. |
 | **ERS** | Немає. У CarStatus (бекенд) є `ersStoreEnergy`, `ersDeployMode` тощо; у live snapshot і в UI їх не передають/не показують. |
 | **Візуал** | Прості картки (`.card`), сітки (`.grid-3`, `.grid-4`). Немає окремого дизайн-референсу для Live; ui_ux_specification може містити загальні токени. |
+| **WebSocket клієнт** | Підписка: `sessionId` (string, з `Session.id` = public_id), `carIndex`; topic `/topic/live/{sessionId}`. Документація в частині місць вказує sessionUID (number) — розбіжність, див. § 4.1. |
 
 **Висновок:** для дельти та ERS потрібні зміни в контракті WebSocket і на бекенді (додати поля в snapshot); візуал і віджети можна покращувати на фронті в межах поточних даних, а потім підключити нові поля.
 
@@ -65,6 +66,7 @@
 
 2. **Контракт і бекенд**
    - Бекенд включає потрібні для дельти поля в WebSocket snapshot, щоб усі дані приходили в одному потоці. Оновити `WsSnapshotMessage` (telemetry-api-contracts), `CarSnapshot`, `WsSnapshotMessageBuilder`, логіку заповнення (з LapData/SessionSummary або з пакета F1 25, якщо дельта там є). Оновити опис snapshot у REST/WS документації.
+   - **Обов'язково (див. § 4.2):** додати в `CarSnapshot` і snapshot повідомлення поля `currentLapTimeMs` (з LapDataProcessor) та `bestLapTimeMs` (кеш у runtime при фіналізації кола або читання з SessionSummary); опційно готове поле `deltaMs` у snapshot (deltaMs = currentLapTimeMs − bestLapTimeMs), або обчислювати дельту на фронті з двох полів.
 
 3. **Фронт**
    - Віджет Delta: формат **знак (+/−) і секунди** (наприклад, +0.250 / −0.100). Кольори: **зелений = швидше best**, **червоний = повільніше**. Розмістити поруч із Lap/Sector або окрема картка.
@@ -83,7 +85,7 @@
 **Кроки:**
 
 1. **Джерело даних ERS (прийнято)**
-   - Мінімум: **залишок енергії нормалізований 0–100%**. Додатково: **режим deploy** (коли гравець натискає ERS) — показувати окремо (підсвітка "Deploy"). У телеметрії (CarStatus) вже є `ersStoreEnergy`, `ersDeployMode` тощо; додати в `CarSnapshot` та `WsSnapshotMessage` поля (наприклад, `ersEnergyPercent`, `ersDeployActive`). Контракт і бекенд оновити; CarStatusProcessor заповнювати з CarStatusDto; на бекенді обчислювати відсоток за константою з документації F1 25.
+   - Мінімум: **залишок енергії нормалізований 0–100%**. Додатково: **режим deploy** (коли гравець натискає ERS) — показувати окремо (підсвітка "Deploy"). У телеметрії (CarStatus) вже є `ersStoreEnergy`, `ersDeployMode` тощо; додати в `CarSnapshot` та `WsSnapshotMessage` поля (наприклад, `ersEnergyPercent`, `ersDeployActive`). Контракт і бекенд оновити; CarStatusProcessor заповнювати з CarStatusDto; на бекенді обчислювати відсоток за константою з документації F1 25. **Див. § 4.3:** константа ERS_MAX_ENERGY_J, формула ersEnergyPercent; ersDeployActive = (ersDeployMode != null && ersDeployMode > 0).
 
 2. **Контракт і бекенд**
    - Оновити `WsSnapshotMessage`: нові опціональні поля. Оновити `CarSnapshot`, `WsSnapshotMessageBuilder`, `CarStatusProcessor`. **ERS у відсотках (0–100%)**; максимальну ємність брати з **константи з документації F1 25**. Документація WebSocket snapshot — додати опис полів ERS.
@@ -128,7 +130,7 @@
 **Кроки:**
 
 1. **REST/WebSocket контракти**
-   - У [rest_web_socket_api_contracts_f_1_telemetry.md](../../project/rest_web_socket_api_contracts_f_1_telemetry.md) оновити опис WebSocket live snapshot: нові поля (дельта, bestLapTimeMs, поточний час кола за наявності; ERS — ersEnergyPercent, ersDeployActive). Зазначити одиниці та джерело даних (F1 25 пакети або розрахунок від best lap).
+   - У [rest_web_socket_api_contracts_f_1_telemetry.md](../../project/rest_web_socket_api_contracts_f_1_telemetry.md) оновити опис WebSocket live snapshot: нові поля (дельта, bestLapTimeMs, currentLapTimeMs за наявності; ERS — ersEnergyPercent, ersDeployActive). Зазначити одиниці та джерело даних (F1 25 пакети або розрахунок від best lap). **Узгодити з реалізацією:** § 4.4.1 SUBSCRIBE — поле sessionId (string); § 4.5.2 SESSION_ENDED — sessionId (string).
 
 2. **UI/архітектура**
    - У [react_spa_ui_architecture.md](../../project/react_spa_ui_architecture.md) та [ui_ux_specification.md](../../project/ui_ux_specification.md) (якщо є опис Live): відобразити дашбордний стиль Live (більші цифри, окремий фон), перелік віджетів (Speed, RPM, Gear, Throttle, Brake, DRS, ERS, Delta, Lap/Sector), що світла/темна тема — окрема задача.
@@ -143,7 +145,56 @@
 
 ---
 
-## 4. Прийняті рішення (підсумок)
+## 4. Виявлені гепи (що відсутнє в плані або потребує уточнення)
+
+Нижче — гепи між планом, поточною реалізацією та документацією. Їх потрібно закрити під час реалізації або явно прийняти як окремі задачі.
+
+### 4.1 Контракт WebSocket (SUBSCRIBE / SESSION_ENDED)
+
+| Геп | Поточний стан | Дія |
+|-----|----------------|-----|
+| **SUBSCRIBE** | Документ [rest_web_socket_api_contracts](../../project/rest_web_socket_api_contracts_f_1_telemetry.md) § 4.4.1 описує поле `sessionUID` (number). Фактично фронт надсилає `sessionId` (string — public id з `GET /api/sessions/active`), бекенд приймає `sessionId` у `WsSubscribeMessage` і резолвить через `SessionResolveService.getSessionByPublicIdOrUid`. | У **Етапі 5** оновити документацію: у § 4.4.1 вказати, що клієнт надсилає **sessionId** (string, public_id або session_uid у вигляді рядка), а не sessionUID. Це узгоджено з тим, що topic = `/topic/live/{topicId}`, де topicId = public id (string). |
+| **SESSION_ENDED** | Документ § 4.5.2 показує `sessionUID` (number). У коді `WsSessionEndedMessage` має поле `sessionId` (String); фронт очікує `sessionId`. | У **Етапі 5** у § 4.5.2 зазначити поле **sessionId** (string), як у реалізації, щоб контракт відповідав коду. |
+
+### 4.2 Дельта — джерела даних і логіка на бекенді
+
+| Геп | Поточний стан | Дія |
+|-----|----------------|-----|
+| **Поточний час кола** | У `LapDto` є `currentLapTimeMs`; у `LapDataProcessor` він не записується в `CarSnapshot`. Зараз у snapshot лише `currentLap`, `currentSector`, `lapDistanceM`. | У **Етапі 2**: додати в `CarSnapshot` і в `WsSnapshotMessage` поле **currentLapTimeMs** (Integer, optional). У `LapDataProcessor` при оновленні snapshot записувати `lap.getCurrentLapTimeMs()`. |
+| **Best lap сесії** | `SessionSummary.bestLapTimeMs` оновлюється при фіналізації кола (LapAggregator → SessionSummaryAggregator). Під час кола «best so far» = найкращий час серед уже завершених кіл. | У **Етапі 2** визначити: (1) чи читати bestLapTimeMs з **SessionSummaryRepository** при зборі snapshot (один запит на 10 Hz на сесію — прийнятно, але варто кешувати по sessionUid+carIndex), або (2) зберігати **bestLapTimeMs у runtime** (наприклад, в CarSnapshot або окремо в state) і оновлювати при фіналізації кола в LapAggregator. Рекомендація: варіант (2) — додати bestLapTimeMs у CarSnapshot і оновлювати його при finalizeLap (з SessionSummary або з події). |
+| **Формула дельти** | План: «дельта від best lap». | Явно: **deltaMs = currentLapTimeMs - bestLapTimeMs** (обидва в мс). Якщо bestLapTimeMs null або currentLapTimeMs null — дельту не показувати. Конвенція: негативний delta = швидше best (зелений), позитивний = повільніше (червоний). |
+
+### 4.3 ERS — константа та обчислення
+
+| Геп | Поточний стан | Дія |
+|-----|----------------|-----|
+| **Максимальна ємність ERS** | У `CarStatusDto` є `ersStoreEnergy` (Float, Дж). Документація F1 25 (Telemetry Output Structures) містить розмірність. | У **Етапі 3**: ввести **константу** (наприклад, у конфигурації або в CarStatusProcessor) для максимальної ємності ERS у Дж; **ersEnergyPercent = 100 * ersStoreEnergy / ERS_MAX_ENERGY_J**, обрізати 0–100. Джерело константи — офіційна специфікація F1 25; якщо значення не оприлюднено — задокументувати припущення. |
+| **ersDeployActive** | У `CarStatusDto` є `ersDeployMode` (0 = none, 1 = medium, 2 = hotlap, 3 = overtake). | Визначити: **ersDeployActive = (ersDeployMode != null && ersDeployMode > 0)**. Додати в контракт і snapshot. |
+
+### 4.4 Поведінка клієнта (reconnect, перший snapshot)
+
+| Геп | Поточний стан | Дія |
+|-----|----------------|-----|
+| **Reconnect** | У `useLiveTelemetry` STOMP client створюється з `reconnectDelay: 0` — автоперепідключення вимкнено. При розриві користувач бачить connectionMessage і кнопку Retry (reload сторінки). | План не змінює scope: **reconnect залишається окремою задачею**. У Етапі 5 у [react_spa_ui_architecture.md](../../project/react_spa_ui_architecture.md) можна зазначити, що поточна поведінка — Retry = reload; автоматичний reconnect WS — майбутня покращина. |
+| **Перший snapshot після SUBSCRIBE** | Документ § 9: «Після успішного SUBSCRIBE сервер обов'язково надсилає повний snapshot». Зараз **LiveDataBroadcaster** тільки по таймеру 100 ms відправляє snapshot; окремого «initial snapshot» на subscribe немає. | Або (a) додати відправку одного snapshot при успішному subscribe у WebSocketSubscriptionService / LiveDataBroadcaster, або (b) у документації вказати, що перший snapshot надходить протягом 100 ms. Для кращого UX варіант (a) бажаний — у плані Етап 2 або окремим пунктом у бекенд-змінах. |
+
+### 4.5 Тести
+
+| Геп | Дія |
+|-----|-----|
+| **Бекенд** | Після додавання полів у CarSnapshot і WsSnapshotMessage: оновити **WsSnapshotMessageBuilderTest** і **TestData.carSnapshot()** (нові поля); оновити **SessionRuntimeStateTest** якщо змінюється getLatestSnapshot. Для CarStatusProcessor/LapDataProcessor — оновити або додати тести на запис ERS і currentLapTimeMs/bestLapTimeMs у snapshot. |
+| **Фронт** | Після винесення віджетів (Етап 4) та нових віджетів Delta/ERS (Етапи 2–3): додати юніт-тести для нових компонентів (наприклад, відображення дельти ±секунди, кольори; ERS progress і Deploy), якщо у проєкті прийнято тестувати UI-компоненти. |
+
+### 4.6 Інше
+
+| Геп | Поточний стан | Дія |
+|-----|----------------|-----|
+| **CarSnapshot.lapDistanceM** | Поле вже є в CarSnapshot (для pedal trace), але не експонується в WsSnapshotMessage. | Не входить у scope Live-сторінки; за потреби можна згадати в документації, що lapDistanceM використовується для trace, не для live UI. |
+| **Адаптивність і a11y** | План згадує адаптивність сітки. | У Етапі 4 чеклист вже містить «на малих екранах layout не ламається». За бажанням додати пункт: aria-live для значень, що часто оновлюються (опційно). |
+
+---
+
+## 5. Прийняті рішення (підсумок)
 
 | # | Питання | Рішення |
 |---|---------|---------|
@@ -158,10 +209,11 @@
 
 ---
 
-## 5. Чеклист перед початком коду
+## 6. Чеклист перед початком коду
 
 - [x] Усі питання мають заповнені рішення.
 - [x] Порядок етапів: **1 → 4 → 2 → 3 → 5** (візуал → віджети → дельта → ERS → оновлення документації).
 - [ ] Для етапів 2 і 3: перевірити документацію F1 25 на наявність дельти в пакетах та константи ERS; узгоджено зміни в telemetry-api-contracts та REST/WS документації.
+- [ ] Закрити гепи з § 4: контракт SUBSCRIBE/SESSION_ENDED (sessionId), джерела дельти (currentLapTimeMs, bestLapTimeMs), ERS константа, опційно — initial snapshot на subscribe та тести.
 
 Після підтвердження теми можна переходити до наступної (наприклад, Сторінка Session — sessionDisplayName, місце на фініші).

@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveTelemetry } from '../ws/useLiveTelemetry'
+import { LiveStateMessage, type LiveStateType } from '../components/LiveStateMessage'
 
 export function LiveDashboardPage() {
   const { status, session, snapshot, sessionEnded, errorMessage, connectionMessage } =
@@ -11,112 +12,37 @@ export function LiveDashboardPage() {
     window.location.reload()
   }, [])
 
+  const showStateMessage =
+    status === 'idle' ||
+    status === 'loading-active-session' ||
+    status === 'error' ||
+    status === 'no-active-session'
+
   return (
-    <div>
-      <h1 className="heading-page">Live Telemetry</h1>
+    <div className="live-dashboard">
+      <header className="live-dashboard__header">
+        <h1 className="heading-page">Live Telemetry</h1>
+      </header>
 
-      {status === 'idle' && (
-        <div className="card" style={{ padding: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-          <p className="text-muted">Loading…</p>
-        </div>
-      )}
-
-      {status === 'loading-active-session' && (
-        <div className="card" style={{ padding: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-          <p className="text-muted">Checking for active session…</p>
-        </div>
-      )}
-
-      {status === 'error' && (
-        <div className="card" style={{ padding: 'var(--space-4)', marginTop: 'var(--space-3)' }}>
-          <p style={{ color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>
-            Cannot connect to the telemetry service
-          </p>
-          <p className="text-muted" style={{ marginBottom: 'var(--space-3)' }}>
-            {errorMessage ?? 'The server may be stopped or unreachable.'}
-          </p>
-          <p className="text-muted" style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--text-sm)' }}>
-            Make sure the backend is running and, if you use telemetry, that the game or UDP ingest is connected.
-          </p>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={handleRetry}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 'var(--radius-md)',
-                border: 'none',
-                backgroundColor: 'var(--accent)',
-                color: 'white',
-                fontWeight: 'var(--font-weight-medium)',
-                cursor: 'pointer',
-              }}
-            >
-              Retry
-            </button>
-            <Link
-              to="/sessions"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: '8px 16px',
-                borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border)',
-                backgroundColor: 'var(--bg-elevated)',
-                color: 'var(--text-primary)',
-                textDecoration: 'none',
-                fontWeight: 'var(--font-weight-medium)',
-              }}
-            >
-              View sessions
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {status === 'no-active-session' && (
-        <div className="card" style={{ padding: 'var(--space-5)', marginTop: 'var(--space-3)' }}>
-          <p style={{ color: 'var(--text-primary)', marginBottom: 'var(--space-2)', fontSize: 'var(--text-lg)' }}>
-            Welcome to F1 FastLaps Telemetry
-          </p>
-          <p className="text-muted" style={{ marginBottom: 'var(--space-4)' }}>
-            This app shows live telemetry from F1 25 and lets you browse recorded sessions, laps and charts.
-          </p>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-2)', fontSize: 'var(--text-sm)' }}>
-            Right now there is no active session and the app is not receiving live data.
-          </p>
-          <ul className="text-muted" style={{ marginBottom: 'var(--space-4)', paddingLeft: 'var(--space-5)', fontSize: 'var(--text-sm)' }}>
-            <li>Start a session in F1 25 and ensure the telemetry backend (UDP ingest) is running and connected.</li>
-            <li>Or open <Link to="/sessions">Sessions</Link> to view and analyse past sessions.</li>
-          </ul>
-          <Link
-            to="/sessions"
-            style={{
-              display: 'inline-block',
-              padding: '8px 16px',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--accent)',
-              color: 'white',
-              textDecoration: 'none',
-              fontWeight: 'var(--font-weight-medium)',
-            }}
-          >
-            View sessions
-          </Link>
-        </div>
+      {showStateMessage && (
+        <LiveStateMessage
+          state={status as LiveStateType}
+          errorMessage={errorMessage}
+          onRetry={status === 'error' ? handleRetry : undefined}
+        />
       )}
 
       {hasActiveSession && (
-        <div style={{ marginTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <div className="live-dashboard__widgets">
           {connectionMessage && (
             <div
               className="card"
               style={{
-                padding: 'var(--space-2)',
-                borderLeft: `4px solid var(--warning)`,
+                padding: 'var(--space-2) var(--space-4)',
+                borderLeft: '4px solid var(--warning)',
               }}
             >
-              <p className="text-muted">{connectionMessage}</p>
+              <p className="text-muted" style={{ margin: 0 }}>{connectionMessage}</p>
             </div>
           )}
 
@@ -124,34 +50,30 @@ export function LiveDashboardPage() {
             <div
               className="card"
               style={{
-                padding: 'var(--space-2)',
-                borderLeft: `4px solid var(--warning)`,
+                padding: 'var(--space-2) var(--space-4)',
+                borderLeft: '4px solid var(--warning)',
               }}
             >
-              <p className="text-muted">
-                Session ended (reason:{' '}
-                <strong>{sessionEnded.endReason}</strong>).{' '}
+              <p className="text-muted" style={{ margin: 0 }}>
+                Session ended (reason: <strong>{sessionEnded.endReason}</strong>).{' '}
                 <Link to="/sessions">View sessions</Link>
               </p>
             </div>
           )}
 
-          <div className="card" style={{ padding: 'var(--space-4)' }}>
-            <p className="text-muted" style={{ marginBottom: 'var(--space-2)' }}>
-              Session: <code className="text-mono">{session.id}</code>
-            </p>
-            <p className="text-muted" style={{ marginBottom: 'var(--space-2)' }}>
-              Connection status: <strong>{status}</strong>
-            </p>
-            {sessionEnded && (
-              <p className="text-muted" style={{ marginTop: 'var(--space-1)' }}>
-                Session ended with reason: <strong>{sessionEnded.endReason}</strong>
-              </p>
-            )}
+          <div className="card live-session-bar">
+            <span className="live-session-bar__id">Session: <code className="text-mono">{session.id}</code></span>
+            <span className="live-session-bar__status">
+              {status === 'connected' ? (
+                <span className="live-session-bar__badge">Live</span>
+              ) : sessionEnded ? (
+                <span className="live-session-bar__badge live-session-bar__badge--ended">Ended</span>
+              ) : (
+                <span className="live-session-bar__badge live-session-bar__badge--disconnected">{status}</span>
+              )}
+            </span>
             {errorMessage && (
-              <p className="text-error" style={{ marginTop: 'var(--space-1)' }}>
-                {errorMessage}
-              </p>
+              <span className="text-error" style={{ fontSize: 'var(--text-sm)' }}>{errorMessage}</span>
             )}
           </div>
 
@@ -347,7 +269,6 @@ export function LiveDashboardPage() {
               </div>
             </div>
           </div>
-
         </div>
       )}
     </div>
@@ -383,4 +304,3 @@ function ProgressBar(props: ProgressBarProps) {
     </div>
   )
 }
-
