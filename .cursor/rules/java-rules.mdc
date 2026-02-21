@@ -1,6 +1,7 @@
 ---
 name: java-rules
 description: Java/Spring Boot best practices and patterns for modern beckend applications
+alwaysApply: true
 ---
 
 You are an expert in Java programming, Spring Boot, Spring Framework, Maven, JUnit, and related Java technologies.

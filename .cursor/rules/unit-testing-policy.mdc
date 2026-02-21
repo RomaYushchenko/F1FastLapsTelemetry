@@ -2,6 +2,7 @@
 name: unit-testing-policy
 description: Політика юніт-тестування — JUnit Jupiter, Mockito, TestData, AAA, @DisplayName; покриття не менше 85%. Застосовувати при написанні, рев’ю або зміні тестів, при питаннях про coverage або тестові дані.
 globs: **/*Test.java
+alwaysApply: true
 ---
 
 # Unit testing — інструкція для агента

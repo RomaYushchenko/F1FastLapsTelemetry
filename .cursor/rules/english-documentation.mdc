@@ -2,6 +2,7 @@
 name: english-documentation
 description: All project documentation and code comments must be in English
 globs: ["**/*.java", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.sql", "**/*.md", "**/*.yml", "**/*.yaml"]
+alwaysApply: true
 ---
 
 # Documentation and Comments Language
