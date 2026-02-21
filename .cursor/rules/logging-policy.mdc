@@ -1,0 +1,64 @@
+---
+name: logging-policy
+description: Політика логування — INFO/DEBUG/TRACE/WARN/ERROR, вхід-вихід з методів, early exit. Застосовувати при написанні нової логіки в сервісах, контролерах, консьюмерах, процесорах, handler'ах.
+globs: "**/src/main/java/**/*.java"
+alwaysApply: true
+---
+
+# Логування — інструкція для агента
+
+При написанні або зміні логіки в сервісах, REST-контролерах, Kafka-консьюмерах, процесорах, UDP-handler'ах дотримуйся цієї політики. Мета: зручний дебаг по логам без зайвого шуму.
+
+## Стек
+
+- **SLF4J** через Lombok: `@Slf4j` на клас, виклики `log.info()`, `log.debug()`, `log.trace()`, `log.warn()`, `log.error()`.
+- **Параметризовані повідомлення**: завжди `log.debug("msg: key={}", value)` або `log.info("... {}, {}", a, b)`. Не конкатенуй рядки для рівнів (зменшує навантаження, якщо рівень вимкнено).
+- Для винятків: `log.error("Short message", e)` або `log.error("Message: {}", e.getMessage(), e)`.
+
+## Рівні логів
+
+| Рівень   | Коли використовувати | Приклади |
+|----------|----------------------|----------|
+| **INFO** | Бізнес-події, життєвий цикл, значимі результати | Session started/ended, lap finalized, best lap, implicit session start, старт/стоп сервісу |
+| **DEBUG** | Сервісна логіка: вхід/вихід публічних методів, кроки обробки, early exit | Вхід у метод з ключовими параметрами; вихід з результатом або кількістю; duplicate packet, out-of-order, skip через shouldProcess |
+| **TRACE** | Деталі, високий об'єм, не для щоденного дебагу | Окремий пакет/фрейм, маппінг entity→DTO (опційно), дрібні поля |
+| **WARN** | Відновлювані проблеми, некоректний вхід, відсутні поля | Payload too short, unknown session, wrong state, invalid id перед throw, timeout, deserialization skip |
+| **ERROR** | Невідновлювані помилки, завжди з винятком | Publish failed after retries, exception в consumer/handler, internal error в exception handler |
+
+## Вхід і вихід з методів
+
+- **Публічні методи** сервісів і контролерів:
+  - На **початку**: один `log.debug("methodName: keyParam1={}, keyParam2={}", p1, p2)` з іменем методу та ключовими аргументами (id, sessionUid, carIndex тощо).
+  - При **виході** (за потреби): результат або підсумок — наприклад `log.debug("methodName: returning {} items", list.size())` або `log.debug("methodName: resolved id={}", id)`. Не обов'язково на кожен метод; додавай там, де це допомагає трасуванню.
+- **Ранні виходи (early return)**:
+  - Перед `return` або перед `throw`: залогую причину на **DEBUG** (наприклад duplicate, shouldNotProcess) або **WARN** (невалідний вхід, відсутнє поле).
+  - Приклад: `log.warn("Session id is required"); throw new SessionNotFoundException(...);`
+  - Приклад: `log.debug("Skipping packet: sessionUid={}, reason=duplicate", sessionUid); return;`
+
+## Що логувати в яких класах
+
+- **Сервіси (Service)**: DEBUG вхід/вихід публічних методів; WARN перед throw при невалідному id або порожньому вводі.
+- **REST-контролери**: DEBUG на вхід кожного endpoint (id, carIndex, lapNum тощо); WARN перед throw при невалідних параметрах (наприклад lapNum == null).
+- **Kafka-консьюмери**: WARN при event == null (deserialization failed); DEBUG при skip після shouldProcessPacket або markAsProcessed з причиною (reason=shouldNotProcess, reason=duplicate); ERROR при необробленому exception з повним stack.
+- **Процесори**: DEBUG на вхід process(...) з sessionUid, carIndex, frameId; DEBUG при out-of-order або skip; при null payload — WARN і return.
+- **UDP-handler'и / adapter**: DEBUG на початок handle з sessionUID, frame або packetId; WARN при payload too short; ERROR при exception з cause.
+- **Маппери, білдери, entity, DTO**: за замовчуванням не додавати логи; якщо потрібен дуже детальний дебаг — лише TRACE (наприклад toDto з ключовими полями).
+- **Репозиторії (Spring Data)**: не логувати вручну.
+
+## Трасування (traceId)
+
+- Кожен рядок лога містить **traceId** у квадратних дужках (формат заданий у `logging.pattern.console`). По ньому можна відфільтрувати всі логи одного запиту або одного Kafka-повідомлення.
+- **REST**: для кожного HTTP-запиту фільтр `TraceIdFilter` кладе в MDC `traceId` — з заголовка `X-Trace-Id` (якщо клієнт передав) або згенерований UUID. Після відповіді MDC очищається.
+- **Kafka**: у кожному консьюмері на початку обробки в MDC ставиться `traceId` формату `kafka-<topic>-<sessionUid>-<frameId>` (наприклад `kafka-ct-12345-67` для car telemetry); у `finally` викликається `MDC.clear()`.
+- Для відслідковування: `grep '\[kafka-ct-12345-67\]' app.log` або `grep '\[abc-uuid\]' app.log` для REST.
+
+## Короткий чеклист для нового коду
+
+1. Клас з логікою — додай `@Slf4j`.
+2. Публічний метод — на початку `log.debug("methodName: keyParams...", ...)`.
+3. Early return (skip, duplicate, wrong state) — перед ним `log.debug(...)` або `log.warn(...)` залежно від типу.
+4. Невалідний вхід перед throw — `log.warn("причина"); throw ...`.
+5. Exception у catch — `log.error("короткий опис", e)`.
+6. Бізнес-подія (session start/end, lap finalized) — `log.info(...)`.
+
+Посилання на план: `.cursor/plans/` (план додавання логів), стратегія рівнів і перелік класів там описані детальніше.

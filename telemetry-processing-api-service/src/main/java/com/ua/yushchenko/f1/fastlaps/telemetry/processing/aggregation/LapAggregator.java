@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.LapBuilder;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import lombok.RequiredArgsConstructor;
@@ -123,19 +124,18 @@ public class LapAggregator {
             return; // Still missing sector times
         }
 
-        Lap lap = Lap.builder()
-                .sessionUid(state.getSessionUid())
-                .carIndex(state.getCarIndex())
-                .lapNumber(state.getCurrentLapNumber())
-                .lapTimeMs(lapTimeMs)
-                .sector1TimeMs(s1)
-                .sector2TimeMs(s2)
-                .sector3TimeMs(s3)
-                .isInvalid(state.isInvalid())
-                .penaltiesSeconds(state.getPenaltiesSeconds())
-                .endedAt(Instant.now())
-                .build();
-
+        Lap lap = LapBuilder.build(
+                state.getSessionUid(),
+                state.getCarIndex(),
+                state.getCurrentLapNumber(),
+                lapTimeMs,
+                s1,
+                s2,
+                s3,
+                state.isInvalid(),
+                state.getPenaltiesSeconds(),
+                Instant.now()
+        );
         lapRepository.save(lap);
 
         tyreWearRecorder.recordForLap(state.getSessionUid(), state.getCarIndex(), state.getCurrentLapNumber());

@@ -9,7 +9,7 @@
 
 ### 1.1 Роль
 
-React SPA є **єдиним клієнтом** backend-сервісу `telemetry-processing-api-service` у MVP:
+React SPA є **єдиним клієнтом** backend-сервісу `telemetry-processing-api-service` у MVP (документація сервісу: [telemetry_processing_api_service.md](telemetry_processing_api_service.md)):
 
 - **Read-only:** UI не змінює дані; всі зміни йдуть з гри через UDP → Kafka → Processing.
 - **Два канали даних:**

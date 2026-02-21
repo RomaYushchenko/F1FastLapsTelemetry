@@ -2,6 +2,7 @@
 name: js-react-rules
 description: React best practices and patterns for modern web applications
 globs: **/*.tsx, **/*.jsx, components/**/*, **/*.ts, **/*.tsx, **/*.d.ts, **/*.js, **/*.ts, src/**/*.ts
+alwaysApply: true
 ---
 
 

@@ -122,6 +122,7 @@ services:
     ports:
       - "20777:20777/udp"  # UDP для F1 25 Game
     environment:
+      SPRING_PROFILES_ACTIVE: dev
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       JAVA_OPTS: "-Xms256m -Xmx512m"
     depends_on:
@@ -147,6 +148,7 @@ services:
     ports:
       - "8081:8081"
     environment:
+      SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/telemetry
       SPRING_DATASOURCE_USERNAME: telemetry
       SPRING_DATASOURCE_PASSWORD: telemetry

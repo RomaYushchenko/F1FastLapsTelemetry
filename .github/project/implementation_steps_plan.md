@@ -108,7 +108,7 @@ react_spa_ui_architecture.md
 |-----------|------------------|------|----------------|
 | **UDP Library (3 модулі)** | Інфраструктура: UDP listener, парсинг, Kafka publishing | Java 17, Pure Java + Spring | f1-telemetry-udp-core, f1-telemetry-udp-spring, f1-telemetry-udp-starter |
 | **UDP Ingest Service** | Deployment wrapper для UDP Library, конфігурація | Java 17, Spring Boot | udp-ingest-service |
-| **Telemetry Processing & API Service** | Kafka consumers, FSM, агрегація, persistence, REST + WebSocket | Java 17, Spring Boot, JPA, WebSocket | telemetry-processing-api-service |
+| **Telemetry Processing & API Service** | Kafka consumers, FSM, агрегація, persistence, REST + WebSocket | Java 17, Spring Boot, JPA, WebSocket | telemetry-processing-api-service ([док.](telemetry_processing_api_service.md)) |
 | **PostgreSQL + TimescaleDB** | Raw telemetry (hypertables), sessions/laps/sectors/summary | PostgreSQL, TimescaleDB | infra/docker-compose.yml |
 | **Kafka** | Буфер подій, decoupling, backpressure | Kafka | infra/docker-compose.yml |
 | **React SPA** | Live dashboard, перегляд сесій, laps/sectors | React | ui/ (майбутній модуль) |

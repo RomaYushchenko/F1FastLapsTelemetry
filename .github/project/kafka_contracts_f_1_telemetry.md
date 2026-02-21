@@ -6,7 +6,7 @@
 
 Контракти є стабільним API між:
 - `udp-ingest-service`
-- `telemetry-processing-api-service`
+- `telemetry-processing-api-service` ([документація сервісу](telemetry_processing_api_service.md))
 
 Будь‑які зміни тут вважаються **breaking / non‑breaking** і повинні проходити контроль версій.
 

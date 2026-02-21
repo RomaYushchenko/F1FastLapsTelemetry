@@ -117,7 +117,8 @@ mvn spring-boot:run
 
 ---
 
-### Step 4: Start Telemetry Processing Service
+### Step 4: Start Telemetry Processing Service  
+*(Документація сервісу: [telemetry_processing_api_service.md](telemetry_processing_api_service.md))*
 
 **Terminal 2:**
 ```powershell

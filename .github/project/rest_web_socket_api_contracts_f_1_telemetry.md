@@ -2,7 +2,7 @@
 
 ## 1. Мета документа
 
-Цей документ описує **публічний API** сервісу `telemetry-processing-api-service`.
+Цей документ описує **публічний API** сервісу `telemetry-processing-api-service`. Детальна документація самого сервісу (архітектура, шари): [telemetry_processing_api_service.md](telemetry_processing_api_service.md).
 
 API використовується UI (Web) та потенційно сторонніми клієнтами для:
 - перегляду історії сесій;

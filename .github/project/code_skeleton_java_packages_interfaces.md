@@ -270,6 +270,8 @@ public interface TelemetryPublisher {
 
 ## 7. telemetry-processing-api-service
 
+**Повна документація сервісу (архітектура після рефакторингу, актуальна структура пакетів):** [telemetry_processing_api_service.md](telemetry_processing_api_service.md)
+
 Найбільший модуль. Поєднує Kafka consumers, агрегацію, persistence та API.
 
 ```

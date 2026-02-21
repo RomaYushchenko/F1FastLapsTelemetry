@@ -1,0 +1,5 @@
+# Dev profile: enable DEBUG for app packages to simplify debugging from logs.
+# Activate with: spring.profiles.active=dev
+logging:
+  level:
+    com.ua.yushchenko.f1.fastlaps.telemetry: DEBUG
