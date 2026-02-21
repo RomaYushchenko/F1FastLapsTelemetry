@@ -47,14 +47,15 @@ public class LiveDataBroadcaster {
                 continue;
             }
 
-            SessionRuntimeState.CarSnapshot carSnapshot = state.getLatestCarSnapshot();
-            if (carSnapshot == null) {
+            Map.Entry<Integer, SessionRuntimeState.CarSnapshot> snapshotEntry = state.getLatestCarSnapshotWithCarIndex();
+            if (snapshotEntry == null) {
                 continue; // No data yet
             }
+            int snapshotCarIndex = snapshotEntry.getKey();
+            SessionRuntimeState.CarSnapshot carSnapshot = snapshotEntry.getValue();
 
-            // Enrich with best lap time from SessionSummary for delta calculation
-            short carIndex = state.getPlayerCarIndex() != null ? state.getPlayerCarIndex().shortValue() : 0;
-            sessionSummaryRepository.findBySessionUidAndCarIndex(sessionUid, carIndex)
+            // Enrich with best lap time from SessionSummary for the same car (use snapshot's car index so we never mix cars)
+            sessionSummaryRepository.findBySessionUidAndCarIndex(sessionUid, (short) snapshotCarIndex)
                     .map(s -> s.getBestLapTimeMs())
                     .ifPresent(carSnapshot::setBestLapTimeMs);
 
