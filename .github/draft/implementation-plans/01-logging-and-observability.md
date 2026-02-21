@@ -2,7 +2,7 @@
 
 **Тема:** Бекенд — логування в файли, розділені лог-файли, лог запитів до БД, трасування (traceId).  
 **Джерело ідей:** [improvements-notes-structured.md](../improvements-notes-structured.md) § 1.1.  
-**Статус:** рішення прийняті; готово до реалізації.
+**Статус:** у реалізації. Етапи 1–4 та 5 (документація) виконані.
 
 ---
 
@@ -127,6 +127,7 @@
      - На кожен пакет генерувати UUID і класти в MDC перед обробкою; після publish очищати MDC.
      - Або traceId = `udp-<sessionUid>-<frameId>` (якщо є в пакеті), щоб корелювати з processing-api по sessionUid+frameId.
    - Рішення: який варіант обрати для ingest — див. питання 8.
+   - **Де встановлювати:** рекомендується встановлювати traceId у компоненті, що викликає packet handlers (наприклад `MethodPacketHandler` у f1-telemetry-udp-spring): на початку `handle()` — UUID у MDC, у `finally` — `MDC.clear()`, щоб усі ingest-хендлери та publisher бачили той самий traceId без змін у кожному handler. Деталі — розділ 6, пункт 4.
 
 4. **Документація**
    - Коротко описати: які файли куди пишуться, як шукати по traceId (приклад grep), як формується traceId для REST / Kafka / UDP.
@@ -182,12 +183,33 @@
 
 ---
 
-## 6. Чеклист перед початком коду
+## 6. Додаткові моменти (виявлено при аналізі коду)
+
+При аналізі коду виявлено аспекти, які не були явно описані в плані. Нижче — перелік і рекомендації.
+
+| # | Аспект | Що виявлено | Рекомендація для плану |
+|---|--------|-------------|-------------------------|
+| 1 | **WebSocket (telemetry-processing-api-service)** | Є WebSocket: `WebSocketEventListener` (connect/disconnect), `LiveDataBroadcaster` (broadcast по розкладу). Логи йдуть через `@Slf4j` (application). traceId для WebSocket не встановлюється: підключення/відключення — у контексті HTTP upgrade, broadcast — у scheduler thread. | Визначити, чи потрібен traceId для WebSocket: (a) залишити як є (у логах буде порожній `[]` або контекст потоку); (b) додати traceId на сесію WebSocket (наприклад `ws-<sessionId>`) при connect і класти в MDC при обробці повідомлень від цієї сесії — тоді логи connect/disconnect/broadcast можна корелювати. Якщо обирати (b) — додати крок у Етап 4: WebSocket — встановлювати traceId при connect, очищати при disconnect; для broadcast (scheduler) залишити без traceId або позначку `scheduled`. |
+| 2 | **Scheduled / фонові задачі** | `NoDataTimeoutWorker` (@Scheduled) і `LiveDataBroadcaster` (@Scheduled) виконуються в потоках планувальника. MDC — thread-local, тому в цих потоках traceId порожній. | Задокументувати: логи зі scheduled задач матимуть порожній `[%X{traceId:-}]` (або `-`). Не потрібно встановлювати traceId для цих задач; за потреби можна додати в pattern окрему позначку для scheduler (наприклад `[scheduled]`) — опційно. Відобразити в політиці логування (.cursor/rules/logging-policy.mdc). |
+| 3 | **Actuator (health, info)** | У `telemetry-processing-api-service` підключено `spring-boot-starter-actuator`; у `application.yml`: `management.endpoints.web.exposure.include: health,info`. План не згадує actuator. | Визначити: логи запитів до `/actuator/health`, `/actuator/info` проходять через REST, тому для них traceId буде встановлений через `TraceIdFilter`. Додати в документацію: actuator endpoints — частина application log; окремого файлу для actuator не передбачено. Якщо згодом додавати метрики (metrics) — це окрема тема observability. |
+| 4 | **Де встановлювати traceId для UDP (ingest)** | Обробка UDP: `UdpTelemetryListener` (f1-telemetry-udp-**core**) приймає пакет → `SimpleUdpPacketDispatcher` → `MethodPacketHandler` (f1-telemetry-udp-**spring**) викликає handler (наприклад `SessionPacketHandler` в ingest). План каже «на кожен пакет генерувати UUID і класти в MDC перед обробкою», але не вказує **де** саме. | Рекомендація: встановлювати traceId у **MethodPacketHandler** (f1-telemetry-udp-spring) на початку `handle(header, payload)` — UUID на пакет, `MDC.put`; у `finally` — `MDC.clear()`. Тоді всі ingest-хендлери та publisher виконуються вже з заповненим MDC, без змін у кожному handler. Якщо не хочеться змінювати бібліотеку — альтернатива: у udp-ingest-service додати обгортку/AOP навколо точки входу (наприклад перед викликом dispatcher), але це складніше. Додати в Етап 4, крок 3: «Установлювати traceId у компоненті, що викликає packet handlers (наприклад MethodPacketHandler у f1-telemetry-udp-spring): на початку handle() — UUID у MDC, у finally — MDC.clear(), щоб усі ingest-хендлери та publisher бачили той самий traceId.» |
+| 5 | **Named loggers для inbound/outbound** | У коді немає `LoggerFactory.getLogger("...")` — усі логи через `@Slf4j` (клас). План передбачає окремі named loggers для inbound/outbound. | При реалізації Етапу 2: додати named logger (наприклад `inbound-events`, `inbound-udp`, `outbound-events`) і в consumer’ах/handler’ах/publisher’і викликати саме його для рядків типу «Received …», «Published …». Це вже зазначено в плані; лише підтвердження, що поточний код цього ще не має. |
+| 6 | **udp-ingest-service: logging.pattern** | У `udp-ingest-service/application.yml` є лише `logging.level`, немає `logging.pattern.console`. Після додавання traceId в ingest потрібно, щоб у логах було поле traceId. | При реалізації Етапу 1 та 4: у logback-spring.xml для ingest (і за бажанням у application.yml) задати pattern з `[%X{traceId:-}]`, щоб після заповнення MDC у файлах і консолі відображався traceId. |
+| 7 | **application-dev.yml** | У processing-api є `application-dev.yml` (рівні логів DEBUG для пакету телеметрії). План згадує профайл `dev` для шляху логів (`logs-dev` з підпапками по сервісах). | При реалізації Етапу 1: переконатися, що logback-spring.xml враховує профайл `dev` для базового шляху (наприклад `<springProfile name="dev">` з іншим property для каталогу). Це узгоджено з рішенням 1 (таблиця розділу 5). |
+| 8 | **Docker і шлях до логів** | У проєкті є `docker-compose.yml` з healthcheck для сервісів. План визначає `./logs/` (або `LOG_PATH`) відносно working directory. | Додати примітку: при запуску в Docker потрібно або змонтувати том для каталогу логів, або задати `LOG_PATH` у середовищі так, щоб логи потрапляли у зручне місце (наприклад volume). Інакше після перезапуску контейнера логи зникають. Коротко задокументувати в розділі «Де зберігати файли логів» або в довідці після реалізації. |
+| 9 | **Глобальний обробник помилок REST** | `RestExceptionHandler` логує помилки (WARN/ERROR) через `@Slf4j`. Це частина application log. | План це не згадує окремо; достатньо того, що такі логи йдуть у загальний application log і мають traceId завдяки TraceIdFilter. Опційно в політиці логування зазначити: exception handler логує в application log з тим самим traceId, що й запит. |
+| 10 | **Бібліотеки f1-telemetry-udp-core / f1-telemetry-udp-spring** | У core і spring є логи (`UdpTelemetryListener`, `SimpleUdpPacketDispatcher`, `MethodPacketHandler`). Вони використовуються лише udp-ingest-service. Після додавання traceId в MethodPacketHandler логи з бібліотек у ingest також матимуть traceId. | Якщо logback-spring.xml в ingest налаштований на пакет `com.ua.yushchenko.f1.fastlaps` — логи з бібліотек потраплятимуть у ті самі файли (application або inbound-udp залежно від того, які логери куди направлені). Окремих logback-файлів для бібліотек не потрібно. |
+
+Підсумок для реалізації: врахувати пункти 1–2 (WebSocket, scheduled) у документації та етапі 4; пункт 4 (місце встановлення traceId для UDP) — у Етап 4, крок 3; пункти 5–7 — при виконанні етапів 1–2; пункт 8 — у документацію про розміщення логів; пункти 9–10 — для повноти картини.
+
+---
+
+## 7. Чеклист перед початком коду
 
 - [x] Усі питання мають заповнені рішення.
-- [ ] Визначити порядок етапів (рекомендація: 1 → 3 → 2 → 4 → 5).
-- [ ] Визначити, чи робити обидва сервіси паралельно чи спочатку один.
-- [ ] Етап 5 виконувати останнім (після того як логи вже пишуться за новою схемою).
+- [x] Визначити порядок етапів (рекомендація: 1 → 3 → 2 → 4 → 5).
+- [x] Визначити, чи робити обидва сервіси паралельно чи спочатку один (зроблено обидва).
+- [x] Етап 5 виконувати останнім (після того як логи вже пишуться за новою схемою).
 
 **Довідка після реалізації:** шлях (default) — `<project-root>/logs/`; (dev) — `logs-dev/telemetry-processing-api-service/`, `logs-dev/udp-ingest-service/`. Усі імена файлів — **з префіксом сервісу** (щоб не плутати між сервісами): `telemetry-processing-api-service-application.log`, `telemetry-processing-api-service-inbound-events.log`, `telemetry-processing-api-service-db.log`, `udp-ingest-service-application.log`, `udp-ingest-service-inbound-udp.log`, `udp-ingest-service-outbound-events.log`. Ротація по дню, 5 днів.
 

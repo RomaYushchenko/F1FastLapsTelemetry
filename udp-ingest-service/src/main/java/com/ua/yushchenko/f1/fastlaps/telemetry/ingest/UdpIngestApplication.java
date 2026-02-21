@@ -6,11 +6,19 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 @Slf4j
 @SpringBootApplication
 public class UdpIngestApplication {
 
+    /** System property read by logback-spring.xml so each run writes to a new log file (previous run's file stays archived). */
+    public static final String LOG_STARTUP_TIMESTAMP_PROP = "log.startup.timestamp";
+
     public static void main(String[] args) {
+        System.setProperty(LOG_STARTUP_TIMESTAMP_PROP,
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")));
         SpringApplication.run(UdpIngestApplication.class, args);
     }
 

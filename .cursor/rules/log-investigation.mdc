@@ -1,0 +1,89 @@
+---
+name: log-investigation
+description: "When to and how to investigate issues using logs: traceId, log file layout, grep, and what to look for. Apply when the user asks to investigate an error, find the cause of a failure, debug using logs, or trace a request/message through the system."
+globs: "**/logs/**/*.log,**/logs-dev/**/*.log,.cursor/rules/logging-policy.mdc,.github/draft/implementation-plans/01-logging-and-observability.md"
+alwaysApply: false
+---
+
+# Log-based investigation — agent instructions
+
+Use this rule when the user asks to **investigate an error**, **find the cause of a failure**, **debug using logs**, or **trace a request/message** through the system. Follow the steps below and use traceId to correlate logs across files and services.
+
+---
+
+## 1. When to run a log investigation
+
+- User reports an error, exception, or unexpected behaviour and wants to find the cause.
+- User provides a time range, session id, error message, or traceId and asks to analyse logs.
+- User asks to trace a single HTTP request or Kafka message end-to-end.
+- Reproducing a bug requires understanding the sequence of events from logs (e.g. session lifecycle, duplicate packet, timeout).
+
+---
+
+## 2. Where logs are and how they are split
+
+| Location | Content |
+|----------|--------|
+| **Base path** | `logs/` at project root (default), or `logs-dev/<service>/` with profile `dev`. Override: `logging.file.path` (e.g. in `application-dev.yml`). |
+| **File names** | Each run creates new files with a startup timestamp: `<service>-<type>-<yyyyMMdd-HHmmss>.log`. Example: `telemetry-processing-api-service-application-20260221-143052.log`. |
+| **Types per service** | **telemetry-processing-api-service:** `application`, `inbound-events`, `db`. **udp-ingest-service:** `application`, `inbound-udp`, `outbound-events`. |
+| **Rotation** | By day; rolled files: `*-<timestamp>.yyyy-MM-dd.log`. Retention: 5 days. |
+
+To find the **current run’s** logs: use the most recent `*-<timestamp>.log` files (sort by modification time or by timestamp in the name). To investigate a **past run**: use the timestamp in the filename that matches the incident time.
+
+---
+
+## 3. TraceId — what it is and how to use it
+
+- **Format in logs:** Every log line includes traceId in square brackets, e.g. `[kafka-ct-123456789-42]` or `[a1b2c3d4-e5f6-7890-abcd-ef1234567890]`.
+- **REST:** `TraceIdFilter` sets MDC from header `X-Trace-Id` or generates a UUID. One traceId per HTTP request.
+- **Kafka (processing-api):** Each consumer sets traceId = `kafka-<shortTopic>-<sessionUid>-<frameId>`, e.g. `kafka-ct-123456789-42` (car telemetry), `kafka-lap-123456789-42`, `kafka-ev-...`, `kafka-cs-...`, `kafka-cd-...`, `kafka-sd-...`.
+- **UDP (ingest):** Each packet gets a UUID in MDC (set in `MethodPacketHandler`); all handler and publisher logs for that packet share the same traceId.
+
+**Searching by traceId across all log files (same service):**
+
+```bash
+# Replace TRACE_ID with the value in square brackets (escape brackets for grep)
+grep '\[TRACE_ID\]' logs/telemetry-processing-api-service-*.log
+# Example for a Kafka message:
+grep '\[kafka-ct-123456789-42\]' logs/telemetry-processing-api-service-*.log
+
+# Search in a specific run (single timestamp) and all types (application, inbound-events, db):
+grep '\[kafka-ct-123456789-42\]' logs/telemetry-processing-api-service-*-20260221-143052.log
+```
+
+**Searching across both services:** If you have a session UID and frame, you can grep the same session UID (and frame) in ingest and processing logs; traceId format differs (UUID in ingest vs `kafka-<topic>-<sessionUid>-<frameId>` in processing), so correlate by `sessionUid` and time.
+
+---
+
+## 4. What to look at during investigation
+
+| Goal | Where to look | What to look for |
+|------|----------------|------------------|
+| **Error / exception** | `*-application-*.log` | Lines with level ERROR or WARN; stack traces; messages like "Session not found", "Invalid request", "Error processing", "Publish failed". |
+| **REST request** | application log | traceId = UUID (or from X-Trace-Id). From first DEBUG (controller) to response or exception. |
+| **Kafka message flow** | inbound-events + application (processing-api) | Inbound: "Received event: topic=..., sessionUid=..., frame=...". Then application log with same traceId: processor, service, DB. |
+| **UDP → Kafka flow** | ingest: inbound-udp, outbound-events, application | Inbound-udp: "handle: packetId=..., sessionUID=..., frame=...". Outbound-events: "Publishing message to topic=..., key=...". Application: handler/parser/builder errors. |
+| **DB issues** | `*-db-*.log` (processing-api only) | SQL and parameters (if enabled). Same traceId as the request/consumer that triggered the query. |
+| **Session lifecycle** | application log | "Session started", "Session timeout", "Implicit session start", "SEND", "SSTA", state transitions. |
+| **Skips / duplicates** | application log, same traceId | "Skipping ... reason=duplicate", "reason=shouldNotProcess", "Duplicate session event". |
+| **Scheduled tasks** | application log | No traceId (empty `-`). "Session timeout", "Broadcast snapshot", etc. Identify by time and message. |
+
+---
+
+## 5. Suggested investigation steps
+
+1. **Narrow time and run:** Identify the log run (startup timestamp) and time range of the incident from the user or from error timestamps.
+2. **Get a traceId or key ids:** From the user (e.g. X-Trace-Id, or session UID + frame), or find one from an ERROR line (traceId is on the same line).
+3. **Grep by traceId:** Run `grep '\[<traceId>\]' <service>-*.log` (for the relevant run) to get the full thread of logs for that request/message.
+4. **Read in order:** Sort lines by timestamp and read the sequence: entry (controller/consumer/handler) → service/processor → DB or publish → response or error.
+5. **Cross files:** For that traceId, look in application, inbound-events (or inbound-udp/outbound-events for ingest), and db logs as needed.
+6. **Cross services:** If the flow goes ingest → Kafka → processing, correlate by time and session UID (and frame) between udp-ingest-service and telemetry-processing-api-service logs.
+7. **Summarise:** Report what happened (entry point, key decisions, where it failed or skipped) and suggest code or config changes if appropriate.
+
+---
+
+## 6. References
+
+- **Logging policy (format, levels, traceId):** `.cursor/rules/logging-policy.mdc`
+- **Log file layout and plan:** `.github/draft/implementation-plans/01-logging-and-observability.md`
