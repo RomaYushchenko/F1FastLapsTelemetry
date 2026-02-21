@@ -24,6 +24,11 @@ public class SessionEventProcessor {
      * Process session event by event code. No per-packet info logging; exceptional cases logged in lifecycle or at debug.
      */
     public void process(long sessionUid, SessionEventDto payload) {
+        log.debug("process: sessionUid={}, eventCode={}", sessionUid, payload != null ? payload.getEventCode() : null);
+        if (payload == null) {
+            log.warn("Session event payload is null, skipping: sessionUid={}", sessionUid);
+            return;
+        }
         EventCode eventCode = payload.getEventCode();
         switch (eventCode) {
             case SSTA -> lifecycleService.onSessionStarted(sessionUid, payload);

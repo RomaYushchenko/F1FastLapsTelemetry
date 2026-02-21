@@ -21,7 +21,9 @@ public class CarDamageProcessor {
     private final TyreWearState tyreWearState;
 
     public void process(long sessionUid, short carIndex, CarDamageDto dto) {
+        log.debug("process: sessionUid={}, carIndex={}", sessionUid, carIndex);
         if (dto == null) {
+            log.debug("Car damage dto is null, skipping");
             return;
         }
         TyreWearSnapshot snapshot = new TyreWearSnapshot(

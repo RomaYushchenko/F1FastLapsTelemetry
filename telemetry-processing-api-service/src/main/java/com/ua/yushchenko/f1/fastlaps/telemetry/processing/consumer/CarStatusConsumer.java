@@ -42,10 +42,12 @@ public class CarStatusConsumer {
 
             lifecycleService.ensureSessionActive(sessionUid);
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
+                log.debug("Skipping car status packet: sessionUid={}, frame={}, reason=shouldNotProcess", sessionUid, frameId);
                 acknowledgment.acknowledge();
                 return;
             }
             if (!idempotencyService.markAsProcessed(sessionUid, frameId, packetId, carIndex)) {
+                log.debug("Skipping car status packet: sessionUid={}, frame={}, reason=duplicate", sessionUid, frameId);
                 acknowledgment.acknowledge();
                 return;
             }

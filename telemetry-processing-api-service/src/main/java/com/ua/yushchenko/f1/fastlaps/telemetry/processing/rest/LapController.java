@@ -30,6 +30,7 @@ public class LapController {
             @PathVariable("id") String id,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
+        log.debug("getLaps: id={}, carIndex={}", id, carIndex);
         List<LapResponseDto> list = lapQueryService.getLaps(id, carIndex);
         return ResponseEntity.ok(list);
     }
@@ -39,6 +40,7 @@ public class LapController {
             @PathVariable("id") String id,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
+        log.debug("getPace: id={}, carIndex={}", id, carIndex);
         List<PacePointDto> list = lapQueryService.getPace(id, carIndex);
         return ResponseEntity.ok(list);
     }
@@ -48,6 +50,7 @@ public class LapController {
             @PathVariable("id") String id,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
+        log.debug("getTyreWear: id={}, carIndex={}", id, carIndex);
         List<TyreWearPointDto> list = lapQueryService.getTyreWear(id, carIndex);
         return ResponseEntity.ok(list);
     }
@@ -58,7 +61,9 @@ public class LapController {
             @PathVariable("lapNum") Integer lapNum,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
+        log.debug("getLapTrace: id={}, lapNum={}, carIndex={}", id, lapNum, carIndex);
         if (lapNum == null) {
+            log.warn("lapNum is required");
             throw new IllegalArgumentException("lapNum is required");
         }
         List<TracePointDto> trace = lapQueryService.getLapTrace(id, lapNum, carIndex);
@@ -70,6 +75,7 @@ public class LapController {
             @PathVariable("id") String id,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
+        log.debug("getSectors: id={}, carIndex={}", id, carIndex);
         return ResponseEntity.ok(lapQueryService.getLaps(id, carIndex));
     }
 }

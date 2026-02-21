@@ -25,6 +25,7 @@ public class SessionSummaryController {
             @PathVariable("id") String id,
             @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
     ) {
+        log.debug("getSummary: id={}, carIndex={}", id, carIndex);
         SessionSummaryDto dto = sessionSummaryQueryService.getSummary(id, carIndex);
         return ResponseEntity.ok(dto);
     }

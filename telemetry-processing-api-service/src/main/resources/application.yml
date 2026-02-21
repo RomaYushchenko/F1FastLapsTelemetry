@@ -32,6 +32,7 @@ logging:
   level:
     org.springframework.kafka: INFO
     com.ua.yushchenko.f1.fastlaps.telemetry.processing.consumer: INFO  # "Received ..." when messages are consumed
+  # For more verbose debugging use profile 'dev': spring.profiles.active=dev (see application-dev.yml)
 
 management:
   endpoints:

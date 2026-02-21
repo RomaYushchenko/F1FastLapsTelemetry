@@ -38,6 +38,7 @@ public class CarDamageConsumer {
 
             lifecycleService.ensureSessionActive(sessionUid);
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
+                log.debug("Skipping car damage packet: sessionUid={}, reason=shouldNotProcess", sessionUid);
                 acknowledgment.acknowledge();
                 return;
             }

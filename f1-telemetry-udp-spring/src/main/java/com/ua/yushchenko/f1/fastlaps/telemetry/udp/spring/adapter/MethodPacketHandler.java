@@ -46,6 +46,8 @@ public class MethodPacketHandler implements UdpPacketConsumer {
     
     @Override
     public void handle(PacketHeader header, ByteBuffer payload) {
+        log.debug("handle: packetId={}, sessionUID={}, frame={}", 
+                packetId, header.getSessionUID(), header.getFrameIdentifier());
         try {
             switch (signature) {
                 case HEADER_AND_PAYLOAD:

@@ -35,6 +35,7 @@ public class CarTelemetryProcessor {
     }
 
     public void process(long sessionUid, short carIndex, int frameId, CarTelemetryDto telemetry, float sessionTime) {
+        log.debug("process: sessionUid={}, carIndex={}, frameId={}", sessionUid, carIndex, frameId);
         SessionRuntimeState state = stateManager.getOrCreate(sessionUid);
         int currentWatermark = state.getWatermark(carIndex);
         if (frameId < currentWatermark) {

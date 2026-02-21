@@ -7,6 +7,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
  * Uses SessionResolveService, SessionRepository, SessionStateManager, SessionMapper.
  * See: implementation_phases.md Phase 2.1.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SessionQueryService {
@@ -33,12 +35,15 @@ public class SessionQueryService {
      * List sessions with pagination (most recent first).
      */
     public List<SessionDto> listSessions(int offset, int limit) {
+        log.debug("listSessions: offset={}, limit={}", offset, limit);
         int size = Math.max(1, Math.min(limit, 100));
         int page = offset / size;
         Pageable pageable = PageRequest.of(page, size);
-        return sessionRepository.findAllByOrderByCreatedAtDesc(pageable).stream()
+        List<SessionDto> result = sessionRepository.findAllByOrderByCreatedAtDesc(pageable).stream()
                 .map(s -> sessionMapper.toDto(s, stateManager.get(s.getSessionUid())))
                 .collect(Collectors.toList());
+        log.debug("listSessions: returning {} sessions", result.size());
+        return result;
     }
 
     /**
@@ -47,20 +52,25 @@ public class SessionQueryService {
      * @throws SessionNotFoundException if id is blank or session not found
      */
     public SessionDto getSession(String id) {
+        log.debug("getSession: id={}", id);
         String trimmedId = id != null ? id.trim() : "";
         if (trimmedId.isEmpty() || "active".equalsIgnoreCase(trimmedId)) {
+            log.warn("Invalid session id: empty or 'active'");
             throw new SessionNotFoundException(
                     trimmedId.isEmpty() ? "Session id is required" : "Use GET /api/sessions/active for active session");
         }
         Session session = sessionResolveService.getSessionByPublicIdOrUid(trimmedId);
-        return sessionMapper.toDto(session, stateManager.get(session.getSessionUid()));
+        SessionDto dto = sessionMapper.toDto(session, stateManager.get(session.getSessionUid()));
+        log.debug("getSession: resolved id={}", SessionMapper.toPublicIdString(session));
+        return dto;
     }
 
     /**
      * Get current active session, if any.
      */
     public Optional<SessionDto> getActiveSession() {
-        return stateManager.getAllActive().values().stream()
+        log.debug("getActiveSession");
+        Optional<SessionDto> result = stateManager.getAllActive().values().stream()
                 .findFirst()
                 .map(state -> sessionRepository.findById(state.getSessionUID()))
                 .filter(Optional::isPresent)
@@ -68,6 +78,8 @@ public class SessionQueryService {
                     Session s = opt.get();
                     return sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
                 });
+        log.debug("getActiveSession: {}", result.isPresent() ? "present" : "empty");
+        return result;
     }
 
     /**
@@ -75,10 +87,14 @@ public class SessionQueryService {
      * Used by LiveDataBroadcaster so topic matches REST/WebSocket client id.
      */
     public Optional<String> getTopicIdForSession(Long sessionUid) {
+        log.debug("getTopicIdForSession: sessionUid={}", sessionUid);
         if (sessionUid == null) {
+            log.debug("getTopicIdForSession: sessionUid is null, returning empty");
             return Optional.empty();
         }
-        return sessionRepository.findById(sessionUid)
+        Optional<String> topicId = sessionRepository.findById(sessionUid)
                 .map(SessionMapper::toPublicIdString);
+        log.debug("getTopicIdForSession: topicId={}", topicId.orElse("empty"));
+        return topicId;
     }
 }

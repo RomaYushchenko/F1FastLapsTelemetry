@@ -25,6 +25,7 @@ public class LapDataProcessor {
      * Process lap data packet. Updates watermark, runs sector/lap logic, updates WebSocket snapshot.
      */
     public void process(long sessionUid, short carIndex, int frameId, LapDto lap) {
+        log.debug("process: sessionUid={}, carIndex={}, frameId={}", sessionUid, carIndex, frameId);
         SessionRuntimeState state = stateManager.getOrCreate(sessionUid);
         int currentWatermark = state.getWatermark(carIndex);
         if (frameId < currentWatermark) {
