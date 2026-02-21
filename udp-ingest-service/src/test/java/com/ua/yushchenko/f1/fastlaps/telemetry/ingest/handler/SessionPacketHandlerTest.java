@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.ingest.handler;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.EventCode;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionLifecycleEvent;
+import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.parser.SessionDataPacketParser;
 import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.parser.SessionPacketParser;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.publisher.TelemetryPublisher;
@@ -30,6 +31,8 @@ class SessionPacketHandlerTest {
     private TelemetryPublisher publisher;
     @Spy
     private SessionPacketParser sessionPacketParser = new SessionPacketParser();
+    @Spy
+    private SessionDataPacketParser sessionDataPacketParser = new SessionDataPacketParser();
     @InjectMocks
     private SessionPacketHandler handler;
 

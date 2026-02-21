@@ -46,7 +46,8 @@
 
 | Topic name | Опис | Producer | Consumer |
 |-----------|------|----------|----------|
-| `telemetry.session` | Події життєвого циклу сесії | ingest | processing |
+| `telemetry.session` | Події життєвого циклу сесії (SSTA/SEND) | ingest | processing |
+| `telemetry.sessionData` | Повний PacketSessionData (724 B) при packetId=1 | ingest | optional |
 | `telemetry.lap` | Дані по колах | ingest | processing |
 | `telemetry.carTelemetry` | Live телеметрія авто | ingest | processing |
 | `telemetry.carStatus` | Статус авто | ingest | processing |

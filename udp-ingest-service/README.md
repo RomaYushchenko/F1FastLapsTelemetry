@@ -32,8 +32,9 @@ Parsers and Kafka payload DTOs cover the **full F1 25 packet payload** for the f
 | Car Status    | 55 bytes    | CarStatusPacketParser     | telemetry.carStatus  |
 | Car Damage    | 46 bytes    | CarDamagePacketParser     | telemetry.carDamage  |
 | Session       | (event)     | SessionPacketParser       | telemetry.session    |
+| Session (full)| 724 bytes   | SessionDataPacketParser   | telemetry.sessionData |
 
-Session handler remains event-based (SSTA/SEND); full PacketSessionData (packetId=1) is out of scope. See `.cursor/plans/full_packet_telemetry_implementation_plan.md` for details.
+When packetId=1 payload has >= 724 bytes it is parsed as full PacketSessionData and published to `telemetry.sessionData`; otherwise event path (SSTA/SEND) to `telemetry.session`. See `.cursor/plans/full_packet_telemetry_implementation_plan.md`.
 
 ## Package layout
 
