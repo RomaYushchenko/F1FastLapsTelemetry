@@ -22,13 +22,6 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Telemetry API Contracts -->
-        <dependency>
-            <groupId>com.ua.yushchenko.f1.fastlaps.telemetry</groupId>
-            <artifactId>telemetry-api-contracts</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Spring Context -->
         <dependency>
             <groupId>org.springframework</groupId>
@@ -43,19 +36,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
-        </dependency>
-
-        <!-- Spring Kafka -->
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-        </dependency>
-
-        <!-- Guava (for RateLimiter) -->
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>33.0.0-jre</version>
         </dependency>
 
         <!-- Lombok -->

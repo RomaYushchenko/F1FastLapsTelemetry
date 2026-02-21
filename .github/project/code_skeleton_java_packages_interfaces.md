@@ -61,6 +61,24 @@ f1-telemetry
     - через `frameIdentifier`.
 - Confidence flag:
     - зберігається у `laps` та `session_summary`.
+
+---
+
+## 1.2 Separation of logic (mappers, builders, parsers, processors, services)
+
+Within each service, keep a clear separation of responsibilities. **Entry points** (controllers, Kafka consumers, UDP handlers) must stay **thin**: validate, delegate, no parsing or event-building logic.
+
+| Layer | Role | Where | Example |
+|-------|------|--------|---------|
+| **Mapper** | Entity → DTO; id → display string. No I/O, no business rules. | `mapper/` | `SessionMapper.toDto()`, `SessionMapper.sessionTypeToDisplayString()` |
+| **Builder** | Assemble entity or event from parameters. Static `build(...)`. | `builder/` | `LapBuilder.build(...)`, `SessionLifecycleEventBuilder.build(header, payload)` |
+| **Parser** | ByteBuffer → DTO. Packet layout lives here. | `parser/` (ingest) | `SessionPacketParser.parse()`, `CarTelemetryPacketParser.parse()` |
+| **Processor** | Domain logic: state, aggregate, persist. Called after consumer/handler. | `processor/` | `CarTelemetryProcessor.process()`, `LapDataProcessor.process()` |
+| **Service** | Orchestration: lifecycle, queries. Uses mappers, builders, processors, repos. | `service/`, `lifecycle/` | `SessionLifecycleService`, `SessionQueryService` |
+| **Entry point** | Thin: validate, delegate to parser+builder+publish or to service/processor. | `rest/`, `consumer/`, `handler/` | `SessionController`, `CarTelemetryConsumer`, `SessionPacketHandler` |
+
+**Rules:** Do not put parsing inside handlers or services; use parsers. Do not build events/entities inline in handlers or consumers; use builders. Do not put domain logic in consumers or controllers; use processors or services. See also: `.cursor/rules/architecture-layering.mdc`.
+
 ---
 
 ## 2. telemetry-api-contracts (shared module)

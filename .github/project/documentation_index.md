@@ -33,6 +33,12 @@
 
 ---
 
+## Code structure and layering
+
+**Розділення логіки:** маппери, білдери, парсери, процесори, сервіси — описані в [code_skeleton_java_packages_interfaces.md](code_skeleton_java_packages_interfaces.md) (розділ 1.2) та в правилі Cursor [.cursor/rules/architecture-layering.mdc](../../.cursor/rules/architecture-layering.mdc). Entry points (контролери, консьюмери, хендлери) мають залишатися тонкими; парсинг і збірка подій — у парсерах і білдерах.
+
+---
+
 ## Which document to read first
 
 ### Рекомендований порядок читання
