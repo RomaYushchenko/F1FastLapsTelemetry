@@ -3,10 +3,10 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFoundException;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -25,12 +25,8 @@ class SessionResolveServiceTest {
     @Mock
     private SessionRepository sessionRepository;
 
+    @InjectMocks
     private SessionResolveService service;
-
-    @BeforeEach
-    void setUp() {
-        service = new SessionResolveService(sessionRepository);
-    }
 
     @Test
     @DisplayName("getSessionByPublicIdOrUid кидає виняток коли id null")

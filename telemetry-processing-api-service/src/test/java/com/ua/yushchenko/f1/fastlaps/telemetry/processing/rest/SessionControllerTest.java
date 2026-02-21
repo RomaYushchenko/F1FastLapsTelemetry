@@ -2,10 +2,10 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -26,12 +26,8 @@ class SessionControllerTest {
     @Mock
     private SessionQueryService sessionQueryService;
 
+    @InjectMocks
     private SessionController controller;
-
-    @BeforeEach
-    void setUp() {
-        controller = new SessionController(sessionQueryService);
-    }
 
     @Test
     @DisplayName("listSessions делегує виклик сервісу")

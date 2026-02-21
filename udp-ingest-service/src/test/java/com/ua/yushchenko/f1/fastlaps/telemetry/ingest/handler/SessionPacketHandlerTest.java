@@ -7,7 +7,12 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.publisher.TelemetryPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -17,16 +22,21 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 @DisplayName("SessionPacketHandler")
 class SessionPacketHandlerTest {
+
+    @Mock
+    private TelemetryPublisher publisher;
+    @Spy
+    private SessionPacketParser sessionPacketParser = new SessionPacketParser();
+    @InjectMocks
+    private SessionPacketHandler handler;
 
     @Test
     @DisplayName("should parse and publish session start event")
     void shouldParseAndPublishSessionStartEvent() {
         // Arrange
-        TelemetryPublisher publisher = mock(TelemetryPublisher.class);
-        SessionPacketHandler handler = new SessionPacketHandler(publisher, new SessionPacketParser());
-
         PacketHeader header = PacketHeader.builder()
                 .packetFormat(2025)
                 .gameYear((short) 25)
@@ -61,9 +71,6 @@ class SessionPacketHandlerTest {
     @DisplayName("should parse and publish session end event")
     void shouldParseAndPublishSessionEndEvent() {
         // Arrange
-        TelemetryPublisher publisher = mock(TelemetryPublisher.class);
-        SessionPacketHandler handler = new SessionPacketHandler(publisher, new SessionPacketParser());
-
         PacketHeader header = PacketHeader.builder()
                 .packetFormat(2025)
                 .gameYear((short) 25)
@@ -96,9 +103,6 @@ class SessionPacketHandlerTest {
     @DisplayName("should not publish non start/end events")
     void shouldNotPublishNonStartEndEvents() {
         // Arrange
-        TelemetryPublisher publisher = mock(TelemetryPublisher.class);
-        SessionPacketHandler handler = new SessionPacketHandler(publisher, new SessionPacketParser());
-
         PacketHeader header = PacketHeader.builder()
                 .packetFormat(2025)
                 .gameYear((short) 25)

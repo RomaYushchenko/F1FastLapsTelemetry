@@ -6,7 +6,12 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.publisher.TelemetryPublisher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -14,19 +19,23 @@ import java.nio.ByteOrder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+@ExtendWith(MockitoExtension.class)
 @DisplayName("CarStatusPacketHandler")
 class CarStatusPacketHandlerTest {
+
+    @Mock
+    private TelemetryPublisher publisher;
+    @Spy
+    private CarStatusPacketParser carStatusPacketParser = new CarStatusPacketParser();
+    @InjectMocks
+    private CarStatusPacketHandler handler;
 
     @Test
     @DisplayName("should parse and publish car status")
     void shouldParseAndPublishCarStatus() {
         // Arrange
-        TelemetryPublisher publisher = mock(TelemetryPublisher.class);
-        CarStatusPacketHandler handler = new CarStatusPacketHandler(publisher, new CarStatusPacketParser());
-
         PacketHeader header = PacketHeader.builder()
                 .packetFormat(2025)
                 .gameYear((short) 25)
