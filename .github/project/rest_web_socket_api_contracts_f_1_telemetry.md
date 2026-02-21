@@ -239,13 +239,18 @@ Response: масив точок для графіка «знос шин (% по 
 
 #### 4.4.1 Subscribe
 
+Client sends **sessionId** (string): public_id or session UID as string, so the topic `/topic/live/{topicId}` matches the id used in REST (e.g. `GET /api/sessions/active` returns `id`).
+
 ```json
 {
   "type": "SUBSCRIBE",
-  "sessionUID": 1234567890123,
+  "sessionId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "carIndex": 0
 }
 ```
+
+- `sessionId` (string, required): session identifier — public UUID or numeric UID as string. Resolved server-side via `SessionResolveService.getSessionByPublicIdOrUid`.
+- `carIndex` (number, optional): player car index; default 0.
 
 ---
 
@@ -274,12 +279,22 @@ Response: масив точок для графіка «знос шин (% по 
   "brake": 0.0,
   "drs": false,
   "currentLap": 5,
-  "currentSector": 2
+  "currentSector": 2,
+  "currentLapTimeMs": 45230,
+  "bestLapTimeMs": 43100,
+  "deltaMs": 2130,
+  "ersEnergyPercent": 78,
+  "ersDeployActive": false
 }
 ```
 
 - `drs` (boolean, optional): DRS active; may be null until first car status packet received.
-- `currentLap`, `currentSector`: from lap data; may be null until first lap packet.
+- `currentLap`, `currentSector`: from lap data (F1 25 LapData); may be null until first lap packet.
+- `currentLapTimeMs` (integer, optional): current lap time in ms (F1 25 LapData `m_currentLapTimeInMS`). Used for delta to best.
+- `bestLapTimeMs` (integer, optional): best lap time in session (ms). From SessionSummary; enriched on server when building snapshot.
+- `deltaMs` (integer, optional): delta to best lap in ms = currentLapTimeMs − bestLapTimeMs. Negative = faster than best; positive = slower. Null if either lap time missing.
+- `ersEnergyPercent` (integer, optional): ERS energy store 0–100%. From CarStatus `m_ersStoreEnergy` (Joules) ÷ ERS max capacity (4 MJ). Null until first car status packet.
+- `ersDeployActive` (boolean, optional): driver using ERS (F1 25 CarStatus `m_ersDeployMode` > 0). Null until first car status packet.
 
 ---
 
@@ -288,10 +303,13 @@ Response: масив точок для графіка «знос шин (% по 
 ```json
 {
   "type": "SESSION_ENDED",
-  "sessionUID": 1234567890123,
+  "sessionId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "endReason": "EVENT_SEND"
 }
 ```
+
+- `sessionId` (string): same identifier as in topic (`/topic/live/{sessionId}`) and REST (session public id or UID as string).
+- `endReason` (string): reason code (e.g. EVENT_SEND, NO_DATA_TIMEOUT).
 
 ---
 

@@ -112,7 +112,7 @@ ui/
 **Потік даних:**
 
 1. При завантаженні: `GET /api/sessions/active` — чи є активна сесія.
-2. Якщо так — відкрити WebSocket `ws://…/ws/live`, відправити `{ "type": "SUBSCRIBE", "sessionUID": <uid>, "carIndex": 0 }`.
+2. Якщо так — відкрити WebSocket `ws://…/ws/live`, відправити `{ "type": "SUBSCRIBE", "sessionId": "<id>", "carIndex": 0 }` (sessionId = string з `GET /api/sessions/active`, напр. public id).
 3. Отримувати повідомлення `type: "SNAPSHOT"` і оновлювати UI (~10 раз/с).
 4. При `type: "SESSION_ENDED"` — показати повідомлення "Session ended", опційно перейти на список сесій або залишити останній snapshot.
 
@@ -130,11 +130,11 @@ ui/
 |   ___ km/h         _____            _                              |
 |   312              10 832           6                              |
 |                                                                   |
-|   THROTTLE         BRAKE            DRS                             |
-|   [=========>   ]  [    ]           ON / OFF                       |
+|   THROTTLE         BRAKE            DRS            ERS              |
+|   [=========>   ]  [    ]           ON / OFF       [====] 78% Deploy |
 |   91%              0%                                               |
 |                                                                   |
-|   Current lap: 5    Sector: 2                                       |
+|   Current lap: 5 · Sector: 2    Delta to best: +0.213s               |
 |                                                                   |
 |  -----------------------------------------------------------------|
 |  (If no active session: "No active session. Start a session in F1.")|
@@ -148,14 +148,18 @@ ui/
 - **Gear** — одна цифра.
 - **Throttle / Brake** — progress bar або відсотки.
 - **DRS** — текст "ON" / "OFF" або індикатор.
+- **ERS** — заряд 0–100% (progress bar або %), індикатор "Deploy" коли гравець використовує ERS.
 - **Current lap / Sector** — з SNAPSHOT (`currentLap`, `currentSector`).
+- **Delta to best** — дельта до кращого часу сесії (±секунди); зелений = швидше best, червоний = повільніше.
 - Якщо **немає активной сесії** — повідомлення замість даних; кнопка "View past sessions" → `/sessions`.
+
+Live має **дашбордний** стиль: більші цифри, картки з тінями, компактний session bar. Підтримка світлої/темної теми — окрема задача.
 
 #### 4.1.1 Діаграми та віджети телеметрії (Live)
 
 Перелік live-віджетів, поля з WebSocket SNAPSHOT та критерії готовності описані в **[telemetry_diagrams_plan.md](telemetry_diagrams_plan.md)** (розділ 3) та в **План реалізації діаграм телеметрії EA SPORTS F1 25.pdf**. Під час реалізації Етапу 11 слід дотримуватися цього плану:
 
-- **Speed** (speedKph), **RPM** (engineRpm), **Gear** (gear), **Throttle** (throttle), **Brake** (brake), **DRS** (drs), **Current lap / Sector** (currentLap, currentSector).
+- **Speed** (speedKph), **RPM** (engineRpm), **Gear** (gear), **Throttle** (throttle), **Brake** (brake), **DRS** (drs), **ERS** (ersEnergyPercent, ersDeployActive), **Current lap / Sector** (currentLap, currentSector), **Delta to best** (deltaMs).
 - Оновлення ~10 Hz з backend; стани екрану: є активна сесія / немає активной сесії.
 
 ---

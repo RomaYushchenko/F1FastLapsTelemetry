@@ -38,6 +38,8 @@
 | 3.5 | **Brake** | `brake` (0–100%) | Progress bar або відсотки | Візуалізація 0–100% |
 | 3.6 | **DRS** | `drs` (boolean) | Текст "ON" / "OFF" або індикатор | Чітко видно стан DRS |
 | 3.7 | **Current lap / Sector** | `currentLap`, `currentSector` | Текст (наприклад: "Lap 5 · Sector 2") | Користувач бачить поточне коло та сектор |
+| 3.8 | **Delta to best** | `deltaMs` (integer, optional) | ±секунди (напр. +0.250 / −0.100); зелений = швидше best, червоний = повільніше | Джерело: currentLapTimeMs − bestLapTimeMs (best з SessionSummary) |
+| 3.9 | **ERS** | `ersEnergyPercent`, `ersDeployActive` | Progress bar 0–100%; бейдж "Deploy" коли активний | Джерело: CarStatus (ersStoreEnergy → %, ersDeployMode > 0) |
 
 **Стани екрану:**
 
@@ -71,7 +73,7 @@
 Рекомендована послідовність у межах Stage 11:
 
 1. **База UI:** проєкт React, роутинг, API client, сторінки-заглушки (11.1–11.2).
-2. **Live Dashboard:** WebSocket підключення, потім **live-віджети по пунктах 3.1–3.7** (відповідає 11.3–11.4).
+2. **Live Dashboard:** WebSocket підключення, потім **live-віджети по пунктах 3.1–3.9** (Speed, RPM, Gear, Throttle, Brake, DRS, Lap/Sector, Delta, ERS) (відповідає 11.3–11.4).
 3. **Session List:** таблиця/картки сесій (11.5).
 4. **Session Detail:** summary, таблиця кіл, сектори (11.6–11.8).
 5. **Опційно:** історичний графік телеметрії (11.9) — залежить від наявності endpoint та вимог з PDF.

@@ -30,4 +30,14 @@ public class WsSnapshotMessage {
     private Boolean drs;
     private Integer currentLap;
     private Integer currentSector;
+    /** Current lap time in ms (from LapData). Used for delta to best. */
+    private Integer currentLapTimeMs;
+    /** Best lap time in session (ms). From SessionSummary. */
+    private Integer bestLapTimeMs;
+    /** Delta to best lap in ms: currentLapTimeMs - bestLapTimeMs. Negative = faster than best. */
+    private Integer deltaMs;
+    /** ERS energy store 0–100%. From CarStatus ersStoreEnergy. */
+    private Integer ersEnergyPercent;
+    /** ERS deploy active (driver using ERS). From CarStatus ersDeployMode > 0. */
+    private Boolean ersDeployActive;
 }

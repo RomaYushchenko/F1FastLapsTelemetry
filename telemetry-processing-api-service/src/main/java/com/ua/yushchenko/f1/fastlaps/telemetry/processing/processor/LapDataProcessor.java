@@ -48,5 +48,6 @@ public class LapDataProcessor {
         snapshot.setCurrentLap(lap.getLapNumber());
         snapshot.setCurrentSector(lap.getSector() != null ? lap.getSector() : 0);
         snapshot.setLapDistanceM(lap.getLapDistance());
+        snapshot.setCurrentLapTimeMs(lap.getCurrentLapTimeMs());
     }
 }

@@ -143,7 +143,9 @@
 | **Throttle** | THROTTLE | 0–100% | Progress bar (горизонтальний); заповнення `--accent` або зелений; під баром опційно «XX%» |
 | **Brake** | BRAKE | 0–100% | Progress bar; заповнення червоний/помаранчевий |
 | **DRS** | DRS | ON / OFF / — | Текст або бейдж: ON — `--accent` або зелений; OFF — `--text-secondary`; null — «—» |
+| **ERS** | ERS | 0–100% + «Deploy» | Progress bar (0–100%); бейдж «Deploy» коли ersDeployActive; колір `--accent` |
 | **Lap / Sector** | Current lap | «Lap {n} · Sector {s}» | `--text-base`, `--text-primary`; якщо null — «—» |
+| **Delta to best** | Delta to best | ±S.mmm (напр. +0.250 / −0.100) | Зелений = швидше best; червоний = повільніше; null — «—» |
 
 - **Progress bar:** висота ~8px, фон `--bg-elevated`, заповнення зліва направо, `--radius-sm`.
 
@@ -283,7 +285,7 @@
 
 - [ ] Усі кольори/відступи/шрифти взяті з токенів (§ 3) або з твоїх перевизначень (§ 8).
 - [ ] Header однаковий на всіх сторінках; active route виділений.
-- [ ] Live: усі 7 віджетів у заданому стилі; стан «no active session» і «session ended» оброблені.
+- [ ] Live: усі віджети (Speed, RPM, Gear, Throttle, Brake, DRS, ERS, Lap/Sector, Delta to best) у заданому стилі; стан «no active session» і «session ended» оброблені.
 - [ ] Session List: таблиця з усіма колонками; loading / empty / error.
 - [ ] Session Detail: summary block, laps table з виділенням best lap і best sectors; back, 404, error.
 - [ ] Кнопки та посилання відповідають § 6.1–6.2.

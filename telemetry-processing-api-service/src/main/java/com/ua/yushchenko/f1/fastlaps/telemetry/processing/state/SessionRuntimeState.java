@@ -163,6 +163,27 @@ public class SessionRuntimeState {
     }
 
     /**
+     * Get the latest car snapshot for the current player (or most recent) without building WS message.
+     * Used by LiveDataBroadcaster to enrich with bestLapTimeMs before building WsSnapshotMessage.
+     */
+    public CarSnapshot getLatestCarSnapshot() {
+        if (snapshots.isEmpty()) {
+            return null;
+        }
+        CarSnapshot snapshot = null;
+        if (playerCarIndex != null) {
+            snapshot = snapshots.get(playerCarIndex);
+        }
+        if (snapshot == null) {
+            snapshot = snapshots.entrySet().stream()
+                    .max(Comparator.comparing(e -> e.getValue().getTimestamp(), Comparator.nullsLast(Comparator.naturalOrder())))
+                    .map(Map.Entry::getValue)
+                    .orElse(null);
+        }
+        return snapshot;
+    }
+
+    /**
      * Simple snapshot holder for live telemetry data.
      */
     @Data
@@ -178,6 +199,14 @@ public class SessionRuntimeState {
         private Integer currentSector;
         /** Lap distance in metres (from LapData); used for pedal trace. */
         private Float lapDistanceM;
+        /** Current lap time in ms (from LapData m_currentLapTimeInMS). Used for delta to best. */
+        private Integer currentLapTimeMs;
+        /** Best lap time in session (ms). Enriched from SessionSummary when building WS snapshot. */
+        private Integer bestLapTimeMs;
+        /** ERS energy 0–100%. Set from CarStatusProcessor (ersStoreEnergy / ERS_MAX_J). */
+        private Integer ersEnergyPercent;
+        /** ERS deploy active (ersDeployMode > 0). Set from CarStatusProcessor. */
+        private Boolean ersDeployActive;
         private Instant timestamp;
     }
 }
