@@ -21,4 +21,11 @@ public class SessionSummaryDto {
     private Integer bestSector1Ms;
     private Integer bestSector2Ms;
     private Integer bestSector3Ms;
+
+    /** Leader (P1) at session end. Filled from session_finishing_positions when available. */
+    private Integer leaderPosition;
+    private Boolean leaderIsPlayer;
+    private Integer leaderCarIndex;
+    private String leaderDriverName;
+    private String leaderTeamName;
 }

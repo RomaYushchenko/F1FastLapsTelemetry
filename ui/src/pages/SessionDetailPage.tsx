@@ -390,6 +390,22 @@ export function SessionDetailPage() {
                 label="Total laps"
                 value={effectiveSummary.totalLaps != null ? String(effectiveSummary.totalLaps) : undefined}
               />
+              {effectiveSummary.leaderPosition != null && (
+                <SummaryItem
+                  label="Leader"
+                  value={
+                    effectiveSummary.leaderIsPlayer
+                      ? 'You'
+                      : effectiveSummary.leaderDriverName ?? effectiveSummary.leaderTeamName
+                        ? [effectiveSummary.leaderDriverName, effectiveSummary.leaderTeamName].filter(Boolean).join(' · ')
+                        : effectiveSummary.leaderCarIndex != null
+                          ? `Car #${effectiveSummary.leaderCarIndex}`
+                          : 'P1'
+                  }
+                  extra={effectiveSummary.leaderIsPlayer ? undefined : 'P1'}
+                  highlight={effectiveSummary.leaderIsPlayer}
+                />
+              )}
               <SummaryItem
                 label="Best S1"
                 value={
@@ -693,6 +709,7 @@ interface SummaryItemProps {
   label: string
   value?: string
   extra?: string
+  highlight?: boolean
 }
 
 function SummaryItem(props: SummaryItemProps) {
@@ -715,8 +732,9 @@ function SummaryItem(props: SummaryItemProps) {
       <div
         style={{
           fontSize: 'var(--text-base)',
-          color: 'var(--text-primary)',
+          color: props.highlight ? 'var(--success)' : 'var(--text-primary)',
           fontFamily: 'var(--font-mono)',
+          fontWeight: props.highlight ? 'var(--font-weight-medium)' : undefined,
         }}
       >
         {props.value ?? '—'}
