@@ -52,6 +52,17 @@ alwaysApply: true
 - **Kafka**: у кожному консьюмері на початку обробки в MDC ставиться `traceId` формату `kafka-<topic>-<sessionUid>-<frameId>` (наприклад `kafka-ct-12345-67` для car telemetry); у `finally` викликається `MDC.clear()`.
 - Для відслідковування: `grep '\[kafka-ct-12345-67\]' app.log` або `grep '\[abc-uuid\]' app.log` для REST.
 
+## File-based logging and log file naming
+
+(Apply after the logging-and-observability implementation plan is done. See `.github/draft/implementation-plans/01-logging-and-observability.md`.)
+
+- **Where logs are stored:** Base directory is `logs` at project root (where service modules live). With **profile `dev`**: logs go to `logs-dev` and are split by service (`logs-dev/telemetry-processing-api-service/`, `logs-dev/udp-ingest-service/`). Default profile: all log files in `logs/` without service subfolders.
+- **All log file names use the service name prefix** so logs from different services are not mixed: e.g. `telemetry-processing-api-service-application.log`, `telemetry-processing-api-service-inbound-events.log`, `telemetry-processing-api-service-db.log`, `udp-ingest-service-application.log`, `udp-ingest-service-inbound-udp.log`, `udp-ingest-service-outbound-events.log`. Same prefix rule for application, inbound, outbound, and db logs.
+- **Rotation:** by day; **retention:** 5 days.
+- **traceId** is included in every appender pattern (e.g. `[%X{traceId:-}]`) so the same traceId can be used to grep across all log files (application, inbound/outbound, db).
+- **When adding a new service:** Add `logback-spring.xml` with the same rules (base path, service-prefixed file names for application and, if applicable, inbound/outbound/db); set traceId in MDC at the start of each request/message handling and clear in `finally`.
+- **When adding new consumers, handlers, or publishers:** Log receive/send events via the appropriate **named logger** (e.g. `inbound-events`, `inbound-udp`, `outbound-events`) so those lines go to the correct dedicated log file; keep using `@Slf4j` for general application logs.
+
 ## Короткий чеклист для нового коду
 
 1. Клас з логікою — додай `@Slf4j`.
