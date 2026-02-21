@@ -6,8 +6,14 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFo
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+
+import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -51,6 +57,28 @@ class RestExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getError()).isEqualTo(ErrorCode.INVALID_REQUEST.name());
         assertThat(response.getBody().getMessage()).isEqualTo("Invalid offset");
+    }
+
+    @Test
+    @DisplayName("handleMethodArgumentNotValid повертає 400 та INVALID_REQUEST для невалідного body")
+    void handleMethodArgumentNotValid_returns400AndInvalidRequestCode() throws NoSuchMethodException {
+        // Arrange: simulate @Valid failure on sessionDisplayName (blank or too long)
+        Method method = SessionController.class.getMethod("updateSessionDisplayName", String.class,
+                UpdateSessionDisplayNameRequest.class);
+        MethodParameter parameter = new MethodParameter(method, 1);
+        BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(null, "request");
+        bindingResult.addError(new FieldError("request", "sessionDisplayName", "must not be blank"));
+        MethodArgumentNotValidException e = new MethodArgumentNotValidException(parameter, bindingResult);
+
+        // Act
+        ResponseEntity<RestErrorResponse> response = handler.handleMethodArgumentNotValid(e);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getError()).isEqualTo(ErrorCode.INVALID_REQUEST.name());
+        assertThat(response.getBody().getMessage()).contains("sessionDisplayName");
+        assertThat(response.getBody().getMessage()).contains("must not be blank");
     }
 
     @Test

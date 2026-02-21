@@ -2,6 +2,8 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionUpdateService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ import java.util.List;
 public class SessionController {
 
     private final SessionQueryService sessionQueryService;
+    private final SessionUpdateService sessionUpdateService;
 
     @GetMapping
     public List<SessionDto> listSessions(
@@ -44,5 +47,19 @@ public class SessionController {
         return sessionQueryService.getActiveSession()
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.noContent().build());
+    }
+
+    /**
+     * Update session display name. Returns updated SessionDto; 404 if session not found.
+     * Plan: 03-session-page.md Etap 1.
+     */
+    @PatchMapping("/{id}")
+    public ResponseEntity<SessionDto> updateSessionDisplayName(
+            @PathVariable("id") String id,
+            @Valid @RequestBody UpdateSessionDisplayNameRequest request
+    ) {
+        log.debug("Patch session display name: id={}", id);
+        SessionDto dto = sessionUpdateService.updateDisplayName(id, request.getSessionDisplayName());
+        return ResponseEntity.ok(dto);
     }
 }

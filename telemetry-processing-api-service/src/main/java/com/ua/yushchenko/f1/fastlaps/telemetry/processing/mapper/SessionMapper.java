@@ -73,6 +73,7 @@ public class SessionMapper {
         }
         return SessionDto.builder()
                 .id(toPublicIdString(session))
+                .sessionDisplayName(session.getSessionDisplayName())
                 .sessionType(sessionTypeToDisplayString(session.getSessionType()))
                 .trackId(session.getTrackId() != null ? session.getTrackId().intValue() : null)
                 .trackLengthM(session.getTrackLengthM())

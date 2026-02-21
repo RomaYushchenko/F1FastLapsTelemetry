@@ -266,10 +266,11 @@ export function SessionDetailPage() {
 
   const titleIdPart =
     sessionUid != null && sessionUid.length > 0 ? `${sessionUid.slice(0, 12)}…` : '—'
+  const pageTitle = session?.sessionDisplayName?.trim() || titleIdPart
 
   return (
     <div>
-      <h1 className="heading-page">Session {titleIdPart}</h1>
+      <h1 className="heading-page">Session {pageTitle}</h1>
 
       {session && (
         <p className="text-muted" style={{ marginBottom: 'var(--space-4)' }}>

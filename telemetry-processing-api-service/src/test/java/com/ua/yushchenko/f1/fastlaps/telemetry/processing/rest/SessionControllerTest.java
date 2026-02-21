@@ -1,7 +1,9 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest.UpdateSessionDisplayNameRequest;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionUpdateService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,8 @@ class SessionControllerTest {
 
     @Mock
     private SessionQueryService sessionQueryService;
+    @Mock
+    private SessionUpdateService sessionUpdateService;
 
     @InjectMocks
     private SessionController controller;
@@ -89,5 +93,23 @@ class SessionControllerTest {
         // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isSameAs(dto);
+    }
+
+    @Test
+    @DisplayName("updateSessionDisplayName повертає 200 OK з оновленим DTO")
+    void updateSessionDisplayName_returnsOkWithUpdatedDto() {
+        // Arrange
+        UpdateSessionDisplayNameRequest request = new UpdateSessionDisplayNameRequest("Monaco Race");
+        SessionDto dto = SessionDto.builder().id(SESSION_PUBLIC_ID_STR).sessionDisplayName("Monaco Race").build();
+        when(sessionUpdateService.updateDisplayName(SESSION_PUBLIC_ID_STR, "Monaco Race")).thenReturn(dto);
+
+        // Act
+        ResponseEntity<SessionDto> response = controller.updateSessionDisplayName(SESSION_PUBLIC_ID_STR, request);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getSessionDisplayName()).isEqualTo("Monaco Race");
+        verify(sessionUpdateService).updateDisplayName(SESSION_PUBLIC_ID_STR, "Monaco Race");
     }
 }

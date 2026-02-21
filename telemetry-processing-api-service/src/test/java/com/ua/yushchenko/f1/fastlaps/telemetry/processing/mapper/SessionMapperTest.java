@@ -113,6 +113,7 @@ class SessionMapperTest {
         // Assert
         assertThat(dto).isNotNull();
         assertThat(dto.getId()).isEqualTo(SESSION_PUBLIC_ID_STR);
+        assertThat(dto.getSessionDisplayName()).isEqualTo(SESSION_PUBLIC_ID_STR);
         assertThat(dto.getSessionType()).isEqualTo("RACE");
         assertThat(dto.getTrackId()).isEqualTo(TRACK_ID);
         assertThat(dto.getTrackLengthM()).isEqualTo(TRACK_LENGTH_M);

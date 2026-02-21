@@ -171,7 +171,7 @@ Live має **дашбордний** стиль: більші цифри, кар
 **Потік даних:**
 
 - `GET /api/sessions?limit=50&offset=0` при монтуванні сторінки.
-- Відповідь — масив об'єктів з `sessionUID`, `sessionType`, `trackId`, `startedAt`, `endedAt`, `endReason`, `state`.
+- Відповідь — масив об'єктів з `id` (sessionId для посилань), `sessionDisplayName`, `sessionType`, `trackId`, `startedAt`, `endedAt`, `endReason`, `state`, `finishingPosition` (місце на фініші; null для активних). Редагування назви: `PATCH /api/sessions/{id}` з body `{ "sessionDisplayName": "..." }`.
 
 **Layout (wireframe):**
 
@@ -183,9 +183,9 @@ Live має **дашбордний** стиль: більші цифри, кар
 |  SESSIONS                                                         |
 |  -----------------------------------------------------------------|
 |                                                                   |
-|  | Session        | Type   | Track   | Started          | Ended    | |
-|  |----------------|--------|---------|------------------|----------| |
-|  | 1234567890…    | RACE   | Monaco  | 28.01 20:10      | 20:55    | |
+|  | Session (name)  | Type   | Track   | Started          | Ended    | Place | State  | |
+|  |------------------|--------|---------|------------------|----------|-------|--------| |
+|  | Monaco Race [Edit]| RACE   | Monaco  | 28.01 20:10      | 20:55    | 3     | FINISHED| |
 |  | 1234567891…    | QUALI  | Monaco  | 28.01 19:00      | 19:45    | |
 |  | …              |        |         |                  |          | |
 |                                                                   |
@@ -195,7 +195,7 @@ Live має **дашбордний** стиль: більші цифри, кар
 
 **Елементи:**
 
-- Таблиця або картки: **Session** (short UID або дата), **Type** (RACE / QUALIFYING / PRACTICE тощо), **Track** (за `trackId` — мапа або назва), **Started**, **Ended**, **State** (ACTIVE / FINISHED).
+- Таблиця: колонка **Session** показує `sessionDisplayName` (за замовчуванням UUID); кнопка Edit відкриває модальне вікно для зміни назви (PATCH). Колонка **Place** — фінішна позиція гравця (число або "—"). Також **Type**, **Track**, **Started**, **Ended**, **State**. Усі посилання та API використовують `session.id` (sessionId).
 - Клік по рядку → перехід на `/sessions/{sessionUid}`.
 - Стани: **Loading** (skeleton або spinner), **Empty** ("No sessions yet"), **Error** (повідомлення + retry).
 
@@ -203,11 +203,11 @@ Live має **дашбордний** стиль: більші цифри, кар
 
 ### 4.3 Session Detail (`/sessions/:sessionUid`)
 
-**Призначення:** повна інформація по одній сесії — кола, сектори, best lap, best sectors.
+**Призначення:** повна інформація по одній сесії — кола, сектори, best lap, best sectors. Заголовок сторінки (h1) показує **sessionDisplayName** (або short id як fallback); для запитів laps/summary використовується `session.id` з URL.
 
 **Потік даних:**
 
-- `GET /api/sessions/{sessionUid}` — заголовок сесії.
+- `GET /api/sessions/{sessionUid}` — заголовок сесії (включає `sessionDisplayName`, `finishingPosition` тощо).
 - `GET /api/sessions/{sessionUid}/laps?carIndex=0` — кола.
 - `GET /api/sessions/{sessionUid}/summary?carIndex=0` — summary (best lap, best sectors, total laps).
 - Сектори в MVP можна брати з laps (sector1Ms, sector2Ms, sector3Ms), окремий `GET .../sectors` — за контрактом, якщо є.

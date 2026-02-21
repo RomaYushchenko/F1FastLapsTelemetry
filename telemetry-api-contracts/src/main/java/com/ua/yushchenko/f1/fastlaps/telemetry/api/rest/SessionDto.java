@@ -20,6 +20,8 @@ public class SessionDto {
 
     /** Public session identifier (UUID). Use in URLs and WebSocket subscribe. */
     private String id;
+    /** User-facing display name (max 64 chars). Editable via PATCH /api/sessions/{id}. */
+    private String sessionDisplayName;
     private String sessionType;
     private Integer trackId;
     private Integer trackLengthM;
@@ -33,4 +35,6 @@ public class SessionDto {
     private SessionState state;
     /** Player car index (0–19) from F1; use this for laps/summary/tyre-wear so data is for the driver. */
     private Integer playerCarIndex;
+    /** Finishing position (race position at session end). Null if session active or no LapData received. */
+    private Integer finishingPosition;
 }

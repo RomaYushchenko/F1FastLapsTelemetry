@@ -6,6 +6,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionState;
@@ -40,6 +41,8 @@ class SessionQueryServiceTest {
     private SessionRepository sessionRepository;
     @Mock
     private LapRepository lapRepository;
+    @Mock
+    private SessionFinishingPositionRepository finishingPositionRepository;
     @Mock
     private SessionStateManager stateManager;
     @Mock

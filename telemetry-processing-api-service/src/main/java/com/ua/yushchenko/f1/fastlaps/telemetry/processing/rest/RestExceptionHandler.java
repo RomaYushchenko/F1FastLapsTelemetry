@@ -6,8 +6,11 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFo
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.stream.Collectors;
 
 /**
  * Global exception handler for REST controllers.
@@ -36,6 +39,26 @@ public class RestExceptionHandler {
                 .message(e.getMessage())
                 .build();
         
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    /**
+     * Handles Bean Validation failures on @Valid request body (e.g. PATCH /api/sessions/{id}).
+     * Returns 400 Bad Request so invalid client input is not reported as 500.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<RestErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .collect(Collectors.joining("; "));
+        if (message.isEmpty()) {
+            message = "Validation failed";
+        }
+        log.warn("Validation failed: {}", message);
+        RestErrorResponse error = RestErrorResponse.builder()
+                .error(ErrorCode.INVALID_REQUEST.name())
+                .message(message)
+                .build();
         return ResponseEntity.badRequest().body(error);
     }
 
