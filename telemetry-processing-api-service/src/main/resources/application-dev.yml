@@ -1,5 +1,7 @@
-# Dev profile: enable DEBUG for app packages to simplify debugging from logs.
+# Dev profile: enable DEBUG for app packages; log files under logs-dev/<service> (see plan 01-logging-and-observability.md).
 # Activate with: spring.profiles.active=dev
 logging:
+  file:
+    path: logs-dev/telemetry-processing-api-service
   level:
     com.ua.yushchenko.f1.fastlaps.telemetry: DEBUG

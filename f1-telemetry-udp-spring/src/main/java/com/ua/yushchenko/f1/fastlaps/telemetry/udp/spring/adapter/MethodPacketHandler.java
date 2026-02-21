@@ -3,10 +3,13 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.adapter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.dispatcher.UdpPacketConsumer;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 
 /**
  * Adapter that bridges Spring-managed methods to the UDP packet consumer interface.
@@ -23,7 +26,13 @@ import java.nio.ByteBuffer;
  */
 @Slf4j
 public class MethodPacketHandler implements UdpPacketConsumer {
-    
+
+    /** MDC key for trace ID (same as in REST/Kafka so log pattern %X{traceId:-} works). */
+    private static final String MDC_TRACE_ID = "traceId";
+
+    /** Named logger for inbound UDP so ingest service can route to inbound-udp log file. */
+    private static final org.slf4j.Logger INBOUND_UDP_LOG = LoggerFactory.getLogger("inbound-udp");
+
     private final Object bean;
     private final Method method;
     private final short packetId;
@@ -46,9 +55,11 @@ public class MethodPacketHandler implements UdpPacketConsumer {
     
     @Override
     public void handle(PacketHeader header, ByteBuffer payload) {
-        log.debug("handle: packetId={}, sessionUID={}, frame={}", 
-                packetId, header.getSessionUID(), header.getFrameIdentifier());
+        String traceId = UUID.randomUUID().toString();
+        MDC.put(MDC_TRACE_ID, traceId);
         try {
+            INBOUND_UDP_LOG.debug("handle: packetId={}, sessionUID={}, frame={}",
+                    packetId, header.getSessionUID(), header.getFrameIdentifier());
             switch (signature) {
                 case HEADER_AND_PAYLOAD:
                     method.invoke(bean, header, payload);
@@ -71,11 +82,13 @@ public class MethodPacketHandler implements UdpPacketConsumer {
                       cause.getMessage(), 
                       cause);
         } catch (IllegalAccessException e) {
-            log.error("Cannot access packet handler method {}.{}: {}", 
-                      bean.getClass().getSimpleName(), 
-                      method.getName(), 
-                      e.getMessage(), 
+            log.error("Cannot access packet handler method {}.{}: {}",
+                      bean.getClass().getSimpleName(),
+                      method.getName(),
+                      e.getMessage(),
                       e);
+        } finally {
+            MDC.clear();
         }
     }
     

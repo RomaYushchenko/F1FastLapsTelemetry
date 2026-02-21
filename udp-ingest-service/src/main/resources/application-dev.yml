@@ -1,0 +1,5 @@
+# Dev profile: log files under logs-dev/<service> (see plan 01-logging-and-observability.md).
+# Activate with: spring.profiles.active=dev
+logging:
+  file:
+    path: logs-dev/udp-ingest-service

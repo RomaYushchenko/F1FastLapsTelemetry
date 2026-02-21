@@ -35,7 +35,7 @@
 
 ## Logging and log files
 
-**Політика логування:** [.cursor/rules/logging-policy.mdc](../../.cursor/rules/logging-policy.mdc) — рівні логів (INFO/DEBUG/TRACE/WARN/ERROR), вхід/вихід методів, traceId, та (після реалізації плану) **файлове логування**: де зберігаються логи (`logs` / `logs-dev`), **префікс сервісу для всіх** лог-файлів (application, inbound-events, inbound-udp, outbound-events, db), ротація по дню, retention 5 днів. При додаванні нового сервісу або нового consumer/handler/publisher — дотримуватися тієї ж схеми (logback-spring.xml, named logger для inbound/outbound).
+**Політика логування:** [.cursor/rules/logging-policy.mdc](../../.cursor/rules/logging-policy.mdc) — рівні логів (INFO/DEBUG/TRACE/WARN/ERROR), вхід/вихід методів, traceId, **файлове логування**: де зберігаються логи (`logs` / `logs-dev`, змінна `logging.file.path`), **префікс сервісу для всіх** лог-файлів (application, inbound-events, inbound-udp, outbound-events, db), ротація по дню, retention 5 днів. При додаванні нового сервісу або нового consumer/handler/publisher — дотримуватися тієї ж схеми (logback-spring.xml, named logger для inbound/outbound).
 
 **План реалізації логування та спостережності:** [.github/draft/implementation-plans/01-logging-and-observability.md](../../.github/draft/implementation-plans/01-logging-and-observability.md) — етапи впровадження файлових логів, розділених файлів, трасування та оновлення документації.
 

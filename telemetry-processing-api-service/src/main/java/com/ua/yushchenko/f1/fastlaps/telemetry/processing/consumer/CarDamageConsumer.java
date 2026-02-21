@@ -7,6 +7,8 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.config.TraceIdFilter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor.CarDamageProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
@@ -20,6 +22,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class CarDamageConsumer {
+
+    private static final Logger INBOUND_LOG = LoggerFactory.getLogger("inbound-events");
 
     private final IdempotencyService idempotencyService;
     private final SessionLifecycleService lifecycleService;
@@ -44,6 +48,8 @@ public class CarDamageConsumer {
         String traceId = "kafka-cd-" + event.getSessionUID() + "-" + event.getFrameIdentifier();
         MDC.put(TraceIdFilter.MDC_TRACE_ID, traceId);
         try {
+            INBOUND_LOG.debug("Received event: topic=telemetry.carDamage, sessionUid={}, frame={}",
+                    event.getSessionUID(), event.getFrameIdentifier());
             long sessionUid = event.getSessionUID();
             int frameId = event.getFrameIdentifier();
             short packetId = (short) event.getPacketId().ordinal();
