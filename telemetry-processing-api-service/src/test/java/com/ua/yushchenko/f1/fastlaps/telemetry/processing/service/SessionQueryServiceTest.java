@@ -7,11 +7,12 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -37,14 +38,11 @@ class SessionQueryServiceTest {
     private SessionStateManager stateManager;
     @Mock
     private SessionResolveService sessionResolveService;
+    @Spy
+    private SessionMapper sessionMapper = new SessionMapper();
 
+    @InjectMocks
     private SessionQueryService service;
-
-    @BeforeEach
-    void setUp() {
-        SessionMapper sessionMapper = new SessionMapper();
-        service = new SessionQueryService(sessionRepository, stateManager, sessionMapper, sessionResolveService);
-    }
 
     @Test
     @DisplayName("listSessions повертає змаплені DTO")

@@ -5,11 +5,12 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionSummaryM
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionSummaryRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
@@ -27,17 +28,11 @@ class SessionSummaryQueryServiceTest {
     private SessionResolveService sessionResolveService;
     @Mock
     private SessionSummaryRepository summaryRepository;
+    @Spy
+    private SessionSummaryMapper sessionSummaryMapper = new SessionSummaryMapper();
 
+    @InjectMocks
     private SessionSummaryQueryService service;
-
-    @BeforeEach
-    void setUp() {
-        service = new SessionSummaryQueryService(
-                sessionResolveService,
-                summaryRepository,
-                new SessionSummaryMapper()
-        );
-    }
 
     @Test
     @DisplayName("getSummary повертає DTO коли summary знайдено")

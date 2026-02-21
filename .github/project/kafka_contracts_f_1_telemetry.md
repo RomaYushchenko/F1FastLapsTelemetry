@@ -46,7 +46,8 @@
 
 | Topic name | Опис | Producer | Consumer |
 |-----------|------|----------|----------|
-| `telemetry.session` | Події життєвого циклу сесії | ingest | processing |
+| `telemetry.session` | Події життєвого циклу сесії (SSTA/SEND) | ingest | processing |
+| `telemetry.sessionData` | Повний PacketSessionData (724 B) при packetId=1 | ingest | optional |
 | `telemetry.lap` | Дані по колах | ingest | processing |
 | `telemetry.carTelemetry` | Live телеметрія авто | ingest | processing |
 | `telemetry.carStatus` | Статус авто | ingest | processing |
@@ -111,14 +112,53 @@ Topic: `telemetry.session`
 
 Topic: `telemetry.lap`
 
+Payload maps F1 25 **LapData** (57 bytes per car). Field semantics: `.github/docs/F1 25 Telemetry Output Structures.txt` (PacketLapData, LapData).
+
+| Field | Type | Description |
+|-------|------|--------------|
+| lapNumber | int | m_currentLapNum |
+| lapDistance | float | Distance around current lap (m) |
+| lastLapTimeMs | int | m_lastLapTimeInMS |
+| currentLapTimeMs | int | m_currentLapTimeInMS |
+| sector1TimeMs, sector2TimeMs | int | Sector times (computed from min+ms parts) |
+| sector | int | 0 = sector1, 1 = sector2, 2 = sector3 |
+| isInvalid | bool | m_currentLapInvalid |
+| penaltiesSeconds | int | m_penalties |
+| deltaToCarInFrontMs | int | Time delta to car in front (ms) |
+| deltaToRaceLeaderMs | int | Time delta to race leader (ms) |
+| totalDistance | float | Total distance in session (m) |
+| safetyCarDelta | float | Safety car delta (s) |
+| carPosition | int | Race position |
+| pitStatus | int | 0 = none, 1 = pitting, 2 = in pit area |
+| numPitStops | int | Pit stops taken |
+| totalWarnings, cornerCuttingWarnings | int | Warnings |
+| numUnservedDriveThroughPens, numUnservedStopGoPens | int | Unserved penalties |
+| gridPosition | int | Grid position at start |
+| driverStatus | int | 0 = garage, 1 = flying lap, 2 = in lap, 3 = out lap, 4 = on track |
+| resultStatus | int | 0 = invalid, 1 = inactive, 2 = active, 3 = finished, etc. |
+| pitLaneTimerActive | int | 0 = inactive, 1 = active |
+| pitLaneTimeInLaneInMs, pitStopTimerInMs | int | Pit timing (ms) |
+| pitStopShouldServePen | int | Serve penalty at this stop |
+| speedTrapFastestSpeed | float | Fastest speed trap (km/h) |
+| speedTrapFastestLap | int | Lap of fastest speed, 255 = not set |
+
+Example (subset of fields):
+
 ```json
 {
   "lapNumber": 5,
   "lapDistance": 4231.4,
+  "lastLapTimeMs": 84500,
   "currentLapTimeMs": 87321,
+  "sector1TimeMs": 28500,
+  "sector2TimeMs": 30000,
   "sector": 2,
   "isInvalid": false,
-  "penaltiesSeconds": 0
+  "penaltiesSeconds": 0,
+  "carPosition": 3,
+  "totalDistance": 15000.0,
+  "pitStatus": 0,
+  "numPitStops": 1
 }
 ```
 
@@ -128,6 +168,29 @@ Topic: `telemetry.lap`
 
 Topic: `telemetry.carTelemetry`
 
+Payload maps F1 25 **CarTelemetryData** (60 bytes per car). Field semantics: `.github/docs/F1 25 Telemetry Output Structures.txt` (PacketCarTelemetryData, CarTelemetryData).
+
+| Field | Type | Description |
+|-------|------|--------------|
+| speedKph | int | Speed of car in km/h (m_speed) |
+| throttle | float | Throttle applied (0.0–1.0) |
+| brake | float | Brake applied (0.0–1.0) |
+| steer | float | Steering (-1.0 full left to 1.0 full right) |
+| gear | int | Gear (1–8, N=0, R=-1) |
+| engineRpm | int | Engine RPM |
+| drs | int | DRS 0=off, 1=on |
+| clutch | int | Clutch applied (0–100) |
+| revLightsPercent | int | Rev lights indicator (percentage) |
+| revLightsBitValue | int | Rev lights bitmask (bit 0 = leftmost LED) |
+| brakesTemperature | int[4] | Brakes temperature °C, order RL, RR, FL, FR |
+| tyresSurfaceTemperature | int[4] | Tyres surface temperature °C, order RL, RR, FL, FR |
+| tyresInnerTemperature | int[4] | Tyres inner temperature °C, order RL, RR, FL, FR |
+| engineTemperature | int | Engine temperature °C |
+| tyresPressure | float[4] | Tyre pressure PSI, order RL, RR, FL, FR |
+| surfaceType | int[4] | Driving surface per appendices, order RL, RR, FL, FR |
+
+Example (full payload):
+
 ```json
 {
   "speedKph": 312,
@@ -136,7 +199,16 @@ Topic: `telemetry.carTelemetry`
   "steer": -0.12,
   "gear": 7,
   "engineRpm": 11543,
-  "drs": 1
+  "drs": 1,
+  "clutch": 0,
+  "revLightsPercent": 85,
+  "revLightsBitValue": 16383,
+  "brakesTemperature": [ 420, 418, 380, 382 ],
+  "tyresSurfaceTemperature": [ 105, 106, 102, 104 ],
+  "tyresInnerTemperature": [ 108, 109, 105, 107 ],
+  "engineTemperature": 95,
+  "tyresPressure": [ 23.1, 23.0, 22.9, 23.2 ],
+  "surfaceType": [ 0, 0, 0, 0 ]
 }
 ```
 
@@ -146,6 +218,35 @@ Topic: `telemetry.carTelemetry`
 
 Topic: `telemetry.carStatus`
 
+Payload maps F1 25 **CarStatusData** (55 bytes per car). Field semantics: `.github/docs/F1 25 Telemetry Output Structures.txt` (PacketCarStatusData, CarStatusData).
+
+| Field | Type | Description |
+|-------|------|--------------|
+| tractionControl | int | 0 = off, 1 = medium, 2 = full |
+| abs | int | 0 = off, 1 = on |
+| fuelInTank | float | Current fuel mass |
+| fuelMix | int | 0 = lean, 1 = standard, 2 = rich, 3 = max |
+| drsAllowed | bool | 0 = not allowed, 1 = allowed |
+| tyresCompound | int | m_actualTyreCompound (e.g. 16 = C5, 7 = inter, 8 = wet) |
+| tyresAgeLaps | int | Age in laps of current set |
+| ersStoreEnergy | float | ERS energy store (J) |
+| frontBrakeBias | int | Front brake bias (%) |
+| pitLimiterStatus | int | 0 = off, 1 = on |
+| fuelCapacity | float | Fuel capacity |
+| fuelRemainingLaps | float | Fuel remaining in laps (MFD value) |
+| maxRpm, idleRpm | int | Max / idle RPM |
+| maxGears | int | Maximum number of gears |
+| drsActivationDistance | int | Metres; 0 = DRS not available |
+| visualTyreCompound | int | Visual compound (can differ from actual) |
+| vehicleFiaFlags | int | -1 = invalid, 0 = none, 1 = green, 2 = blue, 3 = yellow |
+| enginePowerIce, enginePowerMguk | float | Power output (W) |
+| ersDeployMode | int | 0 = none, 1 = medium, 2 = hotlap, 3 = overtake |
+| ersHarvestedThisLapMguk, ersHarvestedThisLapMguh | float | ERS harvested this lap |
+| ersDeployedThisLap | float | ERS deployed this lap |
+| networkPaused | int | Car paused in network game |
+
+Example (subset):
+
 ```json
 {
   "tractionControl": 2,
@@ -154,7 +255,13 @@ Topic: `telemetry.carStatus`
   "fuelMix": 1,
   "drsAllowed": true,
   "tyresCompound": 16,
-  "ersStoreEnergy": 2.34
+  "tyresAgeLaps": 5,
+  "ersStoreEnergy": 2.34,
+  "frontBrakeBias": 55,
+  "fuelCapacity": 110.0,
+  "maxRpm": 12000,
+  "idleRpm": 7000,
+  "maxGears": 8
 }
 ```
 
@@ -164,14 +271,37 @@ Topic: `telemetry.carStatus`
 
 Topic: `telemetry.carDamage`
 
-Payload: знос шин у відсотках (0..1) по колесах. F1 25 CarDamageData m_tyresWear[4] (order: RL, RR, FL, FR).
+Payload maps F1 25 **CarDamageData** (46 bytes per car). Field semantics: `.github/docs/F1 25 Telemetry Output Structures.txt` (PacketCarDamageData, CarDamageData).
+
+| Field | Type | Description |
+|-------|------|--------------|
+| tyresWearFL, tyresWearFR, tyresWearRL, tyresWearRR | float | Tyre wear (%), order in packet RL, RR, FL, FR |
+| tyresDamage | int[4] | Tyre damage (%), order RL, RR, FL, FR |
+| brakesDamage | int[4] | Brakes damage (%), order RL, RR, FL, FR |
+| tyreBlisters | int[4] | Tyre blisters (%), order RL, RR, FL, FR |
+| frontLeftWingDamage, frontRightWingDamage, rearWingDamage | int | Wing damage (%) |
+| floorDamage, diffuserDamage, sidepodDamage | int | Damage (%) |
+| drsFault, ersFault | int | 0 = OK, 1 = fault |
+| gearBoxDamage, engineDamage | int | Damage (%) |
+| engineMguhWear, engineEsWear, engineCeWear, engineIceWear, engineMgukWear, engineTcWear | int | Engine wear (%) |
+| engineBlown, engineSeized | int | 0 = OK, 1 = fault |
+
+Example (subset):
 
 ```json
 {
   "tyresWearFL": 0.08,
   "tyresWearFR": 0.10,
   "tyresWearRL": 0.12,
-  "tyresWearRR": 0.15
+  "tyresWearRR": 0.15,
+  "tyresDamage": [ 0, 0, 5, 3 ],
+  "brakesDamage": [ 0, 0, 0, 0 ],
+  "tyreBlisters": [ 0, 0, 0, 0 ],
+  "frontLeftWingDamage": 0,
+  "frontRightWingDamage": 0,
+  "rearWingDamage": 0,
+  "drsFault": 0,
+  "ersFault": 0
 }
 ```
 

@@ -2,10 +2,10 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionSummaryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionSummaryQueryService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
@@ -22,12 +22,8 @@ class SessionSummaryControllerTest {
     @Mock
     private SessionSummaryQueryService sessionSummaryQueryService;
 
+    @InjectMocks
     private SessionSummaryController controller;
-
-    @BeforeEach
-    void setUp() {
-        controller = new SessionSummaryController(sessionSummaryQueryService);
-    }
 
     @Test
     @DisplayName("getSummary делегує сервісу та повертає 200 з DTO")

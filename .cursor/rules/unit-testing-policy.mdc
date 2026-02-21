@@ -34,7 +34,7 @@ alwaysApply: true
 
 - Один production-клас — один тестовий клас; залежності мокати, без реальної БД/Kafka.
 - Мок-дані та константи — тільки з TestData.
-- Для класів із залежностями: `@ExtendWith(MockitoExtension.class)`, `@Mock`, ініціалізація в `@BeforeEach`.
+- Для класів із залежностями: `@ExtendWith(MockitoExtension.class)`, `@Mock` для залежностей, **`@InjectMocks`** для тестованого класу; при потребі реальної залежності — `@Spy`. Не створювати subject вручну в `@BeforeEach`.
 - Перевірки: AssertJ; при потребі — `verify(mock).method(...)`.
 
 ## Команди

@@ -1,0 +1,80 @@
+---
+name: architecture-layering
+description: Separation of logic into mappers, builders, services, processors, parsers; thin controllers/handlers/consumers. Apply when writing or refactoring Java in ingest or processing services.
+alwaysApply: true
+---
+
+# Architecture layering — mappers, builders, services, processors
+
+When writing or refactoring code in **udp-ingest-service** and **telemetry-processing-api-service**, keep a clear separation of responsibilities. Do not put parsing, event building, or domain logic inside entry points (handlers, consumers, controllers).
+
+## 1. Roles of each layer
+
+| Layer | Responsibility | Typical input → output | Example |
+|-------|----------------|------------------------|---------|
+| **Mapper** | Transform one representation into another (entity → DTO, or id/display helpers). | Entity / value → DTO or String | `SessionMapper.toDto(session, state)`, `SessionMapper.sessionTypeToDisplayString(id)` |
+| **Builder** | Assemble an object from parameters (entity, event, envelope). No business rules beyond “how to build”. | Params (ids, DTOs, header) → entity or event | `LapBuilder.build(...)`, `SessionLifecycleEventBuilder.build(header, payload)` |
+| **Parser** | Read binary or raw input into a DTO. Single responsibility: ByteBuffer / bytes → DTO. | ByteBuffer (or raw) → DTO | `SessionPacketParser.parse(buffer)`, `CarTelemetryPacketParser.parse(buffer)` |
+| **Processor** | Domain processing: state updates, aggregations, persistence. Called after entry point and idempotency/validation. | Event/DTO + context → side effects (state, DB, writer) | `CarTelemetryProcessor.process(...)`, `LapDataProcessor.process(...)` |
+| **Service** | Orchestration: lifecycle, queries, resolution. Coordinates mappers, builders, processors, repositories. | Request / id → result or side effect | `SessionLifecycleService`, `SessionQueryService`, `LapQueryService` |
+| **Entry point** (controller, handler, consumer) | Thin: validate input, resolve context, delegate to service/processor/parser+builder+publish. No parsing or event-building logic. | HTTP / Kafka / UDP → delegate | `SessionController`, `CarTelemetryConsumer`, `SessionPacketHandler` |
+
+## 2. Rules
+
+### 2.1 Mappers
+- **Purpose:** Entity → DTO, or pure functions for display/ids (e.g. session type id → string).
+- **Place:** In a `mapper` package; one mapper per domain concept (e.g. `SessionMapper`, `LapMapper`).
+- **Style:** Prefer static methods or a single-instance component; no dependencies on repositories or external services.
+- **Do not:** Put business rules (e.g. when to persist, when to send) inside mappers.
+
+### 2.2 Builders
+- **Purpose:** Build entities or events from explicit parameters. Single place for “how to construct” (schema version, producedAt, etc.).
+- **Place:** In a `builder` package; one builder per entity/event type (e.g. `LapBuilder`, `SessionLifecycleEventBuilder`).
+- **Style:** Final class, private constructor, static `build(...)` methods. No I/O, no repositories.
+- **Do not:** Put parsing or branching business logic inside builders.
+
+### 2.3 Parsers (ingest)
+- **Purpose:** ByteBuffer (or raw bytes) → DTO. Exact layout and field order live here.
+- **Place:** In a `parser` package; one parser per packet type (e.g. `SessionPacketParser`, `CarTelemetryPacketParser`).
+- **Style:** Component or stateless class; method `parse(ByteBuffer)` (or similar). Advance buffer position as read.
+- **Do not:** Publish to Kafka or build Kafka events inside parsers; that belongs in builders and handlers.
+
+### 2.4 Processors (processing service)
+- **Purpose:** Apply domain logic: update state, call writers/aggregators, persist. Invoked after consumer ensures session and idempotency.
+- **Place:** In a `processor` package; one processor per event type (e.g. `CarTelemetryProcessor`, `LapDataProcessor`).
+- **Style:** Component with dependencies (e.g. state manager, writer); single public `process(...)` with clear parameters.
+- **Do not:** Deserialize Kafka payloads or handle consumer acks inside processors; that stays in the consumer.
+
+### 2.5 Services
+- **Purpose:** Orchestrate: ensure session, resolve IDs, run lifecycle, run queries. Use mappers, builders, processors, repositories.
+- **Place:** In a `service` (or `lifecycle`) package; name by capability (e.g. `SessionLifecycleService`, `SessionQueryService`).
+- **Style:** Component with injected dependencies; public methods represent use cases.
+- **Do not:** Put low-level parsing or ByteBuffer handling in services; use parsers in ingest and processors for domain steps.
+
+### 2.6 Entry points (thin)
+- **Controllers:** Parse request (id, params), call service, map result to DTO (via mapper), return. No business logic.
+- **Kafka consumers:** Deserialize, set traceId, ensure session / shouldProcess / idempotency, then call **one** processor (or service). No parsing of packet layout.
+- **UDP handlers:** Validate payload length / seek to player car, call **parser** → **builder** → **publish**. No inline parsing or event construction.
+
+## 3. Data flow examples
+
+**UDP ingest (udp-ingest-service):**
+```
+UDP packet → Handler (validate/seek) → Parser (ByteBuffer → DTO) → Builder (header + DTO → event) → Publisher
+```
+
+**Kafka processing (telemetry-processing-api-service):**
+```
+Kafka record → Consumer (deserialize, ensureSession, idempotency) → Processor (state, aggregate, write)
+REST request → Controller → Service (orchestrate) → Mapper (entity → DTO) → response
+```
+
+## 4. Checklist for new code
+
+- [ ] Parsing (ByteBuffer → DTO) is in a **parser** class, not in a handler or service.
+- [ ] Event/entity assembly (header + DTO → event, or params → entity) is in a **builder** class, not in a handler or consumer.
+- [ ] Entity → DTO or id → display string is in a **mapper** class, not in a controller or service.
+- [ ] Domain steps (state, aggregate, persist) are in a **processor** or **service**, not in a consumer or controller.
+- [ ] Entry points (controller, consumer, handler) are **thin**: validate, delegate, no business/parsing/assembly logic.
+
+Reference: `.github/project/code_skeleton_java_packages_interfaces.md` for package layout; this rule refines the **separation of logic** within that layout.

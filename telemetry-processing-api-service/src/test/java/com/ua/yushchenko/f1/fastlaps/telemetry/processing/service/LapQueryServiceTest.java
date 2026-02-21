@@ -12,11 +12,12 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Tyr
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarTelemetryRawRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TyreWearPerLapRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -38,19 +39,11 @@ class LapQueryServiceTest {
     private CarTelemetryRawRepository carTelemetryRawRepository;
     @Mock
     private TyreWearPerLapRepository tyreWearPerLapRepository;
+    @Spy
+    private LapMapper lapMapper = new LapMapper();
 
+    @InjectMocks
     private LapQueryService service;
-
-    @BeforeEach
-    void setUp() {
-        service = new LapQueryService(
-                sessionResolveService,
-                lapRepository,
-                carTelemetryRawRepository,
-                tyreWearPerLapRepository,
-                new LapMapper()
-        );
-    }
 
     @Test
     @DisplayName("getLaps резолвить сесію та повертає змаплені кола")

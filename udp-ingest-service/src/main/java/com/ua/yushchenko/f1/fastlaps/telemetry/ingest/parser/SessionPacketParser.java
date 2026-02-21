@@ -1,0 +1,77 @@
+package com.ua.yushchenko.f1.fastlaps.telemetry.ingest.parser;
+
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.EventCode;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
+import org.springframework.stereotype.Component;
+
+import java.nio.ByteBuffer;
+
+/**
+ * Parses F1 2025 Session packet payload (ByteBuffer) into {@link SessionEventDto}.
+ * Packet layout: event code (4 bytes), skip 20, session type, track id, total laps.
+ */
+@Component
+public class SessionPacketParser {
+
+    private static final int SKIP_AFTER_EVENT_CODE = 20;
+
+    /**
+     * Parse session packet payload into SessionEventDto.
+     * Buffer position advances; caller must ensure sufficient remaining bytes.
+     */
+    public SessionEventDto parse(ByteBuffer buffer) {
+        byte[] eventCodeBytes = new byte[4];
+        buffer.get(eventCodeBytes);
+        String eventCodeStr = new String(eventCodeBytes).trim();
+        EventCode eventCode = parseEventCode(eventCodeStr);
+
+        buffer.position(buffer.position() + SKIP_AFTER_EVENT_CODE);
+        byte sessionTypeId = buffer.get();
+        String sessionType = parseSessionType(sessionTypeId);
+
+        int trackId = Byte.toUnsignedInt(buffer.get());
+        int totalLaps = Byte.toUnsignedInt(buffer.get());
+
+        return SessionEventDto.builder()
+                .eventCode(eventCode)
+                .sessionType(sessionType)
+                .sessionTypeId(Byte.toUnsignedInt(sessionTypeId))
+                .trackId(trackId)
+                .totalLaps(totalLaps)
+                .build();
+    }
+
+    /**
+     * Map F1 4-char event code string to EventCode.
+     */
+    public static EventCode parseEventCode(String code) {
+        return switch (code) {
+            case "SSTA" -> EventCode.SSTA;
+            case "SEND" -> EventCode.SEND;
+            case "FLBK" -> EventCode.FLBK;
+            default -> EventCode.SESSION_TIMEOUT;
+        };
+    }
+
+    /**
+     * Map F1 session type id (0–12) to display string. Matches contract used by processing service.
+     */
+    public static String parseSessionType(byte sessionTypeId) {
+        return switch (sessionTypeId) {
+            case 0 -> "UNKNOWN";
+            case 1 -> "PRACTICE_1";
+            case 2 -> "PRACTICE_2";
+            case 3 -> "PRACTICE_3";
+            case 4 -> "SHORT_PRACTICE";
+            case 5 -> "QUALIFYING_1";
+            case 6 -> "QUALIFYING_2";
+            case 7 -> "QUALIFYING_3";
+            case 8 -> "SHORT_QUALIFYING";
+            case 9 -> "ONE_SHOT_QUALIFYING";
+            case 10 -> "RACE";
+            case 11 -> "RACE_2";
+            case 12 -> "TIME_TRIAL";
+            default -> "UNKNOWN";
+        };
+    }
+}

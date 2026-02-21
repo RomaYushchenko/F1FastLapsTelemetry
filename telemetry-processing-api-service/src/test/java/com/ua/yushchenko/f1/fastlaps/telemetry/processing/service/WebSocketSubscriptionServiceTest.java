@@ -6,10 +6,10 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.websocket.WebSocketSessionManager;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -29,16 +29,8 @@ class WebSocketSubscriptionServiceTest {
     @Mock
     private WebSocketSessionManager wsSessionManager;
 
+    @InjectMocks
     private WebSocketSubscriptionService service;
-
-    @BeforeEach
-    void setUp() {
-        service = new WebSocketSubscriptionService(
-                sessionResolveService,
-                sessionStateManager,
-                wsSessionManager
-        );
-    }
 
     @Test
     @DisplayName("subscribe повертає error коли sessionId порожній")

@@ -5,10 +5,10 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.LapQueryService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
@@ -28,12 +28,8 @@ class LapControllerTest {
     @Mock
     private LapQueryService lapQueryService;
 
+    @InjectMocks
     private LapController controller;
-
-    @BeforeEach
-    void setUp() {
-        controller = new LapController(lapQueryService);
-    }
 
     @Test
     @DisplayName("getLaps делегує сервісу та повертає 200")

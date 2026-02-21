@@ -12,6 +12,7 @@ Code Style and Structure
 - Implement RESTful API design patterns when creating web services.
 - Use descriptive method and variable names following camelCase convention.
 - Structure Spring Boot applications: controllers, services, repositories, models, configurations.
+- **Layering (see .cursor/rules/architecture-layering.mdc):** Keep entry points thin. Use **mappers** for entity→DTO and display helpers; **builders** for assembling entities/events from parameters; **parsers** for ByteBuffer→DTO in ingest; **processors** for domain logic (state, aggregate, persist); **services** for orchestration. Do not put parsing, event building, or domain logic inside controllers, Kafka consumers, or UDP handlers.
 
 Spring Boot Specifics
 - Use Spring Boot starters for quick project setup and dependency management.

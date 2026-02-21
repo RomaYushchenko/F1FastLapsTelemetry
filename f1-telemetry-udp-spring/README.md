@@ -1,10 +1,10 @@
 # F1 Telemetry UDP Spring Integration Module
 
-Spring Boot integration module providing annotation-based UDP packet handling for F1 2025 game telemetry.
+**Infrastructure-only** Spring integration for F1 2025 UDP telemetry: annotations, method adapter, registry, and dispatcher configuration. This module does **not** contain packet parsing, Kafka publishing, or business logic — those live in **udp-ingest-service**.
 
 ## Overview
 
-This module provides a declarative, annotation-driven approach to handling F1 UDP telemetry packets in Spring applications. It eliminates boilerplate UDP code by using `@F1UdpListener` and `@F1PacketHandler` annotations.
+This module provides a declarative, annotation-driven **dispatch layer**: it discovers `@F1UdpListener` beans and routes UDP packets to `@F1PacketHandler` methods. Handlers are implemented by the application (e.g. **udp-ingest-service**), which owns parsing, event building, and publishing via the `TelemetryPublisher` interface.
 
 ## Features
 
@@ -27,9 +27,11 @@ This module provides a declarative, annotation-driven approach to handling F1 UD
 ```
 
 This module depends on:
-- `f1-telemetry-udp-core` - Core UDP handling and packet header decoding
-- Spring Context - Bean lifecycle management
-- Spring Boot (optional) - For auto-configuration support
+- `f1-telemetry-udp-core` — Core UDP handling and packet header decoding
+- Spring Context — Bean lifecycle management
+- Spring Boot (optional) — For auto-configuration support
+
+It does **not** depend on Kafka, Guava, or telemetry-api-contracts. The `TelemetryPublisher` interface and `PublishException` are defined here so that applications (e.g. udp-ingest-service) can depend on the abstraction and provide their own implementation.
 
 ## Quick Start
 
@@ -402,15 +404,18 @@ f1-telemetry-udp-spring/
     │       └── com/ua/yushchenko/f1/fastlaps/telemetry/udp/spring/
     │           ├── annotation/
     │           │   ├── F1PacketHandler.java        # Method-level annotation
-    │           │   └── F1UdpListener.java          # Class-level annotation
+    │           │   └── F1UdpListener.java         # Class-level annotation
     │           ├── adapter/
-    │           │   └── MethodPacketHandler.java    # Method invocation adapter
-    │           ├── registry/
-    │           │   └── PacketHandlerRegistry.java  # Handler registration
+    │           │   └── MethodPacketHandler.java   # Method invocation adapter
     │           ├── processor/
     │           │   └── F1PacketHandlerPostProcessor.java  # Bean scanning
-    │           └── config/
-    │               └── UdpDispatcherConfiguration.java    # Spring config
+    │           ├── registry/
+    │           │   └── PacketHandlerRegistry.java # Handler registration
+    │           ├── config/
+    │           │   └── UdpDispatcherConfiguration.java   # Spring config
+    │           └── publisher/
+    │               ├── TelemetryPublisher.java    # Interface (contract only)
+    │               └── PublishException.java     # Used by decorators
     └── test/
         └── java/
             └── com/ua/yushchenko/f1/fastlaps/telemetry/udp/spring/
@@ -423,11 +428,7 @@ f1-telemetry-udp-spring/
                     └── DuplicatePacketIdValidationTest.java
 ```
 
-## Next Steps
-
-- **Phase 3**: Add Kafka publisher integration for forwarding packets to message brokers
-- **Phase 4**: Implement packet parsing helpers for each packet type
-- **Phase 5**: Create Spring Boot Starter for zero-configuration setup
+**Business logic** (packet handlers, parsing, Kafka publisher implementation) lives in **udp-ingest-service**, which depends on this module for the dispatch layer and the `TelemetryPublisher` interface.
 
 ## License
 
