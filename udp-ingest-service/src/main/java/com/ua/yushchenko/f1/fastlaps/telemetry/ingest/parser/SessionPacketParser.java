@@ -54,10 +54,12 @@ public class SessionPacketParser {
     }
 
     /**
-     * Map F1 session type id (0–12) to display string. Matches contract used by processing service.
+     * Map F1 session type id (m_sessionType, uint8) to display string.
+     * Canonical mapping: .github/docs/session_type_mapping.md. Must match SessionMapper.sessionTypeToDisplayString.
      */
     public static String parseSessionType(byte sessionTypeId) {
-        return switch (sessionTypeId) {
+        int id = sessionTypeId & 0xFF;
+        return switch (id) {
             case 0 -> "UNKNOWN";
             case 1 -> "PRACTICE_1";
             case 2 -> "PRACTICE_2";
@@ -71,6 +73,10 @@ public class SessionPacketParser {
             case 10 -> "RACE";
             case 11 -> "RACE_2";
             case 12 -> "TIME_TRIAL";
+            case 13 -> "SPRINT";
+            case 14 -> "SPRINT_SHOOTOUT";
+            case 15 -> "SPRINT";
+            case 16 -> "SPRINT_SHOOTOUT";
             default -> "UNKNOWN";
         };
     }

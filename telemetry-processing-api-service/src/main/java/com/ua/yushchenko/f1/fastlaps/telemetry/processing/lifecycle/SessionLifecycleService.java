@@ -165,9 +165,15 @@ public class SessionLifecycleService {
             return;
         }
         ensureSessionActive(sessionUID);
+        // Keep session alive for no-data timeout: PacketSessionData counts as activity (safety car / pit don't suspend)
+        SessionRuntimeState runtimeState = stateManager.get(sessionUID);
+        if (runtimeState != null) {
+            runtimeState.setLastSeenAt(Instant.now());
+        }
         sessionRepository.findById(sessionUID).ifPresent(session -> {
             boolean updated = false;
-            if (session.getSessionType() == null && dto.getSessionType() != null) {
+            // Always take session type from PacketSessionData when present (overrides SSTA/unknown)
+            if (dto.getSessionType() != null) {
                 session.setSessionType(dto.getSessionType().shortValue());
                 updated = true;
             }
