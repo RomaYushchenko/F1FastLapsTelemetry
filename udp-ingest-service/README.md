@@ -21,6 +21,20 @@ Downstream services (e.g. telemetry-processing-api-service) consume from Kafka. 
 - **UDP:** `f1.telemetry.udp.*` (port, buffer size, handler toggles such as `f1.telemetry.udp.handlers.session.enabled`).
 - **Kafka:** `f1.telemetry.kafka.*` (enabled, retry, throttle). See `application.yml` in this module.
 
+## Packet coverage (F1 25)
+
+Parsers and Kafka payload DTOs cover the **full F1 25 packet payload** for the following packet types, as defined in `.github/docs/F1 25 Telemetry Output Structures.txt`:
+
+| Packet        | Struct size | Parser                    | Topic                |
+|---------------|-------------|---------------------------|----------------------|
+| Car Telemetry | 60 bytes    | CarTelemetryPacketParser  | telemetry.carTelemetry |
+| Lap Data      | 57 bytes    | LapDataPacketParser       | telemetry.lap        |
+| Car Status    | 55 bytes    | CarStatusPacketParser     | telemetry.carStatus  |
+| Car Damage    | 46 bytes    | CarDamagePacketParser     | telemetry.carDamage  |
+| Session       | (event)     | SessionPacketParser       | telemetry.session    |
+
+Session handler remains event-based (SSTA/SEND); full PacketSessionData (packetId=1) is out of scope. See `.cursor/plans/full_packet_telemetry_implementation_plan.md` for details.
+
 ## Package layout
 
 ```

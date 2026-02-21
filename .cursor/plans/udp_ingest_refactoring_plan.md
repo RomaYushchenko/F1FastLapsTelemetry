@@ -44,6 +44,7 @@ Use these documents when implementing and reviewing the refactor. Do not change 
 |------|----------|
 | [implementation_phases.md](implementation_phases.md) | General implementation phases; build verification after each phase |
 | [unit_test_coverage_plan.md](unit_test_coverage_plan.md) | Coverage plan by phase (e.g. for telemetry-processing-api-service) |
+| [full_packet_telemetry_implementation_plan.md](full_packet_telemetry_implementation_plan.md) | Full F1 25 packet payload: parsers and DTOs in udp-ingest-service and telemetry-api-contracts now cover full CarTelemetryData (60 B), LapData (57 B), CarStatusData (55 B), CarDamageData (46 B) per `.github/docs/F1 25 Telemetry Output Structures.txt`. |
 
 ### Module READMEs
 
