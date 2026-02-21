@@ -50,7 +50,8 @@ export function useLiveTelemetry() {
     let isCancelled = false
     let liveSubscription: StompSubscription | null = null
     let errorSubscription: StompSubscription | null = null
-    let pollIntervalId: ReturnType<typeof setInterval> | null = null
+    let pollTimeoutId: ReturnType<typeof setTimeout> | null = null
+    let hasInitiatedConnect = false
 
     function connectWithSession(activeSession: Session) {
       setState(prev => ({
@@ -188,23 +189,27 @@ export function useLiveTelemetry() {
           sessionEnded: null,
           connectionMessage: null,
         }))
-        // Poll so that when user enters practice/qualifying/race, we discover the session
-        pollIntervalId = setInterval(async () => {
+        // Serialized polling: schedule next only after current poll completes (avoids duplicate connect when request is slower than interval)
+        function schedulePoll() {
           if (isCancelled) return
-          try {
-            const session = await getActiveSession()
-            if (isCancelled) return
-            if (session) {
-              if (pollIntervalId != null) {
-                clearInterval(pollIntervalId)
-                pollIntervalId = null
+          pollTimeoutId = setTimeout(async () => {
+            pollTimeoutId = null
+            if (isCancelled || hasInitiatedConnect) return
+            try {
+              const session = await getActiveSession()
+              if (isCancelled || hasInitiatedConnect) return
+              if (session) {
+                hasInitiatedConnect = true
+                connectWithSession(session)
+                return
               }
-              connectWithSession(session)
+            } catch {
+              // ignore poll errors; next poll will retry
             }
-          } catch {
-            // ignore poll errors; next poll will retry
-          }
-        }, ACTIVE_SESSION_POLL_INTERVAL_MS)
+            schedulePoll()
+          }, ACTIVE_SESSION_POLL_INTERVAL_MS)
+        }
+        schedulePoll()
         return
       }
 
@@ -216,9 +221,9 @@ export function useLiveTelemetry() {
 
     return () => {
       isCancelled = true
-      if (pollIntervalId != null) {
-        clearInterval(pollIntervalId)
-        pollIntervalId = null
+      if (pollTimeoutId != null) {
+        clearTimeout(pollTimeoutId)
+        pollTimeoutId = null
       }
       try {
         if (stompClient.connected) {
