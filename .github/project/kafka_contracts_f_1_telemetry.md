@@ -270,14 +270,37 @@ Example (subset):
 
 Topic: `telemetry.carDamage`
 
-Payload: знос шин у відсотках (0..1) по колесах. F1 25 CarDamageData m_tyresWear[4] (order: RL, RR, FL, FR).
+Payload maps F1 25 **CarDamageData** (46 bytes per car). Field semantics: `.github/docs/F1 25 Telemetry Output Structures.txt` (PacketCarDamageData, CarDamageData).
+
+| Field | Type | Description |
+|-------|------|--------------|
+| tyresWearFL, tyresWearFR, tyresWearRL, tyresWearRR | float | Tyre wear (%), order in packet RL, RR, FL, FR |
+| tyresDamage | int[4] | Tyre damage (%), order RL, RR, FL, FR |
+| brakesDamage | int[4] | Brakes damage (%), order RL, RR, FL, FR |
+| tyreBlisters | int[4] | Tyre blisters (%), order RL, RR, FL, FR |
+| frontLeftWingDamage, frontRightWingDamage, rearWingDamage | int | Wing damage (%) |
+| floorDamage, diffuserDamage, sidepodDamage | int | Damage (%) |
+| drsFault, ersFault | int | 0 = OK, 1 = fault |
+| gearBoxDamage, engineDamage | int | Damage (%) |
+| engineMguhWear, engineEsWear, engineCeWear, engineIceWear, engineMgukWear, engineTcWear | int | Engine wear (%) |
+| engineBlown, engineSeized | int | 0 = OK, 1 = fault |
+
+Example (subset):
 
 ```json
 {
   "tyresWearFL": 0.08,
   "tyresWearFR": 0.10,
   "tyresWearRL": 0.12,
-  "tyresWearRR": 0.15
+  "tyresWearRR": 0.15,
+  "tyresDamage": [ 0, 0, 5, 3 ],
+  "brakesDamage": [ 0, 0, 0, 0 ],
+  "tyreBlisters": [ 0, 0, 0, 0 ],
+  "frontLeftWingDamage": 0,
+  "frontRightWingDamage": 0,
+  "rearWingDamage": 0,
+  "drsFault": 0,
+  "ersFault": 0
 }
 ```
 

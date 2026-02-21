@@ -27,10 +27,6 @@ import java.nio.ByteBuffer;
 public class CarDamagePacketHandler {
 
     private static final String TOPIC = "telemetry.carDamage";
-    /** CarDamageData size in bytes. From docs: (1041 - 29 header) / 22 cars = 46. */
-    private static final int CAR_DAMAGE_DATA_SIZE = 46;
-    /** Minimum bytes needed for tyre wear (4 floats = 16). */
-    private static final int TYRE_WEAR_BYTES = 16;
 
     private final TelemetryPublisher publisher;
     private final CarDamagePacketParser carDamagePacketParser;
@@ -41,13 +37,10 @@ public class CarDamagePacketHandler {
                 header.getSessionUID(), header.getFrameIdentifier());
 
         try {
-            int offset = header.getPlayerCarIndex() * CAR_DAMAGE_DATA_SIZE;
-            if (payload.position() + offset + TYRE_WEAR_BYTES > payload.limit()) {
-                log.warn("Car damage payload too short for car index {}: need {} bytes",
-                        header.getPlayerCarIndex(), offset + TYRE_WEAR_BYTES);
+            if (!seekToPlayerCar(payload, header.getPlayerCarIndex(),
+                    CarDamagePacketParser.CAR_DAMAGE_DATA_SIZE_BYTES, "car damage")) {
                 return;
             }
-            payload.position(payload.position() + offset);
 
             CarDamageDto damage = carDamagePacketParser.parse(payload);
             CarDamageEvent event = CarDamageEventBuilder.build(header, damage);
@@ -61,5 +54,15 @@ public class CarDamagePacketHandler {
             log.error("Failed to parse car damage packet: sessionUID={}, frame={}",
                     header.getSessionUID(), header.getFrameIdentifier(), e);
         }
+    }
+
+    private boolean seekToPlayerCar(ByteBuffer payload, int playerCarIndex, int dataSizePerCar, String packetType) {
+        int offset = playerCarIndex * dataSizePerCar;
+        if (payload.position() + offset + dataSizePerCar > payload.limit()) {
+            log.warn("{} payload too short for car index {}: need {} bytes", packetType, playerCarIndex, offset + dataSizePerCar);
+            return false;
+        }
+        payload.position(payload.position() + offset);
+        return true;
     }
 }

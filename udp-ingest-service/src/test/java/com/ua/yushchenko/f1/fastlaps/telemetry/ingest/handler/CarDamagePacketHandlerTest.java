@@ -69,23 +69,18 @@ class CarDamagePacketHandlerTest {
     }
 
     private ByteBuffer createCarDamagePayload() {
-        ByteBuffer buffer = ByteBuffer.allocate(22 * 46).order(ByteOrder.LITTLE_ENDIAN);
-        // For car index 0: m_tyresWear[4] = RL, RR, FL, FR (4 floats = 16 bytes)
-        buffer.putFloat(0.12f);  // RL
-        buffer.putFloat(0.15f);  // RR
-        buffer.putFloat(0.08f);  // FL
-        buffer.putFloat(0.10f);  // FR
-        // Pad rest of first car's 46 bytes (30 more bytes)
-        for (int i = 0; i < 30; i++) {
-            buffer.put((byte) 0);
-        }
-        // Pad remaining 21 cars
-        for (int c = 0; c < 21; c++) {
-            for (int i = 0; i < 46; i++) {
-                buffer.put((byte) 0);
-            }
-        }
-        buffer.rewind();
+        // Full 46 bytes of CarDamageData (F1 25) for player car 0 per CarDamagePacketParser.CAR_DAMAGE_DATA_SIZE_BYTES
+        ByteBuffer buffer = ByteBuffer.allocate(CarDamagePacketParser.CAR_DAMAGE_DATA_SIZE_BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putFloat(0.12f);  // tyresWear RL, RR, FL, FR
+        buffer.putFloat(0.15f);
+        buffer.putFloat(0.08f);
+        buffer.putFloat(0.10f);
+        for (int i = 0; i < 4; i++) buffer.put((byte) 0);   // tyresDamage
+        for (int i = 0; i < 4; i++) buffer.put((byte) 0);   // brakesDamage
+        for (int i = 0; i < 4; i++) buffer.put((byte) 0);   // tyreBlisters
+        for (int i = 0; i < 18; i++) buffer.put((byte) 0);  // single-byte damage fields
+        buffer.flip();
         return buffer;
     }
 }
