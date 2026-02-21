@@ -9,6 +9,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Car
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TyreWearPerLap;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarStatusRawRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarTelemetryRawRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TyreWearPerLapRepository;
@@ -37,6 +38,8 @@ class LapQueryServiceTest {
     private LapRepository lapRepository;
     @Mock
     private CarTelemetryRawRepository carTelemetryRawRepository;
+    @Mock
+    private CarStatusRawRepository carStatusRawRepository;
     @Mock
     private TyreWearPerLapRepository tyreWearPerLapRepository;
     @Spy

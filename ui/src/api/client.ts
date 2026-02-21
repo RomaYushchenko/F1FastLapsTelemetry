@@ -1,7 +1,7 @@
 import { API_BASE_URL } from './config'
 import { HttpError } from './types'
 import type { ApiErrorBody, Lap, Session, SessionSummary } from './types'
-import type { PacePoint, PedalTracePoint, TyreWearPoint } from '../charts/types'
+import type { ErsPoint, PacePoint, PedalTracePoint, TyreWearPoint } from '../charts/types'
 
 async function parseJsonOrNull(response: Response): Promise<unknown | null> {
   const contentType = response.headers.get('content-type')
@@ -120,6 +120,17 @@ export async function getLapTrace(
   if (carIndex !== 0) search.set('carIndex', String(carIndex))
   const suffix = search.toString() ? `?${search.toString()}` : ''
   return requestJson<PedalTracePoint[]>(`/api/sessions/${sessionUid}/laps/${lapNum}/trace${suffix}`)
+}
+
+export async function getLapErs(
+  sessionUid: string | undefined,
+  lapNum: number,
+  carIndex = 0,
+): Promise<ErsPoint[]> {
+  const search = new URLSearchParams()
+  if (carIndex !== 0) search.set('carIndex', String(carIndex))
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  return requestJson<ErsPoint[]>(`/api/sessions/${sessionUid}/laps/${lapNum}/ers${suffix}`)
 }
 
 export async function getSessionTyreWear(

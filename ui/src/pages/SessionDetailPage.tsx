@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
+import { getLapErs, getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
 import { isValidSessionId } from '../api/sessionId'
 import type { Lap, Session, SessionSummary } from '../api/types'
 import { HttpError } from '../api/types'
 import { getTrackName } from '../constants/tracks'
-import type { PacePoint, PedalTracePoint, TyreWearPoint } from '../charts/types'
+import type { ErsPoint, PacePoint, PedalTracePoint, TyreWearPoint } from '../charts/types'
+import { ErsChart } from '../charts/ers-chart'
 import { PaceChart } from '../charts/pace-chart'
 import { ThrottleBrakeChart } from '../charts/throttle-brake-chart'
 import { TyreWearChart } from '../charts/tyre-wear-chart'
@@ -28,6 +29,8 @@ export function SessionDetailPage() {
   const [tracePoints, setTracePoints] = useState<PedalTracePoint[] | null>(null)
   const [traceStatus, setTraceStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
   const [traceError, setTraceError] = useState<string | null>(null)
+  const [ersPoints, setErsPoints] = useState<ErsPoint[]>([])
+  const [ersStatus, setErsStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
 
   const loadTrace = useCallback(
     async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
@@ -42,6 +45,23 @@ export function SessionDetailPage() {
         if (isCancelledRef.current) return
         setTraceStatus('error')
         setTraceError(error instanceof Error ? error.message : 'Failed to load pedal trace')
+      }
+    },
+    [],
+  )
+
+  const loadErs = useCallback(
+    async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
+      setErsStatus('loading')
+      try {
+        const points = await getLapErs(currentSessionUid, lapNumber, carIndex)
+        if (isCancelledRef.current) return
+        setErsPoints(points)
+        setErsStatus('loaded')
+      } catch {
+        if (isCancelledRef.current) return
+        setErsStatus('error')
+        setErsPoints([])
       }
     },
     [],
@@ -89,6 +109,7 @@ export function SessionDetailPage() {
       if (initialLapForTrace != null) {
         setSelectedLapForTrace(initialLapForTrace)
         void loadTrace(id, initialLapForTrace, carIndex)
+        void loadErs(id, initialLapForTrace, carIndex)
       }
       prevLapsLengthRef.current = lapsRes.length
 
@@ -162,6 +183,7 @@ export function SessionDetailPage() {
           prevLapsLengthRef.current = currentLength
           setSelectedLapForTrace(newLapNumber)
           void loadTrace(id, newLapNumber, carIndex)
+          void loadErs(id, newLapNumber, carIndex)
         }
       } else {
         prevLapsLengthRef.current = currentLength
@@ -184,14 +206,20 @@ export function SessionDetailPage() {
     }
   }, [sessionUid, loadTrace])
 
-  /** Quiet refresh of pedal trace for current lap (no loading state) so chart updates in real time. */
+  /** Quiet refresh of pedal trace and ERS for current lap (no loading state). */
   const refreshTraceInBackground = useCallback(
     async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
       try {
-        const points = await getLapTrace(currentSessionUid, lapNumber, carIndex)
-        if (!isCancelledRef.current) setTracePoints(points)
+        const [points, ers] = await Promise.all([
+          getLapTrace(currentSessionUid, lapNumber, carIndex),
+          getLapErs(currentSessionUid, lapNumber, carIndex),
+        ])
+        if (!isCancelledRef.current) {
+          setTracePoints(points)
+          setErsPoints(ers)
+        }
       } catch {
-        // keep current trace on error
+        // keep current data on error
       }
     },
     [],
@@ -493,7 +521,9 @@ export function SessionDetailPage() {
                       if (!Number.isFinite(value)) return
                       setSelectedLapForTrace(value)
                       if (sessionUid != null) {
-                        void loadTrace(sessionUid, value, session?.playerCarIndex ?? 0)
+                        const car = session?.playerCarIndex ?? 0
+                        void loadTrace(sessionUid, value, car)
+                        void loadErs(sessionUid, value, car)
                       }
                     }}
                     style={{
@@ -526,9 +556,11 @@ export function SessionDetailPage() {
                 {selectedLapForTrace != null && sessionUid != null && (
                   <button
                     type="button"
-                    onClick={() =>
-                      loadTrace(sessionUid, selectedLapForTrace, session?.playerCarIndex ?? 0)
-                    }
+                    onClick={() => {
+                      const car = session?.playerCarIndex ?? 0
+                      void loadTrace(sessionUid, selectedLapForTrace, car)
+                      void loadErs(sessionUid, selectedLapForTrace, car)
+                    }}
                     style={{
                       marginTop: 'var(--space-2)',
                       padding: '6px 12px',
@@ -546,6 +578,24 @@ export function SessionDetailPage() {
             )}
             {(traceStatus === 'loaded' || traceStatus === 'idle') && tracePoints && (
               <ThrottleBrakeChart points={tracePoints} />
+            )}
+          </div>
+
+          {/* ERS (Energy Recovery System) */}
+          <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-1)' }}>ERS</h2>
+            <p className="text-muted" style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
+              Stored energy along the lap (merged from telemetry and car status). Same lap as pedal trace above.
+            </p>
+            {ersStatus === 'loading' && <p className="text-muted">Loading ERS…</p>}
+            {ersStatus === 'error' && (
+              <p className="text-error">Failed to load ERS for this lap.</p>
+            )}
+            {(ersStatus === 'loaded' || ersStatus === 'idle') && ersPoints.length > 0 && (
+              <ErsChart points={ersPoints} />
+            )}
+            {(ersStatus === 'loaded' || ersStatus === 'idle') && ersPoints.length === 0 && selectedLapForTrace != null && (
+              <p className="text-muted">No ERS data for lap {selectedLapForTrace}.</p>
             )}
           </div>
 

@@ -13,6 +13,12 @@ export interface PedalTracePoint {
   brake: number
 }
 
+/** Matches ErsPointDto from GET /api/sessions/{id}/laps/{lapNum}/ers. */
+export interface ErsPoint {
+  lapDistanceM: number
+  energyPercent: number
+}
+
 /** Matches TyreWearPointDto from GET /api/sessions/{id}/tyre-wear. */
 export interface TyreWearPoint {
   lapNumber: number
