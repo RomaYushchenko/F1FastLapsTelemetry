@@ -34,7 +34,17 @@ alwaysApply: true
     - Use guard clauses to handle preconditions and invalid states early.
     - Implement proper error logging and user-friendly error messages.
     - Consider using custom error types or error factories for consistent error handling.
-  
+
+  UI notifications (toast)
+  - Use the global toast (sonner: `toast.success()`, `toast.error()`, `toast.warning()`, `toast.info()`) for user-facing messages so they are visible regardless of the current page or scroll position.
+  - When to use toasts:
+    - REST/API errors: show `toast.error(message)` for failed requests (e.g. in API client before throwing). Do not show a toast for 404 when the page already shows an inline "not found" message.
+    - WebSocket/connection: show toasts for connection errors, connect/disconnect, and session-ended events (`toast.error`, `toast.warning`, or `toast.info` as appropriate) so the user sees them even when not on the Live page.
+    - Success feedback: after successful mutations (e.g. PATCH display name), call `toast.success('Display name updated')` in addition to closing modals or refetching.
+    - Secondary load errors (e.g. trace/ERS on Session Detail): show `toast.error(message)` in addition to inline error state so the user sees the message if they scroll away.
+  - When to keep inline only: primary page load error (e.g. "Failed to load sessions") can keep inline message + Retry; toast from the API client will still show one error toast. Prefer one toast per logical event; avoid duplicate toasts for the same failure.
+  - Reference: `.github/project/react_spa_ui_architecture.md` § 7.4 (Global notifications), `.github/draft/implementation-plans/05-ui-notifications-toast.md`.
+
   React/Next.js
   - Use functional components and TypeScript interfaces.
   - Use declarative JSX.

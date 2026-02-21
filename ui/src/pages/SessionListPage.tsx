@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { getSessions, updateSessionDisplayName } from '../api/client'
 import { isValidSessionId, toSessionIdString } from '../api/sessionId'
 import type { Session } from '../api/types'
@@ -75,6 +76,7 @@ export function SessionListPage() {
     try {
       const updated = await updateSessionDisplayName(editingSession.id, trimmed)
       if (isCancelledRef.current) return
+      toast.success('Display name updated')
       setSessions(prev =>
         prev.map(s => (s.id === updated.id ? { ...s, sessionDisplayName: updated.sessionDisplayName } : s)),
       )

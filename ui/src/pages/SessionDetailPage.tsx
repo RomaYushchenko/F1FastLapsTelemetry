@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { getLapErs, getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
 import { isValidSessionId } from '../api/sessionId'
 import type { Lap, Session, SessionSummary } from '../api/types'
@@ -43,8 +44,10 @@ export function SessionDetailPage() {
         setTraceStatus('loaded')
       } catch (error) {
         if (isCancelledRef.current) return
+        const msg = error instanceof Error ? error.message : 'Failed to load pedal trace'
         setTraceStatus('error')
-        setTraceError(error instanceof Error ? error.message : 'Failed to load pedal trace')
+        setTraceError(msg)
+        toast.error(msg)
       }
     },
     [],
@@ -58,8 +61,10 @@ export function SessionDetailPage() {
         if (isCancelledRef.current) return
         setErsPoints(points)
         setErsStatus('loaded')
-      } catch {
+      } catch (error) {
         if (isCancelledRef.current) return
+        const msg = error instanceof Error ? error.message : 'Failed to load ERS'
+        toast.error(msg)
         setErsStatus('error')
         setErsPoints([])
       }

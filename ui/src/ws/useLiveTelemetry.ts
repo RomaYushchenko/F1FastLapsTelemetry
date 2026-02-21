@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import SockJS from 'sockjs-client'
 import { Client } from '@stomp/stompjs'
 import type { IMessage, StompSubscription } from '@stomp/stompjs'
+import { toast } from 'sonner'
 import { WS_URL } from '../api/config'
 import { getActiveSession } from '../api/client'
 import type { Session } from '../api/types'
@@ -78,6 +79,7 @@ export function useLiveTelemetry() {
               if (payload.type === 'SNAPSHOT') {
                 setState(prev => ({ ...prev, snapshot: payload }))
               } else if (payload.type === 'SESSION_ENDED') {
+                toast.info('Session ended')
                 setState(prev => ({
                   ...prev,
                   status: 'disconnected',
@@ -85,10 +87,12 @@ export function useLiveTelemetry() {
                 }))
               }
             } catch (error) {
+              const msg = error instanceof Error ? error.message : 'Failed to parse live message'
+              toast.error(msg)
               setState(prev => ({
                 ...prev,
                 status: 'error',
-                errorMessage: error instanceof Error ? error.message : 'Failed to parse live message',
+                errorMessage: msg,
               }))
             }
           },
@@ -97,6 +101,7 @@ export function useLiveTelemetry() {
         errorSubscription = stompClient.subscribe('/user/queue/errors', (message: IMessage) => {
           try {
             const payload = JSON.parse(message.body) as WsErrorMessage
+            toast.warning(payload.message)
             setState(prev => ({
               ...prev,
               status: 'error',
@@ -104,10 +109,12 @@ export function useLiveTelemetry() {
               connectionMessage: 'Connection lost. Live data may be outdated.',
             }))
           } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Failed to parse error message'
+            toast.warning(msg)
             setState(prev => ({
               ...prev,
               status: 'error',
-              errorMessage: error instanceof Error ? error.message : 'Failed to parse error message',
+              errorMessage: msg,
               connectionMessage: 'Connection lost. Live data may be outdated.',
             }))
           }
@@ -123,20 +130,24 @@ export function useLiveTelemetry() {
         })
 
         setState(prev => ({ ...prev, status: 'connected' }))
+        toast.info('Live telemetry connected')
       }
 
       stompClient.onStompError = frame => {
         if (isCancelled) return
+        const msg = frame.body || 'WebSocket protocol error'
+        toast.error(msg)
         setState(prev => ({
           ...prev,
           status: 'error',
-          errorMessage: frame.body || 'WebSocket protocol error',
+          errorMessage: msg,
           connectionMessage: 'Connection lost. Live data may be outdated.',
         }))
       }
 
       stompClient.onWebSocketError = () => {
         if (isCancelled) return
+        toast.error('WebSocket connection error')
         setState(prev => ({
           ...prev,
           status: 'error',
@@ -147,6 +158,7 @@ export function useLiveTelemetry() {
 
       stompClient.onDisconnect = () => {
         if (isCancelled) return
+        toast.info('Disconnected from live feed')
         setState(prev => ({
           ...prev,
           status: 'disconnected',
@@ -170,10 +182,12 @@ export function useLiveTelemetry() {
         activeSession = await getActiveSession()
       } catch (error) {
         if (isCancelled) return
+        const msg = error instanceof Error ? error.message : 'Failed to load active session'
+        toast.error(msg)
         setState(prev => ({
           ...prev,
           status: 'error',
-          errorMessage: error instanceof Error ? error.message : 'Failed to load active session',
+          errorMessage: msg,
           connectionMessage: 'Connection lost. Live data may be outdated.',
         }))
         return
