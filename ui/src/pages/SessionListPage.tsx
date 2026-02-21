@@ -136,6 +136,7 @@ export function SessionListPage() {
                 <th>Track</th>
                 <th>Started</th>
                 <th>Ended</th>
+                <th>Place</th>
                 <th>State</th>
               </tr>
             </thead>
@@ -200,6 +201,9 @@ export function SessionListPage() {
                     <td className="text-muted">{getTrackName(session.trackId)}</td>
                     <td className="text-muted">{startedLabel}</td>
                     <td className="text-muted">{endedLabel}</td>
+                    <td className="text-muted">
+                      {session.finishingPosition != null ? session.finishingPosition : '—'}
+                    </td>
                     <td>
                       <StateBadge state={session.state} />
                     </td>

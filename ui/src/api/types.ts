@@ -19,6 +19,8 @@ export interface Session {
   endedAt?: string | null
   endReason?: string | null
   state?: SessionState
+  /** Finishing position (race position at session end). Null if active or no data. */
+  finishingPosition?: number | null
 }
 
 export type SessionState = 'ACTIVE' | 'FINISHED'
