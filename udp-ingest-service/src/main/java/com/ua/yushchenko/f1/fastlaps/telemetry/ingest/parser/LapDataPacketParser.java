@@ -13,9 +13,12 @@ import java.nio.ByteOrder;
 @Component
 public class LapDataPacketParser {
 
+    /** Size in bytes of one LapData struct (F1 25 spec). */
+    public static final int LAP_DATA_SIZE_BYTES = 57;
+
     /**
      * Parse one car's lap data from current buffer position. Buffer must be positioned at start of LapData.
-     * Advances buffer position by full LapData size.
+     * Advances buffer position by {@value #LAP_DATA_SIZE_BYTES} bytes.
      */
     public LapDto parse(ByteBuffer buffer) {
         buffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -27,33 +30,37 @@ public class LapDataPacketParser {
         int sector2MinPart = buffer.get() & 0xFF;
         int sector1TimeMs = sector1MinPart * 60_000 + sector1MsPart;
         int sector2TimeMs = sector2MinPart * 60_000 + sector2MsPart;
-        buffer.getShort();
-        buffer.get();
-        buffer.getShort();
-        buffer.get();
+
+        int deltaToCarInFrontMsPart = buffer.getShort() & 0xFFFF;
+        int deltaToCarInFrontMinPart = buffer.get() & 0xFF;
+        int deltaToRaceLeaderMsPart = buffer.getShort() & 0xFFFF;
+        int deltaToRaceLeaderMinPart = buffer.get() & 0xFF;
+        int deltaToCarInFrontMs = deltaToCarInFrontMinPart * 60_000 + deltaToCarInFrontMsPart;
+        int deltaToRaceLeaderMs = deltaToRaceLeaderMinPart * 60_000 + deltaToRaceLeaderMsPart;
+
         float lapDistance = buffer.getFloat();
-        buffer.getFloat();
-        buffer.getFloat();
-        buffer.get();
+        float totalDistance = buffer.getFloat();
+        float safetyCarDelta = buffer.getFloat();
+        int carPosition = buffer.get() & 0xFF;
         int currentLapNum = buffer.get() & 0xFF;
-        buffer.get();
-        buffer.get();
+        int pitStatus = buffer.get() & 0xFF;
+        int numPitStops = buffer.get() & 0xFF;
         int sector = buffer.get() & 0xFF;
         int currentLapInvalid = buffer.get() & 0xFF;
         int penalties = buffer.get() & 0xFF;
-        buffer.get();
-        buffer.get();
-        buffer.get();
-        buffer.get();
-        buffer.get();
-        buffer.get();
-        buffer.get();
-        buffer.get();
-        buffer.getShort();
-        buffer.getShort();
-        buffer.get();
-        buffer.getFloat();
-        buffer.get();
+        int totalWarnings = buffer.get() & 0xFF;
+        int cornerCuttingWarnings = buffer.get() & 0xFF;
+        int numUnservedDriveThroughPens = buffer.get() & 0xFF;
+        int numUnservedStopGoPens = buffer.get() & 0xFF;
+        int gridPosition = buffer.get() & 0xFF;
+        int driverStatus = buffer.get() & 0xFF;
+        int resultStatus = buffer.get() & 0xFF;
+        int pitLaneTimerActive = buffer.get() & 0xFF;
+        int pitLaneTimeInLaneInMs = buffer.getShort() & 0xFFFF;
+        int pitStopTimerInMs = buffer.getShort() & 0xFFFF;
+        int pitStopShouldServePen = buffer.get() & 0xFF;
+        float speedTrapFastestSpeed = buffer.getFloat();
+        int speedTrapFastestLap = buffer.get() & 0xFF;
 
         return LapDto.builder()
                 .lapNumber(currentLapNum)
@@ -65,6 +72,26 @@ public class LapDataPacketParser {
                 .sector(sector)
                 .isInvalid(currentLapInvalid == 1)
                 .penaltiesSeconds(penalties > 0 ? penalties : null)
+                .deltaToCarInFrontMs(deltaToCarInFrontMs != 0 ? deltaToCarInFrontMs : null)
+                .deltaToRaceLeaderMs(deltaToRaceLeaderMs != 0 ? deltaToRaceLeaderMs : null)
+                .totalDistance(totalDistance)
+                .safetyCarDelta(safetyCarDelta)
+                .carPosition(carPosition)
+                .pitStatus(pitStatus)
+                .numPitStops(numPitStops)
+                .totalWarnings(totalWarnings)
+                .cornerCuttingWarnings(cornerCuttingWarnings)
+                .numUnservedDriveThroughPens(numUnservedDriveThroughPens)
+                .numUnservedStopGoPens(numUnservedStopGoPens)
+                .gridPosition(gridPosition)
+                .driverStatus(driverStatus)
+                .resultStatus(resultStatus)
+                .pitLaneTimerActive(pitLaneTimerActive)
+                .pitLaneTimeInLaneInMs(pitLaneTimeInLaneInMs)
+                .pitStopTimerInMs(pitStopTimerInMs)
+                .pitStopShouldServePen(pitStopShouldServePen)
+                .speedTrapFastestSpeed(speedTrapFastestSpeed)
+                .speedTrapFastestLap(speedTrapFastestLap != 255 ? speedTrapFastestLap : null)
                 .build();
     }
 }

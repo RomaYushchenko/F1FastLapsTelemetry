@@ -103,57 +103,9 @@ class LapDataPacketHandlerTest {
     }
 
     private ByteBuffer createLapDataPayload() {
-        ByteBuffer buffer = ByteBuffer.allocate(1000).order(ByteOrder.LITTLE_ENDIAN);
-
-        // Last lap time
-        buffer.putInt(84500);           // m_lastLapTimeInMS
-        // Current lap time
-        buffer.putInt(85500);           // m_currentLapTimeInMS
-        // Sector 1 time
-        buffer.putShort((short) 28500); // m_sector1TimeMSPart
-        buffer.put((byte) 0);           // m_sector1TimeMinutesPart
-        // Sector 2 time
-        buffer.putShort((short) 30000); // m_sector2TimeMSPart
-        buffer.put((byte) 0);           // m_sector2TimeMinutesPart
-        // Delta to car in front
-        buffer.putShort((short) 0);     // m_deltaToCarInFrontMSPart
-        buffer.put((byte) 0);           // m_deltaToCarInFrontMinutesPart
-        // Delta to race leader
-        buffer.putShort((short) 0);     // m_deltaToRaceLeaderMSPart
-        buffer.put((byte) 0);           // m_deltaToRaceLeaderMinutesPart
-        // Lap distance
-        buffer.putFloat(2500.5f);
-        // Total distance
-        buffer.putFloat(15000.0f);
-        // Safety car delta
-        buffer.putFloat(0.0f);
-        // Car position
-        buffer.put((byte) 3);
-        // Current lap number
-        buffer.put((byte) 5);
-        // Pit status
-        buffer.put((byte) 0);
-        // Num pit stops
-        buffer.put((byte) 1);
-        // Sector
-        buffer.put((byte) 2);
-        // Current lap invalid
-        buffer.put((byte) 0);           // Valid
-        // Penalties
-        buffer.put((byte) 0);
-        // Warnings
-        buffer.put((byte) 0);
-        buffer.put((byte) 0);
-        buffer.put((byte) 0);
-        buffer.put((byte) 0);
-
-        buffer.rewind();
-        return buffer;
-    }
-
-    private ByteBuffer createInvalidLapDataPayload() {
-        ByteBuffer buffer = ByteBuffer.allocate(1000).order(ByteOrder.LITTLE_ENDIAN);
-
+        // Full 57 bytes of LapData (F1 25) per LapDataPacketParser.LAP_DATA_SIZE_BYTES
+        ByteBuffer buffer = ByteBuffer.allocate(LapDataPacketParser.LAP_DATA_SIZE_BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN);
         buffer.putInt(84500);
         buffer.putInt(85500);
         buffer.putShort((short) 28500);
@@ -172,14 +124,62 @@ class LapDataPacketHandlerTest {
         buffer.put((byte) 0);
         buffer.put((byte) 1);
         buffer.put((byte) 2);
-        buffer.put((byte) 1);           // Invalid!
+        buffer.put((byte) 0);           // Valid
+        buffer.put((byte) 0);
+        buffer.put((byte) 0);
+        buffer.put((byte) 0);
+        buffer.put((byte) 0);
+        buffer.put((byte) 0);
+        buffer.put((byte) 2);          // gridPosition
+        buffer.put((byte) 4);          // driverStatus
+        buffer.put((byte) 2);          // resultStatus
+        buffer.put((byte) 0);          // pitLaneTimerActive
+        buffer.putShort((short) 0);
+        buffer.putShort((short) 0);
+        buffer.put((byte) 0);
+        buffer.putFloat(0.0f);
+        buffer.put((byte) 255);        // speedTrapFastestLap not set
+        buffer.flip();
+        return buffer;
+    }
+
+    private ByteBuffer createInvalidLapDataPayload() {
+        ByteBuffer buffer = ByteBuffer.allocate(LapDataPacketParser.LAP_DATA_SIZE_BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putInt(84500);
+        buffer.putInt(85500);
+        buffer.putShort((short) 28500);
+        buffer.put((byte) 0);
+        buffer.putShort((short) 30000);
+        buffer.put((byte) 0);
+        buffer.putShort((short) 0);
+        buffer.put((byte) 0);
+        buffer.putShort((short) 0);
+        buffer.put((byte) 0);
+        buffer.putFloat(2500.5f);
+        buffer.putFloat(15000.0f);
+        buffer.putFloat(0.0f);
+        buffer.put((byte) 3);
+        buffer.put((byte) 5);
+        buffer.put((byte) 0);
+        buffer.put((byte) 1);
+        buffer.put((byte) 2);
+        buffer.put((byte) 1);           // Invalid
         buffer.put((byte) 5);           // 5 seconds penalty
         buffer.put((byte) 0);
         buffer.put((byte) 0);
         buffer.put((byte) 0);
         buffer.put((byte) 0);
-
-        buffer.rewind();
+        buffer.put((byte) 2);
+        buffer.put((byte) 4);
+        buffer.put((byte) 2);
+        buffer.put((byte) 0);
+        buffer.putShort((short) 0);
+        buffer.putShort((short) 0);
+        buffer.put((byte) 0);
+        buffer.putFloat(0.0f);
+        buffer.put((byte) 255);
+        buffer.flip();
         return buffer;
     }
 }

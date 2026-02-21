@@ -111,14 +111,53 @@ Topic: `telemetry.session`
 
 Topic: `telemetry.lap`
 
+Payload maps F1 25 **LapData** (57 bytes per car). Field semantics: `.github/docs/F1 25 Telemetry Output Structures.txt` (PacketLapData, LapData).
+
+| Field | Type | Description |
+|-------|------|--------------|
+| lapNumber | int | m_currentLapNum |
+| lapDistance | float | Distance around current lap (m) |
+| lastLapTimeMs | int | m_lastLapTimeInMS |
+| currentLapTimeMs | int | m_currentLapTimeInMS |
+| sector1TimeMs, sector2TimeMs | int | Sector times (computed from min+ms parts) |
+| sector | int | 0 = sector1, 1 = sector2, 2 = sector3 |
+| isInvalid | bool | m_currentLapInvalid |
+| penaltiesSeconds | int | m_penalties |
+| deltaToCarInFrontMs | int | Time delta to car in front (ms) |
+| deltaToRaceLeaderMs | int | Time delta to race leader (ms) |
+| totalDistance | float | Total distance in session (m) |
+| safetyCarDelta | float | Safety car delta (s) |
+| carPosition | int | Race position |
+| pitStatus | int | 0 = none, 1 = pitting, 2 = in pit area |
+| numPitStops | int | Pit stops taken |
+| totalWarnings, cornerCuttingWarnings | int | Warnings |
+| numUnservedDriveThroughPens, numUnservedStopGoPens | int | Unserved penalties |
+| gridPosition | int | Grid position at start |
+| driverStatus | int | 0 = garage, 1 = flying lap, 2 = in lap, 3 = out lap, 4 = on track |
+| resultStatus | int | 0 = invalid, 1 = inactive, 2 = active, 3 = finished, etc. |
+| pitLaneTimerActive | int | 0 = inactive, 1 = active |
+| pitLaneTimeInLaneInMs, pitStopTimerInMs | int | Pit timing (ms) |
+| pitStopShouldServePen | int | Serve penalty at this stop |
+| speedTrapFastestSpeed | float | Fastest speed trap (km/h) |
+| speedTrapFastestLap | int | Lap of fastest speed, 255 = not set |
+
+Example (subset of fields):
+
 ```json
 {
   "lapNumber": 5,
   "lapDistance": 4231.4,
+  "lastLapTimeMs": 84500,
   "currentLapTimeMs": 87321,
+  "sector1TimeMs": 28500,
+  "sector2TimeMs": 30000,
   "sector": 2,
   "isInvalid": false,
-  "penaltiesSeconds": 0
+  "penaltiesSeconds": 0,
+  "carPosition": 3,
+  "totalDistance": 15000.0,
+  "pitStatus": 0,
+  "numPitStops": 1
 }
 ```
 
