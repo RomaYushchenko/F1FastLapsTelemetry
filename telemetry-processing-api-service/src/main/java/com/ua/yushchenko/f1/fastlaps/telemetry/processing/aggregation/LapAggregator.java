@@ -55,9 +55,10 @@ public class LapAggregator {
         state.setInvalid(lapDto.isInvalid());
         state.setPenaltiesSeconds(lapDto.getPenaltiesSeconds() != null ? lapDto.getPenaltiesSeconds().shortValue() : (short) 0);
 
-        // Track sector completion: game sends 1 when S1 done, 2 when S2 done; S3 is derived in finalizeLap
+        // Track sector completion: game sends 1 when S1 done, 2 when S2 done; S3 is derived in finalizeLap.
+        // Prefer official sector times from packet (m_sector1Time/m_sector2Time) so values match the game display.
         if (sectorJustCompleted > 0 && sectorJustCompleted > state.getCurrentSector()) {
-            completeSector(state, sectorJustCompleted, lapDto.getCurrentLapTimeMs());
+            completeSector(state, sectorJustCompleted, lapDto);
         }
 
         // Check if lap is complete (all 3 sectors); no lastLapTimeMs yet, use current state
@@ -69,20 +70,28 @@ public class LapAggregator {
 
     /**
      * Complete a sector and store its time.
+     * Prefer official sector times from the packet (m_sector1TimeMs / m_sector2TimeMs) when present,
+     * so stored times match the game display; otherwise derive from currentLapTime.
      */
-    private void completeSector(LapRuntimeState state, int sector, Integer currentLapTime) {
-        if (currentLapTime == null) {
-            return;
+    private void completeSector(LapRuntimeState state, int sector, LapDto lapDto) {
+        Integer sectorTime;
+        if (sector == 1 && lapDto.getSector1TimeMs() != null && lapDto.getSector1TimeMs() > 0) {
+            sectorTime = lapDto.getSector1TimeMs();
+        } else if (sector == 2 && lapDto.getSector2TimeMs() != null && lapDto.getSector2TimeMs() > 0) {
+            sectorTime = lapDto.getSector2TimeMs();
+        } else {
+            Integer currentLapTime = lapDto.getCurrentLapTimeMs();
+            if (currentLapTime == null) {
+                return;
+            }
+            int previousSectorTime = 0;
+            if (sector == 2 && state.getSector1TimeMs() != null) {
+                previousSectorTime = state.getSector1TimeMs();
+            } else if (sector == 3 && state.getSector1TimeMs() != null && state.getSector2TimeMs() != null) {
+                previousSectorTime = state.getSector1TimeMs() + state.getSector2TimeMs();
+            }
+            sectorTime = currentLapTime - previousSectorTime;
         }
-
-        int previousSectorTime = 0;
-        if (sector == 2 && state.getSector1TimeMs() != null) {
-            previousSectorTime = state.getSector1TimeMs();
-        } else if (sector == 3 && state.getSector1TimeMs() != null && state.getSector2TimeMs() != null) {
-            previousSectorTime = state.getSector1TimeMs() + state.getSector2TimeMs();
-        }
-
-        int sectorTime = currentLapTime - previousSectorTime;
 
         switch (sector) {
             case 1 -> state.setSector1TimeMs(sectorTime);
