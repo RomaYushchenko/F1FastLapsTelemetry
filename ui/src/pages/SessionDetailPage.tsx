@@ -430,7 +430,7 @@ export function SessionDetailPage() {
                           : 'P1'
                   }
                   extra={effectiveSummary.leaderIsPlayer ? undefined : 'P1'}
-                  highlight={effectiveSummary.leaderIsPlayer}
+                  highlight={effectiveSummary.leaderIsPlayer ?? undefined}
                 />
               )}
               <SummaryItem

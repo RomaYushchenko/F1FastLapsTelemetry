@@ -42,7 +42,7 @@ export function ErsChart(props: ErsChartProps) {
           label={{ value: 'ERS %', angle: -90, position: 'insideLeft', style: { fontSize: 12 } }}
         />
         <Tooltip
-          formatter={(value: number) => [`${value}%`, 'ERS']}
+          formatter={(value: number | undefined) => [value != null && Number.isFinite(value) ? `${value}%` : '—', 'ERS']}
           labelFormatter={label => `Distance: ${Number(label).toFixed(0)} m`}
           contentStyle={{
             backgroundColor: '#111827',
