@@ -32,6 +32,8 @@ export interface Lap {
   sector2Ms: number | null
   sector3Ms: number | null
   isInvalid: boolean
+  /** Race position at the start of this lap. Optional (from API). */
+  positionAtLapStart?: number | null
 }
 
 export interface SessionSummary {

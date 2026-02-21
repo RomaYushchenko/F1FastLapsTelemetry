@@ -47,6 +47,10 @@ public class LapAggregator {
             if (state.getCurrentLapNumber() > 0) {
                 finalizeLap(state, lapDto.getLastLapTimeMs(), lapDto.getSector1TimeMs(), lapDto.getSector2TimeMs());
             }
+            // Incoming packet is for the new lap; its carPosition is position at start of that lap
+            if (lapDto.getCarPosition() != null && lapDto.getCarPosition() > 0) {
+                state.setPositionAtLapStart(lapDto.getCarPosition());
+            }
             state.reset(lapNumber);
         }
 
@@ -143,6 +147,7 @@ public class LapAggregator {
                 s3,
                 state.isInvalid(),
                 state.getPenaltiesSeconds(),
+                state.getPositionAtLapStart(),
                 Instant.now()
         );
         lapRepository.save(lap);

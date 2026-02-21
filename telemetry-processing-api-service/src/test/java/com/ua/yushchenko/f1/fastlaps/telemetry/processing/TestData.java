@@ -141,6 +141,7 @@ public final class TestData {
                 .sector3TimeMs(SECTOR3_MS)
                 .isInvalid(false)
                 .penaltiesSeconds((short) 0)
+                .positionAtLapStart(3)
                 .endedAt(LAP_ENDED_AT)
                 .build();
     }

@@ -51,6 +51,9 @@ public class Lap {
     @Column(name = "penalties_seconds")
     private Short penaltiesSeconds;
 
+    @Column(name = "position_at_lap_start")
+    private Integer positionAtLapStart;
+
     @Column(name = "started_at")
     private Instant startedAt;
 

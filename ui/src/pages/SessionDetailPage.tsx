@@ -540,6 +540,8 @@ export function SessionDetailPage() {
                 <tr>
                   <th style={{ textAlign: 'left' }}>Lap</th>
                   <th>Time</th>
+                  <th>Delta</th>
+                  <th>Position</th>
                   <th>S1</th>
                   <th>S2</th>
                   <th>S3</th>
@@ -547,7 +549,7 @@ export function SessionDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {laps.map(lap => {
+                {laps.map((lap, index) => {
                   const isBestLap = bestLapNumber != null && lap.lapNumber === bestLapNumber
                   const isBestS1 =
                     bestSectors.s1 != null && lap.sector1Ms === bestSectors.s1 && !lap.isInvalid
@@ -555,6 +557,18 @@ export function SessionDetailPage() {
                     bestSectors.s2 != null && lap.sector2Ms === bestSectors.s2 && !lap.isInvalid
                   const isBestS3 =
                     bestSectors.s3 != null && lap.sector3Ms === bestSectors.s3 && !lap.isInvalid
+                  const bestLapTimeMs = effectiveSummary?.bestLapTimeMs ?? null
+                  const deltaMs =
+                    lap.lapTimeMs != null && bestLapTimeMs != null && !lap.isInvalid
+                      ? lap.lapTimeMs - bestLapTimeMs
+                      : null
+                  const prevLap = index > 0 ? laps[index - 1] : null
+                  const position = lap.positionAtLapStart ?? null
+                  const prevPosition = prevLap?.positionAtLapStart ?? null
+                  const positionChange =
+                    position != null && prevPosition != null
+                      ? position - prevPosition
+                      : null
 
                   return (
                     <tr
@@ -593,6 +607,35 @@ export function SessionDetailPage() {
                           >
                             BEST
                           </span>
+                        )}
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>
+                        {deltaMs != null ? (
+                          <span style={{ color: deltaMs <= 0 ? 'var(--success)' : 'var(--text-secondary)' }}>
+                            {deltaMs >= 0 ? '+' : ''}{(deltaMs / 1000).toFixed(3)}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>
+                        {position != null ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {positionChange !== null && positionChange !== 0 && (
+                              <span
+                                style={{
+                                  color: positionChange < 0 ? 'var(--success)' : 'var(--error)',
+                                  fontSize: 'var(--text-sm)',
+                                }}
+                                title={positionChange < 0 ? 'Gained position' : 'Lost position'}
+                              >
+                                {positionChange < 0 ? '↑' : '↓'}
+                              </span>
+                            )}
+                            {position}
+                          </span>
+                        ) : (
+                          '—'
                         )}
                       </td>
                       <td>

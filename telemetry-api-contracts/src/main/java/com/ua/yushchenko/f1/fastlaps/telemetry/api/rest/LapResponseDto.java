@@ -21,4 +21,6 @@ public class LapResponseDto {
     private Integer sector2Ms;
     private Integer sector3Ms;
     private boolean isInvalid;
+    /** Race position at the start of this lap (from LapData carPosition). Optional. */
+    private Integer positionAtLapStart;
 }
