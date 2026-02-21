@@ -35,17 +35,20 @@
 **Кроки:**
 
 1. **База даних**
-   - Додати колонку `session_display_name` у таблицю `telemetry.sessions`. Тип: VARCHAR(64), NOT NULL. **Заповнювати при INSERT** нової сесії значенням `public_id::text` (UUID) у місці, де створюється Session (наприклад, SessionPersistenceService).
-   - Міграція (Flyway/Liquibase): один скрипт додавання колонки та оновлення існуючих рядків (SET session_display_name = public_id::text WHERE session_display_name IS NULL), потім NOT NULL.
+   - Додати колонку `session_display_name` у таблицю `telemetry.sessions`. Тип: VARCHAR(64), NOT NULL.
+   - **Міграції:** у проєкті використовується `infra/init-db/` (не Flyway/Liquibase). Додати новий скрипт, наприклад `14-session-display-name.sql`: `ALTER TABLE telemetry.sessions ADD COLUMN session_display_name VARCHAR(64);` → оновити існуючі рядки `UPDATE telemetry.sessions SET session_display_name = public_id::text WHERE session_display_name IS NULL;` → `ALTER TABLE telemetry.sessions ALTER COLUMN session_display_name SET NOT NULL;`
 
 2. **Entity і DTO**
-   - У `Session` entity додати поле `sessionDisplayName` (String, не null). При збереженні нової сесії встановлювати за замовчуванням = `publicId.toString()`.
+   - У `Session` entity додати поле `sessionDisplayName` (String, не null). **За замовчуванням при INSERT:** у `@PrePersist` встановлювати `if (sessionDisplayName == null) sessionDisplayName = publicId.toString();` (publicId вже заданий у тому ж @PrePersist). Так обидва місця створення сесії (`SessionLifecycleService.onSessionStarted` та `ensureSessionActive`) отримають значення без дублювання логіки в білдері.
+   - У `SessionDto` (telemetry-api-contracts) додати поле `sessionDisplayName` (String).
 
-3. **PATCH або PUT для оновлення назви**
-   - Додати endpoint оновлення display name (наприклад PATCH /api/sessions/{id} з body `{ "sessionDisplayName": "..." }`). Валідація: **максимум 64 символи**, **порожнє значення не допустиме**; **унікальність не потрібна**. Повертати оновлений SessionDto.
+3. **PATCH для оновлення назви**
+   - **Endpoint:** PATCH /api/sessions/{id}, body `{ "sessionDisplayName": "..." }`. Повертати оновлений SessionDto; при відсутності сесії — 404 (існуючий `SessionNotFoundException` та exception handler).
+   - **Request DTO:** окремий DTO (наприклад `UpdateSessionDisplayNameRequest`) з полем `sessionDisplayName`, Bean Validation: `@NotBlank`, `@Size(max = 64)`.
+   - **Сервіс:** додати метод оновлення display name. За архітектурою (orchestration у services): створити `SessionUpdateService.updateDisplayName(String id, String sessionDisplayName)` або аналогічний метод у існуючому сервісі; контролер лишається тонким — валідує вхід, викликає сервіс, повертає DTO. Репозиторій оновлення — `SessionRepository.save` після `findById` та `setSessionDisplayName`.
 
 4. **Документація**
-   - Оновити REST контракт (rest_web_socket_api_contracts): опис SessionDto з новим полем; опис PATCH/PUT для зміни назви.
+   - Оновити REST контракт (`.github/project/rest_web_socket_api_contracts_f_1_telemetry.md`): опис SessionDto з полем `sessionDisplayName` (max 64, not empty); опис PATCH /api/sessions/{id} для зміни назви.
 
 **Залежності:** немає. Можна робити першим.
 
@@ -58,15 +61,16 @@
 **Кроки:**
 
 1. **Типи і API**
-   - У `Session` (api/types.ts) додати `sessionDisplayName?: string | null`. У `getSessions()` і `getSession()` відповіді вже міститимуть поле після етапу 1.
-   - Додати виклик API для оновлення назви (наприклад, `updateSessionDisplayName(sessionId: string, sessionDisplayName: string)` → PATCH /api/sessions/{id} з body).
+   - У `Session` (ui/src/api/types.ts) додати `sessionDisplayName?: string | null`. У `getSessions()` і `getSession()` відповіді вже міститимуть поле після етапу 1.
+   - Додати в `ui/src/api/client.ts` виклик `updateSessionDisplayName(sessionId: string, sessionDisplayName: string)` → PATCH /api/sessions/{id} з body `{ sessionDisplayName }`. Обробляти 404 як і інші endpoints.
 
 2. **Таблиця сесій**
-   - У колонці "Session" показувати `session.sessionDisplayName` (завжди заповнене з бекенду). При наведенні або в тултипі можна показувати повний sessionId для копіювання.
-   - **Редагування: окрема кнопка в таблиці** (наприклад, іконка олівця або "Edit" у рядку) відкриває **модальне вікно** з полем sessionDisplayName; після збереження викликати PATCH і оновити стан списку. Валідація на фронті: максимум 64 символи, порожнє не допустиме.
+   - У колонці "Session" показувати `session.sessionDisplayName ?? session.id` (fallback на id якщо старий бекенд). При наведенні або в тултипі показувати повний `session.id` для копіювання.
+   - **Редагування:** окрема кнопка в таблиці (іконка олівця або "Edit") відкриває **модальне вікно** з полем sessionDisplayName; після збереження викликати PATCH і оновити стан списку (refetch або оновити відповідний елемент у state). Валідація на фронті: максимум 64 символи, порожнє не допустиме (наприклад, перед submit).
 
 3. **Інші екрани**
-   - У заголовках деталей сесії, breadcrumbs тощо використовувати sessionDisplayName де показується "назва" сесії; для посилань і API завжди використовувати `session.id`.
+   - **SessionDetailPage (ui/src/pages/SessionDetailPage.tsx):** заголовок h1 зараз "Session {shortId}…". Змінити на відображення назви: `session.sessionDisplayName ?? titleIdPart` (де titleIdPart — поточний shortId для fallback). Підзаголовок (sessionType, track, startedAt) залишити без змін. Для всіх запитів (laps, summary, trace, pace, tyre wear) продовжувати використовувати `session.id` з URL.
+   - **AppLayout (ui/src/components/AppLayout.tsx):** зараз для деталей сесії показується лише "← Back to Sessions". Опційно: у блоці навігації показувати "Sessions" + поточну назву сесії (sessionDisplayName), якщо вона доступна в контексті (наприклад, через передачу з роута або окремий міні-запит). Для MVP достатньо лише оновлення h1 на SessionDetailPage; breadcrumbs можна залишити як майбутнє покращення.
 
 4. **Чеклист готовності**
    - У таблиці відображається display name; користувач може змінити його; після зміни дані зберігаються і відображаються коректно; всі запити (laps, summary, WebSocket) продовжують використовувати sessionId.
@@ -77,25 +81,28 @@
 
 ### Етап 3: Місце на фініші — бекенд
 
-**Мета:** мати фінішну позицію гравця по сесії і повертати її в SessionDto. Джерело: якщо в F1 25 є пакет **Final Classification** — використовувати його і брати дані звідти; якщо немає — брати **carPosition з LapDto** (останнє значення при завершенні сесії). Зберігання: **окрема таблиця** для майбутнього мульти-кар.
+**Мета:** мати фінішну позицію гравця по сесії і повертати її в SessionDto. Джерело: **спочатку** використовувати **carPosition з LapDto** (Kafka LapData) — останнє значення під час сесії; опційно в майбутньому — пакет **Final Classification** F1 25, якщо він існує в специфікації. Зберігання: **окрема таблиця** для майбутнього мульти-кар.
 
 **Кроки:**
 
-1. **Джерело даних**
-   - Перевірити наявність пакета **Final Classification** у F1 25 телеметрії. Якщо є — додати парсер/обробник і брати фінішну позицію гравця звідти при завершенні сесії.
-   - Якщо Final Classification немає — використовувати **carPosition з LapDto** (Kafka LapData): при переході сесії в FINISHED зберегти останнє відоме carPosition гравця (playerCarIndex) як фінішну позицію.
+1. **Джерело даних (carPosition з LapData)**
+   - **LapDto** (telemetry-api-contracts) вже містить `carPosition` (F1 25 LapData m_carPosition). Lap entity **не** зберігає carPosition; значення потрібно накопичувати в runtime і при завершенні сесії записати в БД.
+   - У **SessionRuntimeState** додати поле для останньої позиції гравця: наприклад `lastCarPositionByCarIndex` (Map carIndex → position) або для MVP одне поле `lastCarPosition` (Integer), яке оновлюється для поточного playerCarIndex.
+   - У **LapDataProcessor** після `lapAggregator.processLapData(...)` оновлювати в `SessionRuntimeState` останнє значення carPosition для відповідного carIndex (з `lapDto.getCarPosition()`). Так під час сесії завжди є актуальне "останнє місце" гравця.
+   - **Final Classification:** у поточній кодовій базі пакет Final Classification не використовується. Реалізувати **тільки шлях через carPosition з LapData**. Якщо пізніше в специфікації F1 25 буде знайдено пакет Final Classification, можна додати окремий consumer/парсер і при завершенні сесії перезаписати фінішну позицію з нього (пріоритет вище за carPosition).
 
 2. **Зберігання — окрема таблиця**
-   - Створити таблицю (наприклад, `telemetry.session_finishing_positions` або `session_results`): `session_uid` (PK/FK), `car_index` (для майбутнього мульти-кар), `finishing_position` (Integer). Для MVP один рядок на сесію (гравець = один car_index). Заповнювати при переході сесії в FINISHED (з Final Classification або з LapDataProcessor).
-   - Міграція: створення таблиці.
+   - Створити таблицю (наприклад, `telemetry.session_finishing_positions`): `session_uid` (PK/FK), `car_index` (для мульти-кар), `finishing_position` (Integer NOT NULL). Міграція: новий скрипт у `infra/init-db/`, наприклад `15-session-finishing-positions.sql`.
+   - Entity + Repository (наприклад `SessionFinishingPosition`, `SessionFinishingPositionRepository`). При переході сесії в FINISHED у **SessionLifecycleService.onSessionEnded** після `lapAggregator.finalizeAllLaps(sessionUID)` і оновлення session (ended_at, end_reason): отримати з `SessionRuntimeState` останнє carPosition для playerCarIndex (або з session entity); якщо не null — створити запис у `session_finishing_positions` і зберегти. Якщо lastCarPosition відсутній (наприклад, не було LapData) — не записувати рядок; API тоді поверне `finishingPosition: null`.
 
-3. **API**
-   - У `SessionDto` додати поле `finishingPosition` (Integer, optional). При зборі DTO (SessionMapper або SessionQueryService) джойнити/запитувати фінішну позицію для гравця з нової таблиці. Список сесій і GET by id повертатимуть це поле.
+3. **API і збір DTO**
+   - У `SessionDto` додати поле `finishingPosition` (Integer, optional/null).
+   - **SessionMapper** лишається без залежностей від репозиторіїв: не додавати туди запит finishing position. У **SessionQueryService** при зборі DTO (listSessions і getSession): після `sessionMapper.toDto(session, runtimeState)` отримати з репозиторія finishing position по `session_uid` та player car_index (або по session_uid для одного гравця в MVP); встановити `dto.setFinishingPosition(...)`. Для getActiveSession аналогічно, якщо потрібно (зазвичай активна сесія ще не має finishing position).
 
 4. **Документація**
-   - REST контракт: опис поля `finishingPosition` у SessionDto; коли воно null (сесія ще активна або дані не надійшли).
+   - REST контракт: опис поля `finishingPosition` у SessionDto; коли воно null (сесія ще активна, не FINISHED, або дані не надійшли). Джерело: останнє carPosition з LapData при завершенні сесії; окрема таблиця для мульти-кар.
 
-**Залежності:** наявність carPosition у LapDto або Final Classification у F1 25; логіка завершення сесії. Можна паралельно з етапами 1–2.
+**Залежності:** логіка завершення сесії (SessionLifecycleService), LapDataProcessor. Можна паралельно з етапами 1–2.
 
 ---
 
@@ -106,7 +113,7 @@
 **Кроки:**
 
 1. **Типи і дані**
-   - У `Session` (api/types.ts) додати `finishingPosition?: number | null`. Після етапу 3 API вже повертає це поле.
+   - У `Session` (ui/src/api/types.ts) додати `finishingPosition?: number | null`. Після етапу 3 API вже повертає це поле.
 
 2. **Таблиця**
    - Додати колонку (наприклад, "Place" або "Finish") у заголовок таблиці; у тілі виводити `session.finishingPosition ?? '—'` для сесій без даних або ACTIVE.
@@ -118,20 +125,27 @@
 
 ---
 
-### Етап 5: Оновлення документації
+### Етап 5: Оновлення документації та тести
 
-**Мета:** після впровадження sessionDisplayName та місця на фініші оновити існуючу документацію проєкту.
+**Мета:** після впровадження sessionDisplayName та місця на фініші оновити документацію та переконатися в покритті тестами.
 
 **Кроки:**
 
 1. **REST контракт**
-   - [rest_web_socket_api_contracts_f_1_telemetry.md](../../project/rest_web_socket_api_contracts_f_1_telemetry.md): SessionDto — поля `sessionDisplayName` (max 64, not empty), `finishingPosition`; опис PATCH для оновлення display name; джерело finishingPosition (Final Classification або LapData.carPosition); окрема таблиця для результатів (мульти-кар).
+   - `.github/project/rest_web_socket_api_contracts_f_1_telemetry.md`: SessionDto — поля `sessionDisplayName` (max 64, not empty), `finishingPosition` (Integer, optional); опис PATCH /api/sessions/{id} для оновлення display name; джерело finishingPosition (останнє carPosition з LapData при завершенні сесії; окрема таблиця session_finishing_positions для мульти-кар).
 
 2. **Архітектура / UI**
-   - [react_spa_ui_architecture.md](../../project/react_spa_ui_architecture.md) або [documentation_index.md](../../project/documentation_index.md): коротко відобразити, що список сесій показує display name (з можливістю редагування) і фінішну позицію; API ідентифікатор лишається sessionId.
+   - `.github/project/react_spa_ui_architecture.md` або `documentation_index.md`: коротко відобразити, що список сесій показує display name (з можливістю редагування в модальному вікні) і колонку фінішної позиції; заголовок деталей сесії — sessionDisplayName; API ідентифікатор лишається sessionId.
 
-3. **Чеклист готовності**
-   - Документація відповідає поточній поведінці API та UI.
+3. **Unit-тести (політика покриття 85%)**
+   - **SessionMapper:** оновити `SessionMapperTest` — toDto включає `sessionDisplayName` (з entity); для `finishingPosition` маппер його не встановлює (це робить SessionQueryService), тому достатньо перевіряти інші поля. Якщо маппер отримає overload з finishingPosition — додати тест.
+   - **PATCH display name:** тести для сервісу оновлення (наприклад `SessionUpdateServiceTest`) — успішне оновлення, 404 для неіснуючого id, валідація (порожнє, > 64). Контролер: `SessionControllerTest` — виклик PATCH повертає 200 та оновлений DTO.
+   - **SessionQueryService:** при поверненні списку/сесії DTO містить finishingPosition, коли воно є в БД; при відсутності — null. Покриття через існуючий або оновлений `SessionQueryServiceTest`.
+   - **Finishing position persistence:** тест сценарію "при onSessionEnded зберігається lastCarPosition у session_finishing_positions" (інтеграційний або unit з моками SessionLifecycleService + state + repository).
+   - Команда перевірки: `mvn -pl telemetry-processing-api-service verify`.
+
+4. **Чеклист готовності**
+   - Документація відповідає поточній поведінці API та UI; тести проходять; coverage не падає нижче 85%.
 
 **Залежності:** етапи 1–4.
 
@@ -144,7 +158,7 @@
 | 1 | sessionDisplayName — значення за замовчуванням | **Запам'ятовувати при INSERT:** заповнювати колонку при вставці нової сесії (наприклад, значенням public_id::text / UUID у коді персистенції). |
 | 2 | Редагування назви — унікальність і обмеження | **sessionDisplayName не повинно бути унікальним.** Максимальна довжина **64 символи**. **Порожнє значення не допустиме.** |
 | 3 | Редагування на фронті — UX | **Окрема кнопка в таблиці** та **модальне вікно** для редагування назви. |
-| 4 | Фінішна позиція — джерело даних | Якщо в F1 25 є **Final Classification** — використовувати його і брати дані звідти. Якщо немає — брати **carPosition з LapDto** (якщо воно є). |
+| 4 | Фінішна позиція — джерело даних | **Спочатку** брати **carPosition з LapDto** (останнє значення під час сесії, накопичувати в SessionRuntimeState). **Final Classification** — опційно в майбутньому, якщо пакет є в специфікації F1 25. |
 | 5 | Фінішна позиція — де зберігати | **Окрема таблиця** (наприклад, session_finishing_positions або session_results) для майбутнього мульти-кар; структура з session_uid + car_index + finishing_position. |
 
 ---
@@ -153,6 +167,25 @@
 
 - [x] Усі питання мають заповнені рішення.
 - [x] Порядок етапів: **1 → 2 → 3 → 4 → 5**.
-- [ ] Перевірити наявність Final Classification у F1 25 та carPosition у LapDto; визначити, яке джерело використовувати першим.
+- [x] Джерело фінішної позиції: **carPosition з LapDto** (вже є в LapDto та LapDataPacketParser); Final Classification — опційно в майбутньому.
+- [ ] Перед етапом 1: переконатися, що наступний номер скрипту в `infra/init-db/` відповідає (наприклад 14, 15).
 
 Після підтвердження теми можна переходити до наступної (наприклад, Сторінка Session Summary — блоки Summary, Lap pace, Tyre wear тощо).
+
+---
+
+## 6. Розширення плану (усунені прогалини)
+
+При аналізі поточної реалізації та плану було додано таке, щоб план був однозначним і без прогалин:
+
+| Прогалина | Доповнення |
+|-----------|------------|
+| Міграції | У проєкті немає Flyway/Liquibase; використовується `infra/init-db/`. Вказано конкретні номери скриптів (14, 15) та кроки ALTER/UPDATE. |
+| sessionDisplayName за замовчуванням | Встановлення в entity `@PrePersist` (якщо null → publicId.toString()), щоб не дублювати логіку в двох місцях створення сесії (onSessionStarted, ensureSessionActive). |
+| PATCH — хто робить оновлення | Request DTO з валідацією; окремий сервіс (наприклад SessionUpdateService) або метод у сервісі; контролер тонкий; 404 через існуючий exception handler. |
+| Фінішна позиція — звідки брати | Lap entity не зберігає carPosition. Накопичувати в SessionRuntimeState при обробці LapData в LapDataProcessor; при onSessionEnded зберегти в session_finishing_positions. |
+| Final Classification | У кодовій базі відсутній. Реалізувати тільки carPosition з LapData; Final Classification — майбутнє розширення за наявності в специфікації F1 25. |
+| Збір finishingPosition у DTO | SessionMapper без репозиторіїв; SessionQueryService після toDto запитує finishing position і встановлює на DTO. |
+| SessionDetailPage / breadcrumbs | Конкретизовано: h1 = sessionDisplayName ?? shortId; AppLayout — опційно breadcrumbs, для MVP достатньо оновлення h1. |
+| Тести | Додано етап 5: SessionMapperTest, тести PATCH (сервіс + контролер), SessionQueryService з finishingPosition, перевірка coverage (mvn verify). |
+| Шляхи до файлів | Уточнено шляхи: ui/src/api/types.ts, client.ts, SessionDetailPage.tsx, AppLayout.tsx; .github/project/rest_web_socket_api_contracts_f_1_telemetry.md. |

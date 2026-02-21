@@ -20,6 +20,8 @@ public class SessionDto {
 
     /** Public session identifier (UUID). Use in URLs and WebSocket subscribe. */
     private String id;
+    /** User-facing display name (max 64 chars). Editable via PATCH /api/sessions/{id}. */
+    private String sessionDisplayName;
     private String sessionType;
     private Integer trackId;
     private Integer trackLengthM;

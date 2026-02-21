@@ -17,7 +17,7 @@ API використовується UI (Web) та потенційно стор
 
 - Протокол: HTTP + WebSocket
 - Формат: JSON
-- API **read-only**
+- API переважно read-only; єдиний запис: **PATCH /api/sessions/{id}** для оновлення sessionDisplayName.
 - Timezone: UTC (ISO-8601)
 - MVP: single user / single session stream
 
@@ -37,16 +37,23 @@ Query params (optional):
 - `limit` (int, default 50)
 - `offset` (int, default 0)
 
-Response:
+Response: array of SessionDto. Each item includes:
+- `id` (string) — public session identifier (UUID). Use in URLs and WebSocket subscribe.
+- `sessionDisplayName` (string) — user-facing display name; max 64 characters; not empty. Editable via PATCH. Defaults to UUID at creation.
+- `sessionType`, `trackId`, `startedAt`, `endedAt`, `endReason`, `state` (ACTIVE | FINISHED), `playerCarIndex`, etc.
+
+Example:
 ```json
 [
   {
-    "sessionUID": 1234567890123,
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "sessionDisplayName": "550e8400-e29b-41d4-a716-446655440000",
     "sessionType": "RACE",
     "trackId": 12,
     "startedAt": "2026-01-28T20:10:00Z",
     "endedAt": "2026-01-28T20:55:12Z",
-    "endReason": "EVENT_SEND"
+    "endReason": "EVENT_SEND",
+    "state": "FINISHED"
   }
 ]
 ```
@@ -59,19 +66,29 @@ Response:
 GET /api/sessions/{sessionUid}
 ```
 
-Response:
+Response: SessionDto with `id`, `sessionDisplayName`, `sessionType`, `trackId`, `trackLengthM`, `totalLaps`, `aiDifficulty`, `startedAt`, `endedAt`, `endReason`, `state`, `playerCarIndex`.
+
+---
+
+#### 3.1.3 Оновити відображувану назву сесії
+
+```
+PATCH /api/sessions/{id}
+```
+
+Path: `id` — public session id (UUID) or session_uid string.
+
+Request body:
 ```json
 {
-  "sessionUID": 1234567890123,
-  "sessionType": "RACE",
-  "trackId": 12,
-  "trackLengthM": 5300,
-  "totalLaps": 57,
-  "aiDifficulty": 95,
-  "startedAt": "2026-01-28T20:10:00Z",
-  "endedAt": "2026-01-28T20:55:12Z"
+  "sessionDisplayName": "Monaco Race 2026"
 }
 ```
+
+- `sessionDisplayName` (string, required): not blank, max 64 characters. Uniqueness not required.
+
+Response: 200 OK, body = full SessionDto (updated session).  
+Errors: 404 if session not found; 400 if validation fails (blank or length > 64).
 
 ---
 

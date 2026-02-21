@@ -34,6 +34,10 @@ public class Session {
     @Column(name = "public_id", nullable = false, unique = true, updatable = false)
     private UUID publicId;
 
+    /** User-facing display name (max 64 chars). Defaults to public_id at insert. */
+    @Column(name = "session_display_name", nullable = false, length = 64)
+    private String sessionDisplayName;
+
     @Column(name = "packet_format", nullable = false)
     private Short packetFormat;
 
@@ -81,6 +85,9 @@ public class Session {
     protected void onCreate() {
         if (publicId == null) {
             publicId = UUID.randomUUID();
+        }
+        if (sessionDisplayName == null) {
+            sessionDisplayName = publicId.toString();
         }
         createdAt = Instant.now();
         updatedAt = Instant.now();
