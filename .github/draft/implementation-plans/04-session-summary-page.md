@@ -45,6 +45,7 @@
 
 2. **Бекенд**
    - Розширити SessionSummaryDto (або окремий endpoint) полями типу: leaderPosition (1), leaderIsPlayer (boolean), leaderDriverName (optional), leaderTeamName (optional). Заповнення з агрегату або з session_finishing_positions + довідника гравців (якщо є).
+   - **Доповнення:** У `SessionFinishingPositionRepository` зараз є лише `findBySessionUidAndCarIndex`. Потрібен метод для отримання лідера: наприклад `List<SessionFinishingPosition> findBySessionUidOrderByFinishingPositionAsc(Long sessionUid)` — перший елемент (position = 1) дасть `car_index` лідера. Порівняти з `playerCarIndex` з сесії → `leaderIsPlayer`. Ім'я гонщика/команда: перевірити, чи F1 25 передає participants/Final Classification у телеметрії; якщо ні — fallback: «P1» або «Car #N» (car index лідера).
 
 3. **Фронт**
    - У блоці Summary додати рядок «Leader: …»; якщо leaderIsPlayer — виділити (наприклад, badge «You»); інакше вивести leaderDriverName + leaderTeamName або «Car #N».
@@ -65,11 +66,11 @@
 **Кроки:**
 
 1. **Вихід за межі графіку**
-   - У PaceChart (Recharts) переконатися, що YAxis має адекватний domain (вже є yDomain з padding). Якщо підписи осі обрізаються — збільшити margin контейнера або використати tickFormatter з коротшим форматом; опційно тултип з повним часом (вже є PaceTooltip). Можливе рішення: domain з мінімумом 0 або з діапазоном [min - padding, max + padding] з достатнім padding; перевірити overflow підписів (CSS overflow visible або зміщення).
+   - У PaceChart (Recharts) переконатися, що YAxis має адекватний domain (вже є yDomain з padding). Якщо підписи осі обрізаються — **збільшити `margin` у `LineChart`** (наприклад `margin={{ left: 50, right: 20 }}`), щоб підписи осі Y не обрізались; опційно tickFormatter з коротшим форматом (наприклад `m:ss`); тултип з повним часом вже є (PaceTooltip). Domain: [min - padding, max + padding]; перевірити, що екстремальні часи кола не виходять за межі.
 
 2. **Медіанний час кола**
-   - Обчислення на фронті з pacePoints: **медіана** по lapTimeMs за всі валідні кола. Додати на графік другу лінію (по точках з полем medianTimeMs для кожного lapNumber). Recharts: другий Line з dataKey для медіани.
-   - Альтернатива: бекенд повертає медіанний час у pace API; фронт тільки малює.
+   - Обчислення на фронті: медіана по `lapTimeMs` **лише валідних** кіл. Валідні кола: з масиву `laps` (SessionDetailPage вже має laps) — фільтр `laps.filter(l => !l.isInvalid && l.lapTimeMs != null)`. Медіана — одне число на всю сесію; на графіку друга лінія — горизонтальна (одне й те саме значення для кожного lapNumber). Recharts: другий `<Line dataKey="medianTimeSeconds" name="Median" />`, де для кожного елемента `data` поле `medianTimeSeconds = medianMs / 1000`.
+   - Альтернатива: бекенд повертає медіанний час у pace API (наприклад у кожному PacePointDto поле `medianTimeMs` для консистентності); фронт тільки малює.
 
 3. **Чеклист**
    - Час кола повністю в межах графіку; **медіанна** лінія відображається; тултипи з повним значенням при потребі.
@@ -87,7 +88,7 @@
 **Кроки:**
 
 1. **Відсотки зносу — конкретний крок (обов’язково виконати перед фіксом відображення)**
-   - **Уточнити з бекендом:** в яких одиницях приходять wearFL/FR/RL/RR (0–1 чи 0–100)? Чи є подвійне підсумовування по колах (накопичувальний знос vs знос на кінець кожного кола)? Після узгодження — виправити агрегат або фронт (TyreWearPoint: кожне колесо окремо; у chart зараз * 100 для відсотків — узгодити з фактичним форматом бекенду).
+   - **Уточнити:** F1 25 Telemetry Output Structures: `m_tyresWear[4]` — "Tyre wear (percentage)". У коді: CarDamageDto → TyreWearSnapshot → TyreWearPerLap (Float); REST contract (§ 3.6) — "float у діапазоні 0..1 (відповідає 0–100%)"; UI (TyreWearChart) робить `p.wearFL * 100`. Тобто очікується, що бекенд віддає 0–1. Потрібно перевірити: парсер зчитує `buffer.getFloat()` — у грі це 0–1 чи вже 0–100? Якщо гра віддає 0–100, при збереженні в TyreWearPerLap потрібно ділити на 100 або не множити на 100 на фронті. Після узгодження — виправити TyreWearRecorder/TyreWearPerLapBuilder або фронт (TyreWearChart). Накопичувальний знос vs знос на кінець кола: зараз зберігається **останній** snapshot на момент finalizeLap — це знос на кінець кола.
    - Рішення: цей пункт зафіксовано як виконуваний крок етапу (питання 3).
 
 2. **Тип компаунду (compound)**
@@ -114,7 +115,12 @@
    - Рішення: див. розділ 5 (питання 5).
 
 2. **Місце на колі**
-   - Показувати **місце на старті кола.** LapResponseDto зараз не містить carPosition. Додати поле (наприклад, positionAtLapStart) в Lap entity / LapResponseDto; заповнювати з LapData — carPosition на початку кола (наприклад, при першому LapData для цього lapNumber). Стрілки зміни: порівнювати positionAtLapStart кола N з positionAtLapStart кола N−1.
+   - Показувати **місце на старті кола.** LapResponseDto та entity Lap зараз не містять position. Потрібно:
+     - **LapRuntimeState:** додати поле `positionAtLapStart` (Integer). При зміні номера кола в LapAggregator (вхідний пакет — перший пакет нового кола) зберігати в state: `state.setPositionAtLapStart(lapDto.getCarPosition())` — це позиція на **старті** поточного (нового) кола; при finalizeLap для **попереднього** кола використовувати значення, яке було збережене на початку того кола (тобто при `reset(newLapNumber)` зберігати поточний positionAtLapStart у тимчасову змінну і передавати в LapBuilder для кола, що фіналізується; або зберігати в state position на старті поточного кола і при finalize брати з state перед reset).
+     - **Lap entity:** додати колонку `position_at_lap_start` (INTEGER NULL). Міграція: новий скрипт у `infra/init-db/` (наприклад `16-laps-position-at-lap-start.sql`).
+     - **LapBuilder.build(...):** додати параметр `Integer positionAtLapStart`; LapMapper.toLapResponseDto — мапити в LapResponseDto поле `positionAtLapStart`.
+     - **LapResponseDto:** додати поле `Integer positionAtLapStart` (optional).
+   - Стрілки зміни: порівнювати positionAtLapStart кола N з positionAtLapStart кола N−1.
    - Рішення: див. розділ 5 (питання 6).
 
 3. **Стрілки зміни позиції**
@@ -124,7 +130,7 @@
    - Якщо додаємо carPosition (і опційно positionChange) у laps API — оновити LapResponseDto, LapMapper, агрегацію/персистенцію з LapData.
 
 5. **Фронт**
-   - Колонки: Delta, Position (місце + стрілка). Дельта обчислюється на фронті з laps + bestLapTimeMs; Position з lap.position (після додавання в API).
+   - Колонки: Delta, Position (місце + стрілка). Дельта обчислюється на фронті з laps + bestLapTimeMs; Position з lap.positionAtLapStart (після додавання поля в LapResponseDto).
 
 6. **Чеклист**
    - Колонки відображаються; дельта та місце коректні; стрілки відображають зміну.
@@ -146,7 +152,7 @@
    - Рішення: див. розділ 5 (питання 7).
 
 2. **Бекенд**
-   - Збірка ERS-точок по колу з car_status_raw (кореляція по lap_distance з telemetry або по timestamp); endpoint GET .../laps/{lapNum}/ers. Контракт: ErsPointDto (lapDistance, energyPercent, deployActive опційно).
+   - У `car_status_raw` немає `lap_distance` — є лише `session_uid`, `car_index`, `ts`, `ers_store_energy`. Тому збірка ERS по колу: (1) отримати Lap за (sessionUid, carIndex, lapNum) — поля `started_at`, `ended_at` (або діапазон по `created_at`/`updated_at` як fallback); (2) вибрати з `car_telemetry_raw` записи за цей lap (lap_number, session_uid, car_index) — отримати пари (ts, lap_distance_m); (3) вибрати з `car_status_raw` записи в діапазоні ts по сесії/машині; (4) **об'єднати по timestamp**: для кожного семплу telemetry (lap_distance_m, ts) знайти найближчий за часом запис car_status_raw і взяти ersStoreEnergy; (5) energy % = ersStoreEnergy / ERS_MAX_ENERGY_J * 100 (ERS_MAX як у CarStatusProcessor). Endpoint GET .../laps/{lapNum}/ers. Контракт: ErsPointDto (lapDistanceM або lapDistance, energyPercent, deployActive опційно).
 
 3. **Фронт**
    - Блок «ERS»: короткий опис (що таке ERS); графік (ось X: дистанція кола, Y: залишок енергії %). Вибір кола — аналогічно Pedal trace.
@@ -237,7 +243,39 @@
 ## 6. Чеклист перед початком коду
 
 - [x] Усі питання мають заповнені рішення.
-- [ ] Визначено порядок етапів (рекомендація: 2 → 3 → 4 → 1 → 5 → 6 або за пріоритетом).
+- [ ] Визначено порядок етапів (див. рекомендований порядок нижче).
 - [ ] Перевірено наявність полів (positionAtLapStart по колах, compound у CarStatus/tyre-wear, ERS по lap_distance) на бекенді та в телеметрії.
 
+**Рекомендований порядок етапів:** 2 → 3 → 4 → 1 → 5 → 6.
+
+- **Етап 2 (Lap pace)** — лише фронт (overflow + медіана з laps), без змін контрактів; швидкий результат.
+- **Етап 3 (Tyre wear)** — спочатку уточнити одиниці зносу (0–1 vs 0–100), потім фікс відображення + compound на бекенді та UI.
+- **Етап 4 (Таблиця кіл)** — дельта тільки на фронті; місце/стрілки потребують бекенду (Lap entity, LapRuntimeState, міграція, LapMapper, LapResponseDto).
+- **Етап 1 (Summary — лідер)** — потребує нового методу в SessionFinishingPositionRepository та розширення SessionSummaryDto/сервісу; логічно після таблиці (вже працює з laps/summary).
+- **Етап 5 (ERS)** — новий endpoint і злиття даних за timestamp; найбільш трудомісткий.
+- **Етап 6 (Документація)** — після всіх змін.
+
+**Тестування:** Після кожного етапу оновити або додати unit-тести (SessionSummaryMapper, LapMapper, LapQueryService, SessionSummaryQueryService, ERS-сервіс/контролер тощо) і перевірити `mvn -pl telemetry-processing-api-service verify` (покриття ≥ 85%).
+
+**Граничні випадки:**
+- Немає записів у session_finishing_positions (сесія завершилась без класифікації) → лідер не показувати або «—» / «Unknown».
+- Немає кіл → дельта та місце порожні; медіана не малюється.
+- Перше коло (немає попереднього) → стрілка зміни позиції не показується.
+
 Після вибору порядку етапів можна розпочинати реалізацію або переходити до інших тем з improvements-notes.
+
+---
+
+## 7. Виявлені гепи та доповнення (що не було в початковому плані)
+
+Нижче — короткий звіт про гепи між планом і поточною реалізацією; відповідні кроки вже інтегровані в етапи вище, тут — довідково.
+
+| Геп | Поточний стан | Що додано в план |
+|-----|----------------|------------------|
+| **Лідер — як отримати** | SessionFinishingPositionRepository має лише `findBySessionUidAndCarIndex` | Потрібен метод типу `findBySessionUidOrderByFinishingPositionAsc`; взяти перший запис (position = 1) → car_index лідера; порівняти з playerCarIndex. Джерело імені гонщика/команди — перевірити F1 25; fallback «P1» / «Car #N». |
+| **Місце на колі — де зберігати** | Lap entity без position; LapRuntimeState без positionAtLapStart; LapData містить carPosition | Явний потік: LapRuntimeState.positionAtLapStart; встановлювати при переході на нове коло (перший пакет нового кола); при finalizeLap передавати в LapBuilder; міграція — колонка `position_at_lap_start` в `laps`; LapResponseDto + LapMapper. |
+| **Pace chart — overflow і медіана** | yDomain є; margin не заданий; медіана не описана детально | Margin у LineChart для підписів осі Y; медіана — одне число з валідних кіл (laps), друга лінія — горизонтальна; валідність через laps (isInvalid). |
+| **Tyre wear — одиниці** | REST: 0–1; UI * 100; F1 25 spec: "percentage" (float) | У план додано крок перевірки: гра віддає 0–1 чи 0–100; при невідповідності — виправити запис (TyreWearRecorder/Builder) або відображення (UI). |
+| **ERS — джерело даних** | car_status_raw без lap_distance; є ts, ers_store_energy | У план додано: отримати Lap (started_at/ended_at); telemetry по колу для lap_distance_m; car_status_raw за діапазоном ts; об'єднати по timestamp для отримання (lap_distance_m, energyPercent). |
+| **Оновлення даних (refresh)** | SessionDetailPage робить background refresh кожні 5 с для ACTIVE | План вже передбачає оновлення разом із графіками; окрема live-підписка не потрібна — достатньо поточного polling refresh. |
+| **Порядок етапів і тести** | Чеклист без фіксованого порядку та без явних вимог до тестів | Додано рекомендований порядок 2→3→4→1→5→6 з обґрунтуванням; вимога оновлювати unit-тести та перевіряти verify; граничні випадки (немає positions, немає кіл, перше коло). |

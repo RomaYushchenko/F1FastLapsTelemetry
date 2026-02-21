@@ -264,6 +264,17 @@ export function SessionDetailPage() {
     }
   }, [laps, effectiveSummary])
 
+  /** Median lap time (ms) of valid laps for pace chart reference line. */
+  const medianLapTimeMs = useMemo((): number | null => {
+    const validTimes = laps
+      .filter(l => !l.isInvalid && l.lapTimeMs != null && l.lapTimeMs > 0)
+      .map(l => l.lapTimeMs as number)
+    if (validTimes.length === 0) return null
+    const sorted = [...validTimes].sort((a, b) => a - b)
+    const mid = Math.floor(sorted.length / 2)
+    return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
+  }, [laps])
+
   const titleIdPart =
     sessionUid != null && sessionUid.length > 0 ? `${sessionUid.slice(0, 12)}…` : '—'
   const pageTitle = session?.sessionDisplayName?.trim() || titleIdPart
@@ -424,7 +435,7 @@ export function SessionDetailPage() {
           {/* Pace chart */}
           <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
             <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-3)' }}>Lap pace</h2>
-            <PaceChart points={pacePoints} />
+            <PaceChart points={pacePoints} medianTimeMs={medianLapTimeMs} />
           </div>
 
           <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>

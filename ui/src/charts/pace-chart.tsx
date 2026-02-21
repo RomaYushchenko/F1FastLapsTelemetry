@@ -3,10 +3,13 @@ import type { PacePoint } from './types'
 
 interface PaceChartProps {
   points: PacePoint[]
+  /** Median lap time (ms) of valid laps; shown as horizontal reference line. */
+  medianTimeMs?: number | null
 }
 
 interface PaceChartDatum extends PacePoint {
   lapTimeSeconds: number
+  medianTimeSeconds: number | null
 }
 
 interface PaceTooltipProps {
@@ -24,16 +27,26 @@ export function PaceChart(props: PaceChartProps) {
     )
   }
 
+  const medianTimeSeconds =
+    props.medianTimeMs != null && Number.isFinite(props.medianTimeMs)
+      ? props.medianTimeMs / 1000
+      : null
+
   const data: PaceChartDatum[] = props.points.map(point => ({
     ...point,
     lapTimeSeconds: point.lapTimeMs / 1000,
+    medianTimeSeconds,
   }))
 
   const yDomain = (() => {
     const seconds = data.map(d => d.lapTimeSeconds).filter(Number.isFinite)
-    if (seconds.length === 0) return undefined
-    const min = Math.min(...seconds)
-    const max = Math.max(...seconds)
+    const withMedian =
+      medianTimeSeconds != null && Number.isFinite(medianTimeSeconds)
+        ? [...seconds, medianTimeSeconds]
+        : seconds
+    if (withMedian.length === 0) return undefined
+    const min = Math.min(...withMedian)
+    const max = Math.max(...withMedian)
     const span = max - min
     const padding = Math.max(2, span * 0.15)
     return [min - padding, max + padding]
@@ -41,7 +54,7 @@ export function PaceChart(props: PaceChartProps) {
 
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={data}>
+      <LineChart data={data} margin={{ left: 50, right: 20, top: 5, bottom: 5 }}>
         <XAxis dataKey="lapNumber" />
         <YAxis tickFormatter={formatSecondsLabel} domain={yDomain} />
         <Tooltip content={<PaceTooltip />} />
@@ -54,6 +67,17 @@ export function PaceChart(props: PaceChartProps) {
           dot={{ r: 3 }}
           activeDot={{ r: 5 }}
         />
+        {medianTimeSeconds != null && (
+          <Line
+            type="monotone"
+            dataKey="medianTimeSeconds"
+            name="Median"
+            stroke="#94a3b8"
+            strokeDasharray="4 4"
+            dot={false}
+            activeDot={false}
+          />
+        )}
       </LineChart>
     </ResponsiveContainer>
   )
@@ -108,6 +132,14 @@ function PaceTooltip(props: PaceTooltipProps) {
       {typeof datum.stintIndex === 'number' && (
         <div>
           Stint: <span>{datum.stintIndex}</span>
+        </div>
+      )}
+      {datum.medianTimeSeconds != null && Number.isFinite(datum.medianTimeSeconds) && (
+        <div style={{ marginTop: 4, color: 'var(--text-secondary)' }}>
+          Median:{' '}
+          <span style={{ fontFamily: 'var(--font-mono)' }}>
+            {formatLapTimeFromMs(datum.medianTimeSeconds * 1000)}
+          </span>
         </div>
       )}
     </div>
