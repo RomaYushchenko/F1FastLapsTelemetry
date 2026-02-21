@@ -6,6 +6,8 @@
 export interface Session {
   /** Session public id (UUID). Use in URLs and WebSocket subscribe. */
   id: string
+  /** User-facing display name (max 64 chars). Editable via PATCH. */
+  sessionDisplayName?: string | null
   sessionType?: string | null
   trackId?: number | null
   trackLengthM?: number

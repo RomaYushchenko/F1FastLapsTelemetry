@@ -46,6 +46,17 @@ export async function getSession(sessionUid: string | undefined): Promise<Sessio
   return requestJson<Session>(`/api/sessions/${sessionUid}`)
 }
 
+export async function updateSessionDisplayName(
+  sessionId: string,
+  sessionDisplayName: string,
+): Promise<Session> {
+  return requestJson<Session>(`/api/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionDisplayName }),
+  })
+}
+
 export async function getSessionLaps(
   sessionUid: string | undefined,
   carIndex = 0,
