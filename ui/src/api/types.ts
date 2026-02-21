@@ -1,3 +1,8 @@
+/**
+ * API types must match REST DTOs from telemetry-processing-api-service:
+ * SessionDto, LapResponseDto, SessionSummaryDto (see telemetry-api-contracts api/rest).
+ */
+
 export interface Session {
   /** Session public id (UUID). Use in URLs and WebSocket subscribe. */
   id: string

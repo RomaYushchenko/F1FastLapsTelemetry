@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.consumer;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarDamageEvent;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle.SessionLifecycleService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.config.TraceIdFilter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor.CarDamageProcessor;
@@ -12,14 +13,15 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
 /**
- * Kafka consumer for telemetry.carDamage topic. Thin: deserialize, ensureSession, shouldProcess, then CarDamageProcessor.
- * See: implementation_phases.md Phase 5.1.
+ * Kafka consumer for telemetry.carDamage topic. Thin: deserialize, ensureSession, shouldProcess, idempotency, then CarDamageProcessor.
+ * See: implementation_phases.md Phase 5.1; kafka_contracts_f_1_telemetry.md § 9.2.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class CarDamageConsumer {
 
+    private final IdempotencyService idempotencyService;
     private final SessionLifecycleService lifecycleService;
     private final CarDamageProcessor carDamageProcessor;
 
@@ -39,15 +41,22 @@ public class CarDamageConsumer {
             }
             return;
         }
-        String traceId = "kafka-cd-" + event.getSessionUID() + "-" + event.getCarIndex();
+        String traceId = "kafka-cd-" + event.getSessionUID() + "-" + event.getFrameIdentifier();
         MDC.put(TraceIdFilter.MDC_TRACE_ID, traceId);
         try {
             long sessionUid = event.getSessionUID();
+            int frameId = event.getFrameIdentifier();
+            short packetId = (short) event.getPacketId().ordinal();
             short carIndex = (short) event.getCarIndex();
 
             lifecycleService.ensureSessionActive(sessionUid);
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
-                log.debug("Skipping car damage packet: sessionUid={}, reason=shouldNotProcess", sessionUid);
+                log.debug("Skipping car damage packet: sessionUid={}, frame={}, reason=shouldNotProcess", sessionUid, frameId);
+                acknowledgment.acknowledge();
+                return;
+            }
+            if (!idempotencyService.markAsProcessed(sessionUid, frameId, packetId, carIndex)) {
+                log.debug("Skipping car damage packet: sessionUid={}, frame={}, reason=duplicate", sessionUid, frameId);
                 acknowledgment.acknowledge();
                 return;
             }

@@ -1,3 +1,4 @@
+/** Matches PacePointDto from GET /api/sessions/{id}/pace. */
 export interface PacePoint {
   lapNumber: number
   lapTimeMs: number
@@ -5,12 +6,14 @@ export interface PacePoint {
   tyreCompound?: string
 }
 
+/** Matches TracePointDto from GET /api/sessions/{id}/laps/{lapNum}/trace. */
 export interface PedalTracePoint {
   distance: number
   throttle: number
   brake: number
 }
 
+/** Matches TyreWearPointDto from GET /api/sessions/{id}/tyre-wear. */
 export interface TyreWearPoint {
   lapNumber: number
   wearFL: number | null
