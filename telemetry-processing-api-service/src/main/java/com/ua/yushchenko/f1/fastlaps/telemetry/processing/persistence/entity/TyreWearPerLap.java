@@ -42,4 +42,8 @@ public class TyreWearPerLap {
 
     @Column(name = "wear_rr")
     private Float wearRR;
+
+    /** F1 25 actual tyre compound at end of lap (e.g. 16=C5, 18=C3, 7=inter, 8=wet). */
+    @Column(name = "compound")
+    private Short compound;
 }

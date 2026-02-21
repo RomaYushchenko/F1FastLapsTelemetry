@@ -20,5 +20,7 @@ export interface TyreWearPoint {
   wearFR: number | null
   wearRL: number | null
   wearRR: number | null
+  /** F1 25 actual tyre compound code (e.g. 16=C5 soft, 18=C3 medium). Optional until API provides it. */
+  compound?: number | null
 }
 

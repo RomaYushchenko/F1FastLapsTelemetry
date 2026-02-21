@@ -197,6 +197,7 @@ public final class TestData {
                 .wearFR(WEAR_FR)
                 .wearRL(WEAR_RL)
                 .wearRR(WEAR_RR)
+                .compound((short) 18)
                 .build();
     }
 

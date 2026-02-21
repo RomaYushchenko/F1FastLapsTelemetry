@@ -64,6 +64,7 @@ public class LapMapper {
                 .wearFR(row.getWearFR())
                 .wearRL(row.getWearRL())
                 .wearRR(row.getWearRR())
+                .compound(row.getCompound() != null ? row.getCompound().intValue() : null)
                 .build();
     }
 }

@@ -16,8 +16,17 @@ interface TyreWearChartProps {
 
 interface TyreWearTooltipProps {
   active?: boolean
-  payload?: Array<{ name: string; value: number; color: string }>
+  payload?: Array<{ name: string; value: number; color: string; payload?: { compound?: number } }>
   label?: string | number
+}
+
+/** F1 25 compound code to Pirelli label (16=C5 soft … 21=C0 hard, 22=C6, 7=Inter, 8=Wet). */
+function compoundLabel(code: number): string {
+  if (code === 7) return 'Inter'
+  if (code === 8) return 'Wet'
+  if (code === 22) return 'C6'
+  if (code >= 16 && code <= 21) return `C${21 - code}` // C5(16) … C0(21)
+  return `#${code}`
 }
 
 const WEAR_FL_COLOR = '#3b82f6'
@@ -34,12 +43,17 @@ export function TyreWearChart(props: TyreWearChartProps) {
     )
   }
 
+  // Backend may send 0–1 (fraction) or 0–100 (percentage); normalize to 0–100 for display.
+  const toPercent = (v: number | null | undefined): number | null =>
+    v == null ? null : v > 1 ? v : v * 100
+
   const data = props.points.map(p => ({
     lapNumber: p.lapNumber,
-    wearFL: p.wearFL != null ? p.wearFL * 100 : null,
-    wearFR: p.wearFR != null ? p.wearFR * 100 : null,
-    wearRL: p.wearRL != null ? p.wearRL * 100 : null,
-    wearRR: p.wearRR != null ? p.wearRR * 100 : null,
+    wearFL: toPercent(p.wearFL),
+    wearFR: toPercent(p.wearFR),
+    wearRL: toPercent(p.wearRL),
+    wearRR: toPercent(p.wearRR),
+    compound: p.compound ?? undefined,
   }))
 
   return (
@@ -99,6 +113,9 @@ function TyreWearTooltip(props: TyreWearTooltipProps) {
   const { active, payload, label } = props
   if (!active || !payload || !payload.length) return null
 
+  const datum = payload[0]?.payload as { compound?: number } | undefined
+  const compound = datum?.compound
+
   return (
     <div
       style={{
@@ -110,6 +127,11 @@ function TyreWearTooltip(props: TyreWearTooltipProps) {
       }}
     >
       <div style={{ marginBottom: 4 }}>Lap {label}</div>
+      {compound != null && (
+        <div style={{ marginBottom: 4, color: 'var(--text-secondary)' }}>
+          Compound: {compoundLabel(compound)}
+        </div>
+      )}
       {payload.map(entry => (
         <div key={entry.name} style={{ color: entry.color }}>
           {entry.name}: {entry.value != null && Number.isFinite(entry.value) ? `${Number(entry.value).toFixed(1)}%` : '—'}

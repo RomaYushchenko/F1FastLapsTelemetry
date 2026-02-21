@@ -178,5 +178,6 @@ class LapMapperTest {
         assertThat(dto.getWearFR()).isEqualTo(WEAR_FR);
         assertThat(dto.getWearRL()).isEqualTo(WEAR_RL);
         assertThat(dto.getWearRR()).isEqualTo(WEAR_RR);
+        assertThat(dto.getCompound()).isEqualTo(18);
     }
 }

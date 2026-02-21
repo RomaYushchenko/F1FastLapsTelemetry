@@ -15,7 +15,7 @@ class TyreWearPerLapBuilderTest {
     @DisplayName("fromSnapshot повертає null коли snapshot null")
     void fromSnapshot_returnsNull_whenSnapshotNull() {
         // Act
-        TyreWearPerLap result = TyreWearPerLapBuilder.fromSnapshot(SESSION_UID, CAR_INDEX, LAP_NUMBER, null);
+        TyreWearPerLap result = TyreWearPerLapBuilder.fromSnapshot(SESSION_UID, CAR_INDEX, LAP_NUMBER, null, null);
 
         // Assert
         assertThat(result).isNull();
@@ -28,7 +28,8 @@ class TyreWearPerLapBuilderTest {
         TyreWearSnapshot snapshot = tyreWearSnapshot();
 
         // Act
-        TyreWearPerLap entity = TyreWearPerLapBuilder.fromSnapshot(SESSION_UID, CAR_INDEX, LAP_NUMBER, snapshot);
+        Short compound = (short) 18;
+        TyreWearPerLap entity = TyreWearPerLapBuilder.fromSnapshot(SESSION_UID, CAR_INDEX, LAP_NUMBER, snapshot, compound);
 
         // Assert
         assertThat(entity).isNotNull();
@@ -39,5 +40,6 @@ class TyreWearPerLapBuilderTest {
         assertThat(entity.getWearFR()).isEqualTo(WEAR_FR);
         assertThat(entity.getWearRL()).isEqualTo(WEAR_RL);
         assertThat(entity.getWearRR()).isEqualTo(WEAR_RR);
+        assertThat(entity.getCompound()).isEqualTo(compound);
     }
 }
