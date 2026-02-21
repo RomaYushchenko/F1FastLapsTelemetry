@@ -40,6 +40,10 @@ public class LapDataProcessor {
 
         lapAggregator.processLapData(sessionUid, carIndex, lap);
 
+        if (lap.getCarPosition() != null && lap.getCarPosition() > 0) {
+            state.setLastCarPosition(carIndex, lap.getCarPosition());
+        }
+
         SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
         if (snapshot == null) {
             snapshot = new SessionRuntimeState.CarSnapshot();

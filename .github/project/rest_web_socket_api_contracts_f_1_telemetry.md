@@ -40,7 +40,7 @@ Query params (optional):
 Response: array of SessionDto. Each item includes:
 - `id` (string) — public session identifier (UUID). Use in URLs and WebSocket subscribe.
 - `sessionDisplayName` (string) — user-facing display name; max 64 characters; not empty. Editable via PATCH. Defaults to UUID at creation.
-- `sessionType`, `trackId`, `startedAt`, `endedAt`, `endReason`, `state` (ACTIVE | FINISHED), `playerCarIndex`, etc.
+- `sessionType`, `trackId`, `startedAt`, `endedAt`, `endReason`, `state` (ACTIVE | FINISHED), `playerCarIndex`, `finishingPosition` (integer, optional) — race position at session end; null if session active or no LapData received. Source: last carPosition from LapData at session end; stored in `session_finishing_positions` for multi-car support.
 
 Example:
 ```json
@@ -66,7 +66,7 @@ Example:
 GET /api/sessions/{sessionUid}
 ```
 
-Response: SessionDto with `id`, `sessionDisplayName`, `sessionType`, `trackId`, `trackLengthM`, `totalLaps`, `aiDifficulty`, `startedAt`, `endedAt`, `endReason`, `state`, `playerCarIndex`.
+Response: SessionDto with `id`, `sessionDisplayName`, `sessionType`, `trackId`, `trackLengthM`, `totalLaps`, `aiDifficulty`, `startedAt`, `endedAt`, `endReason`, `state`, `playerCarIndex`, `finishingPosition` (integer or null).
 
 ---
 

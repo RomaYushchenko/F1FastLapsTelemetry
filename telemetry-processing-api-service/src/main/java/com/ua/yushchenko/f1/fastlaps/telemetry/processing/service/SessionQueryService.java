@@ -5,6 +5,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFo
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class SessionQueryService {
 
     private final SessionRepository sessionRepository;
     private final LapRepository lapRepository;
+    private final SessionFinishingPositionRepository finishingPositionRepository;
     private final SessionStateManager stateManager;
     private final SessionMapper sessionMapper;
     private final SessionResolveService sessionResolveService;
@@ -58,6 +60,25 @@ public class SessionQueryService {
     }
 
     /**
+     * Set finishing position on DTO from session_finishing_positions (player car). Plan: 03-session-page.md Etap 3.
+     */
+    private void applyFinishingPosition(Session session, SessionDto dto) {
+        if (dto == null || session.getSessionUid() == null) {
+            return;
+        }
+        Short carIndex = session.getPlayerCarIndex();
+        if (carIndex == null) {
+            Integer inferred = inferPlayerCarIndexFromData(session.getSessionUid());
+            if (inferred == null) {
+                return;
+            }
+            carIndex = inferred.shortValue();
+        }
+        finishingPositionRepository.findBySessionUidAndCarIndex(session.getSessionUid(), carIndex)
+                .ifPresent(fp -> dto.setFinishingPosition(fp.getFinishingPosition()));
+    }
+
+    /**
      * List sessions with pagination (most recent first).
      */
     public List<SessionDto> listSessions(int offset, int limit) {
@@ -69,6 +90,7 @@ public class SessionQueryService {
                 .map(s -> {
                     SessionDto dto = sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
                     applyInferredPlayerCarIndex(s, dto);
+                    applyFinishingPosition(s, dto);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -92,6 +114,7 @@ public class SessionQueryService {
         Session session = sessionResolveService.getSessionByPublicIdOrUid(trimmedId);
         SessionDto dto = sessionMapper.toDto(session, stateManager.get(session.getSessionUid()));
         applyInferredPlayerCarIndex(session, dto);
+        applyFinishingPosition(session, dto);
         log.debug("getSession: resolved id={}", SessionMapper.toPublicIdString(session));
         return dto;
     }
@@ -112,6 +135,7 @@ public class SessionQueryService {
                     Session s = opt.get();
                     SessionDto dto = sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
                     applyInferredPlayerCarIndex(s, dto);
+                    applyFinishingPosition(s, dto);
                     return dto;
                 });
         log.debug("getActiveSession: {}", result.isPresent() ? "present" : "empty");

@@ -41,6 +41,9 @@ public class SessionRuntimeState {
     /** Current player car index (from packet headers); used to select correct snapshot when multiple exist. */
     private volatile Integer playerCarIndex;
 
+    /** Last known race position per car (from LapData m_carPosition). Persisted as finishing position on session end. */
+    private final Map<Integer, Integer> lastCarPositionByCarIndex = new ConcurrentHashMap<>();
+
     // Snapshot for WebSocket (per carIndex)
     private final Map<Integer, CarSnapshot> snapshots = new ConcurrentHashMap<>();
 
@@ -141,6 +144,31 @@ public class SessionRuntimeState {
     }
 
     /**
+     * Update last known race position for a car (from LapData m_carPosition). Used to persist finishing position on session end.
+     */
+    public void setLastCarPosition(int carIndex, int position) {
+        lastCarPositionByCarIndex.put(carIndex, position);
+        this.lastSeenAt = Instant.now();
+    }
+
+    /**
+     * Get last known race position for a car, or null if never received.
+     */
+    public Integer getLastCarPosition(int carIndex) {
+        return lastCarPositionByCarIndex.get(carIndex);
+    }
+
+    /**
+     * Get last known race position for the player car (playerCarIndex), or null.
+     */
+    public Integer getLastCarPositionForPlayer() {
+        if (playerCarIndex == null) {
+            return null;
+        }
+        return lastCarPositionByCarIndex.get(playerCarIndex.intValue());
+    }
+
+    /**
      * Get latest snapshot for WebSocket broadcast.
      * Selects by current player car index when set; otherwise by most recent timestamp to avoid
      * undefined map iteration order (e.g. ConcurrentHashMap) when multiple snapshots exist.
@@ -163,24 +191,27 @@ public class SessionRuntimeState {
     }
 
     /**
-     * Get the latest car snapshot for the current player (or most recent) without building WS message.
-     * Used by LiveDataBroadcaster to enrich with bestLapTimeMs before building WsSnapshotMessage.
+     * Get the latest car snapshot together with its car index (for consistent best-lap lookup).
+     * Selects by player car index when set; otherwise by most recent timestamp.
+     * Caller must use the returned car index when loading SessionSummary so snapshot and best-lap
+     * refer to the same car (avoids mixing data when playerCarIndex is unset and fallback is used).
+     *
+     * @return entry with key = carIndex, value = snapshot; or null if no snapshots
      */
-    public CarSnapshot getLatestCarSnapshot() {
+    public Map.Entry<Integer, CarSnapshot> getLatestCarSnapshotWithCarIndex() {
         if (snapshots.isEmpty()) {
             return null;
         }
-        CarSnapshot snapshot = null;
         if (playerCarIndex != null) {
-            snapshot = snapshots.get(playerCarIndex);
+            CarSnapshot snapshot = snapshots.get(playerCarIndex);
+            if (snapshot != null) {
+                return Map.entry(playerCarIndex.intValue(), snapshot);
+            }
         }
-        if (snapshot == null) {
-            snapshot = snapshots.entrySet().stream()
-                    .max(Comparator.comparing(e -> e.getValue().getTimestamp(), Comparator.nullsLast(Comparator.naturalOrder())))
-                    .map(Map.Entry::getValue)
-                    .orElse(null);
-        }
-        return snapshot;
+        return snapshots.entrySet().stream()
+                .max(Comparator.comparing(e -> e.getValue().getTimestamp(), Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(e -> Map.entry(e.getKey(), e.getValue()))
+                .orElse(null);
     }
 
     /**

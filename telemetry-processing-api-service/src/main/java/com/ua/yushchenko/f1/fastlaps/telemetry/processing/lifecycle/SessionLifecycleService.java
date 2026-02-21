@@ -4,6 +4,8 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionDataDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.EndReason;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
@@ -28,6 +30,7 @@ public class SessionLifecycleService {
 
     private final SessionStateManager stateManager;
     private final SessionRepository sessionRepository;
+    private final SessionFinishingPositionRepository finishingPositionRepository;
     private final SessionPersistenceService sessionPersistenceService;
     private final LapAggregator lapAggregator;
     private final LiveDataBroadcaster liveDataBroadcaster;
@@ -87,11 +90,25 @@ public class SessionLifecycleService {
             // Flush pending aggregations (finalize laps, session summary)
             lapAggregator.finalizeAllLaps(sessionUID);
 
-            // Update session in DB (set ended_at, end_reason)
+            // Update session in DB (set ended_at, end_reason) and persist finishing position if available
             sessionRepository.findById(sessionUID).ifPresent(session -> {
                 session.setEndedAt(state.getEndedAt());
                 session.setEndReason(reason.name());
                 sessionRepository.save(session);
+
+                int carIndex = session.getPlayerCarIndex() != null
+                        ? session.getPlayerCarIndex().intValue()
+                        : (state.getPlayerCarIndex() != null ? state.getPlayerCarIndex().intValue() : 0);
+                Integer lastPosition = state.getLastCarPosition(carIndex);
+                if (lastPosition != null && lastPosition > 0) {
+                    SessionFinishingPosition fp = SessionFinishingPosition.builder()
+                            .sessionUid(sessionUID)
+                            .carIndex((short) carIndex)
+                            .finishingPosition(lastPosition)
+                            .build();
+                    finishingPositionRepository.save(fp);
+                    log.info("Saved finishing position: sessionUID={}, carIndex={}, position={}", sessionUID, carIndex, lastPosition);
+                }
             });
 
             // Notify WebSocket subscribers
