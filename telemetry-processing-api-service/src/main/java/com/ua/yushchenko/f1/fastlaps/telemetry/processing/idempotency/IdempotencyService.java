@@ -8,6 +8,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 /**
  * Idempotency service: checks and records processed packets.
  * Uses database constraint to prevent duplicate processing (INSERT ... ON CONFLICT DO NOTHING pattern).
@@ -32,6 +34,7 @@ public class IdempotencyService {
                     .frameIdentifier(frameIdentifier)
                     .packetId(packetId)
                     .carIndex(carIndex)
+                    .processedAt(Instant.now())
                     .build();
 
             repository.save(packet);

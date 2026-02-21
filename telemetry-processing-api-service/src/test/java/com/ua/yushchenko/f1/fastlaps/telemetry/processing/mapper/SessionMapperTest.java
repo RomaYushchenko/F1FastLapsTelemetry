@@ -73,18 +73,21 @@ class SessionMapperTest {
         // Act & Assert
         assertThat(SessionMapper.sessionTypeToDisplayString((short) 0)).isEqualTo("UNKNOWN");
         assertThat(SessionMapper.sessionTypeToDisplayString((short) 1)).isEqualTo("PRACTICE_1");
+        assertThat(SessionMapper.sessionTypeToDisplayString((short) 2)).isEqualTo("PRACTICE_2");
         assertThat(SessionMapper.sessionTypeToDisplayString((short) 10)).isEqualTo("RACE");
         assertThat(SessionMapper.sessionTypeToDisplayString((short) 12)).isEqualTo("TIME_TRIAL");
+        assertThat(SessionMapper.sessionTypeToDisplayString((short) 13)).isEqualTo("SPRINT");
+        assertThat(SessionMapper.sessionTypeToDisplayString((short) 14)).isEqualTo("SPRINT_SHOOTOUT");
+        assertThat(SessionMapper.sessionTypeToDisplayString((short) 15)).isEqualTo("SPRINT");
+        assertThat(SessionMapper.sessionTypeToDisplayString((short) 16)).isEqualTo("SPRINT_SHOOTOUT");
     }
 
     @Test
     @DisplayName("sessionTypeToDisplayString повертає UNKNOWN для невідомого id")
     void sessionTypeToDisplayString_returnsUnknown_forUnknownId() {
-        // Act
-        String result = SessionMapper.sessionTypeToDisplayString((short) 99);
-
-        // Assert
-        assertThat(result).isEqualTo("UNKNOWN");
+        // Act & Assert
+        assertThat(SessionMapper.sessionTypeToDisplayString((short) 99)).isEqualTo("UNKNOWN");
+        assertThat(SessionMapper.sessionTypeToDisplayString((short) -1)).isEqualTo("UNKNOWN"); // 255 as byte
     }
 
     @Test

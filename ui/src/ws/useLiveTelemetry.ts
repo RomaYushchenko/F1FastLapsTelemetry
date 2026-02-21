@@ -7,6 +7,8 @@ import { getActiveSession } from '../api/client'
 import type { Session } from '../api/types'
 import type { WsErrorMessage, WsServerMessage, WsSessionEndedMessage, WsSnapshotMessage } from './types'
 
+const ACTIVE_SESSION_POLL_INTERVAL_MS = 4000
+
 export type LiveConnectionStatus =
   | 'idle'
   | 'loading-active-session'
@@ -48,51 +50,16 @@ export function useLiveTelemetry() {
     let isCancelled = false
     let liveSubscription: StompSubscription | null = null
     let errorSubscription: StompSubscription | null = null
+    let pollTimeoutId: ReturnType<typeof setTimeout> | null = null
+    let hasInitiatedConnect = false
 
-    async function start() {
-      setState(prev => ({
-        ...prev,
-        status: 'loading-active-session',
-        errorMessage: null,
-        connectionMessage: null,
-      }))
-
-      let activeSession: Session | null = null
-      try {
-        activeSession = await getActiveSession()
-      } catch (error) {
-        if (isCancelled) return
-        setState(prev => ({
-          ...prev,
-          status: 'error',
-          errorMessage: error instanceof Error ? error.message : 'Failed to load active session',
-          connectionMessage: 'Connection lost. Live data may be outdated.',
-        }))
-        return
-      }
-
-      // WebSocket is only opened when there is an active session; otherwise server shows 0 connections
-      if (!activeSession) {
-        if (isCancelled) return
-        setState(prev => ({
-          ...prev,
-          status: 'no-active-session',
-          session: null,
-          snapshot: null,
-          sessionEnded: null,
-          connectionMessage: null,
-        }))
-        return
-      }
-
-      if (isCancelled) return
-
+    function connectWithSession(activeSession: Session) {
       setState(prev => ({
         ...prev,
         status: 'connecting',
         session: activeSession,
         errorMessage: null,
-          connectionMessage: null,
+        connectionMessage: null,
       }))
 
       const sessionId = activeSession.id
@@ -103,17 +70,13 @@ export function useLiveTelemetry() {
           return
         }
 
-        // Subscribe to live snapshots (topic uses session UUID)
         liveSubscription = stompClient.subscribe(
           `/topic/live/${sessionId}`,
           (message: IMessage) => {
             try {
               const payload = JSON.parse(message.body) as WsServerMessage
               if (payload.type === 'SNAPSHOT') {
-                setState(prev => ({
-                  ...prev,
-                  snapshot: payload,
-                }))
+                setState(prev => ({ ...prev, snapshot: payload }))
               } else if (payload.type === 'SESSION_ENDED') {
                 setState(prev => ({
                   ...prev,
@@ -131,7 +94,6 @@ export function useLiveTelemetry() {
           },
         )
 
-        // Subscribe to error queue
         errorSubscription = stompClient.subscribe('/user/queue/errors', (message: IMessage) => {
           try {
             const payload = JSON.parse(message.body) as WsErrorMessage
@@ -151,20 +113,16 @@ export function useLiveTelemetry() {
           }
         })
 
-        // Send subscribe command (session id = UUID)
         stompClient.publish({
           destination: '/app/subscribe',
           body: JSON.stringify({
             type: 'SUBSCRIBE',
             sessionId,
-            carIndex: 0,
+            carIndex: activeSession.playerCarIndex ?? 0,
           }),
         })
 
-        setState(prev => ({
-          ...prev,
-          status: 'connected',
-        }))
+        setState(prev => ({ ...prev, status: 'connected' }))
       }
 
       stompClient.onStompError = frame => {
@@ -199,13 +157,75 @@ export function useLiveTelemetry() {
       stompClient.activate()
     }
 
+    async function start() {
+      setState(prev => ({
+        ...prev,
+        status: 'loading-active-session',
+        errorMessage: null,
+        connectionMessage: null,
+      }))
+
+      let activeSession: Session | null = null
+      try {
+        activeSession = await getActiveSession()
+      } catch (error) {
+        if (isCancelled) return
+        setState(prev => ({
+          ...prev,
+          status: 'error',
+          errorMessage: error instanceof Error ? error.message : 'Failed to load active session',
+          connectionMessage: 'Connection lost. Live data may be outdated.',
+        }))
+        return
+      }
+
+      if (!activeSession) {
+        if (isCancelled) return
+        setState(prev => ({
+          ...prev,
+          status: 'no-active-session',
+          session: null,
+          snapshot: null,
+          sessionEnded: null,
+          connectionMessage: null,
+        }))
+        // Serialized polling: schedule next only after current poll completes (avoids duplicate connect when request is slower than interval)
+        function schedulePoll() {
+          if (isCancelled) return
+          pollTimeoutId = setTimeout(async () => {
+            pollTimeoutId = null
+            if (isCancelled || hasInitiatedConnect) return
+            try {
+              const session = await getActiveSession()
+              if (isCancelled || hasInitiatedConnect) return
+              if (session) {
+                hasInitiatedConnect = true
+                connectWithSession(session)
+                return
+              }
+            } catch {
+              // ignore poll errors; next poll will retry
+            }
+            schedulePoll()
+          }, ACTIVE_SESSION_POLL_INTERVAL_MS)
+        }
+        schedulePoll()
+        return
+      }
+
+      if (isCancelled) return
+      connectWithSession(activeSession)
+    }
+
     start()
 
     return () => {
       isCancelled = true
-
+      if (pollTimeoutId != null) {
+        clearTimeout(pollTimeoutId)
+        pollTimeoutId = null
+      }
       try {
-        // Send unsubscribe if connected
         if (stompClient.connected) {
           stompClient.publish({
             destination: '/app/unsubscribe',
@@ -215,14 +235,8 @@ export function useLiveTelemetry() {
       } catch {
         // ignore
       }
-
-      if (liveSubscription) {
-        liveSubscription.unsubscribe()
-      }
-      if (errorSubscription) {
-        errorSubscription.unsubscribe()
-      }
-
+      if (liveSubscription) liveSubscription.unsubscribe()
+      if (errorSubscription) errorSubscription.unsubscribe()
       stompClient.deactivate()
     }
   }, [stompClient])

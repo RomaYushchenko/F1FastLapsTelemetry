@@ -14,7 +14,9 @@ import java.util.Map;
 
 /**
  * Background worker that checks for session timeouts.
- * Runs periodically and triggers session end if no data received for timeout period.
+ * Session is ended only if no telemetry at all for the timeout period (e.g. game closed).
+ * Safety car, pit stops, or brief gaps do not end the session as long as any packet
+ * (lap data, car telemetry, car status, or session data) is received within the window.
  * See: implementation_steps_plan.md § Етап 4.9.
  */
 @Slf4j
@@ -25,7 +27,8 @@ public class NoDataTimeoutWorker {
     private final SessionStateManager stateManager;
     private final SessionLifecycleService lifecycleService;
 
-    @Value("${telemetry.session.timeout-seconds:30}")
+    /** No data for this many seconds triggers session end. Default 60s to tolerate safety car / pit / pauses. */
+    @Value("${telemetry.session.timeout-seconds:60}")
     private int timeoutSeconds;
 
     /**

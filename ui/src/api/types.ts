@@ -10,6 +10,8 @@ export interface Session {
   trackId?: number | null
   trackLengthM?: number
   totalLaps?: number
+  /** Player car index (0–19); use for laps/summary/tyre-wear so data is for the driver. */
+  playerCarIndex?: number | null
   aiDifficulty?: number
   startedAt: string
   endedAt?: string | null

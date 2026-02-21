@@ -4,6 +4,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFoundException;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -27,9 +28,34 @@ import java.util.stream.Collectors;
 public class SessionQueryService {
 
     private final SessionRepository sessionRepository;
+    private final LapRepository lapRepository;
     private final SessionStateManager stateManager;
     private final SessionMapper sessionMapper;
     private final SessionResolveService sessionResolveService;
+
+    /**
+     * When session has no player_car_index set (e.g. created before we added the column),
+     * infer from existing laps so the UI can request the correct car's data.
+     */
+    private Integer inferPlayerCarIndexFromData(Long sessionUid) {
+        if (sessionUid == null) {
+            return null;
+        }
+        return lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(sessionUid).stream()
+                .findFirst()
+                .map(lap -> lap.getCarIndex() != null ? lap.getCarIndex().intValue() : null)
+                .orElse(null);
+    }
+
+    private void applyInferredPlayerCarIndex(Session session, SessionDto dto) {
+        if (dto != null && dto.getPlayerCarIndex() == null) {
+            Integer inferred = inferPlayerCarIndexFromData(session.getSessionUid());
+            if (inferred != null) {
+                dto.setPlayerCarIndex(inferred);
+                log.debug("Inferred playerCarIndex={} for sessionUID={} from laps", inferred, session.getSessionUid());
+            }
+        }
+    }
 
     /**
      * List sessions with pagination (most recent first).
@@ -40,7 +66,11 @@ public class SessionQueryService {
         int page = offset / size;
         Pageable pageable = PageRequest.of(page, size);
         List<SessionDto> result = sessionRepository.findAllByOrderByCreatedAtDesc(pageable).stream()
-                .map(s -> sessionMapper.toDto(s, stateManager.get(s.getSessionUid())))
+                .map(s -> {
+                    SessionDto dto = sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
+                    applyInferredPlayerCarIndex(s, dto);
+                    return dto;
+                })
                 .collect(Collectors.toList());
         log.debug("listSessions: returning {} sessions", result.size());
         return result;
@@ -61,22 +91,28 @@ public class SessionQueryService {
         }
         Session session = sessionResolveService.getSessionByPublicIdOrUid(trimmedId);
         SessionDto dto = sessionMapper.toDto(session, stateManager.get(session.getSessionUid()));
+        applyInferredPlayerCarIndex(session, dto);
         log.debug("getSession: resolved id={}", SessionMapper.toPublicIdString(session));
         return dto;
     }
 
     /**
      * Get current active session, if any.
+     * Returns only sessions in ACTIVE state (user is driving); ignores ENDING (session ended, flushing).
+     * This ensures live view shows the current qualification/race, not the previous session.
      */
     public Optional<SessionDto> getActiveSession() {
         log.debug("getActiveSession");
         Optional<SessionDto> result = stateManager.getAllActive().values().stream()
+                .filter(state -> state.isActive())
                 .findFirst()
                 .map(state -> sessionRepository.findById(state.getSessionUID()))
                 .filter(Optional::isPresent)
                 .map(opt -> {
                     Session s = opt.get();
-                    return sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
+                    SessionDto dto = sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
+                    applyInferredPlayerCarIndex(s, dto);
+                    return dto;
                 });
         log.debug("getActiveSession: {}", result.isPresent() ? "present" : "empty");
         return result;

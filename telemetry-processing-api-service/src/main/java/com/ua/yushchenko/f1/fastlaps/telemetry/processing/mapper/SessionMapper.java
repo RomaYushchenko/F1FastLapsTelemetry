@@ -29,14 +29,16 @@ public class SessionMapper {
     }
 
     /**
-     * Map F1 game session type id (0–12) to display string.
-     * Matches SessionPacketHandler.parseSessionType / ingest contract.
+     * Map F1 game session type id (m_sessionType, uint8) to display string.
+     * Canonical mapping: {@code .github/docs/session_type_mapping.md}. Must match
+     * SessionPacketParser.parseSessionType in udp-ingest-service.
      */
     public static String sessionTypeToDisplayString(Short sessionTypeId) {
         if (sessionTypeId == null) {
             return null;
         }
-        return switch (sessionTypeId.intValue()) {
+        int id = sessionTypeId.intValue() & 0xFF;
+        return switch (id) {
             case 0 -> "UNKNOWN";
             case 1 -> "PRACTICE_1";
             case 2 -> "PRACTICE_2";
@@ -50,6 +52,10 @@ public class SessionMapper {
             case 10 -> "RACE";
             case 11 -> "RACE_2";
             case 12 -> "TIME_TRIAL";
+            case 13 -> "SPRINT";
+            case 14 -> "SPRINT_SHOOTOUT";
+            case 15 -> "SPRINT";
+            case 16 -> "SPRINT_SHOOTOUT";
             default -> "UNKNOWN";
         };
     }
@@ -71,6 +77,7 @@ public class SessionMapper {
                 .trackId(session.getTrackId() != null ? session.getTrackId().intValue() : null)
                 .trackLengthM(session.getTrackLengthM())
                 .totalLaps(session.getTotalLaps() != null ? session.getTotalLaps().intValue() : null)
+                .playerCarIndex(session.getPlayerCarIndex() != null ? session.getPlayerCarIndex().intValue() : null)
                 .aiDifficulty(session.getAiDifficulty() != null ? session.getAiDifficulty().intValue() : null)
                 .startedAt(session.getStartedAt())
                 .endedAt(session.getEndedAt())

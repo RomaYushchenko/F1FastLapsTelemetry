@@ -31,4 +31,6 @@ public class SessionDto {
     private String endReason;
     /** ACTIVE or FINISHED (required in all responses per § 8.2) */
     private SessionState state;
+    /** Player car index (0–19) from F1; use this for laps/summary/tyre-wear so data is for the driver. */
+    private Integer playerCarIndex;
 }

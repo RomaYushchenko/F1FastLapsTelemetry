@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS telemetry.sessions (
   track_id           SMALLINT      NULL,
   track_length_m     INTEGER       NULL,
   total_laps         SMALLINT      NULL,
+  player_car_index   SMALLINT      NULL,
   ai_difficulty      SMALLINT      NULL,
 
   started_at         TIMESTAMPTZ   NULL,

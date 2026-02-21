@@ -37,6 +37,8 @@
 
 **Розділення логіки:** маппери, білдери, парсери, процесори, сервіси — описані в [code_skeleton_java_packages_interfaces.md](code_skeleton_java_packages_interfaces.md) (розділ 1.2) та в правилі Cursor [.cursor/rules/architecture-layering.mdc](../../.cursor/rules/architecture-layering.mdc). Entry points (контролери, консьюмери, хендлери) мають залишатися тонкими; парсинг і збірка подій — у парсерах і білдерах.
 
+**F1 UDP session type:** канонічний маппінг `m_sessionType` (uint8) → display string: [session_type_mapping.md](../docs/session_type_mapping.md). Використовується в ingest (SessionPacketParser, SessionDataPacketParser) та processing (SessionMapper); при зміні типів оновлювати спочатку цей документ.
+
 ---
 
 ## Which document to read first
