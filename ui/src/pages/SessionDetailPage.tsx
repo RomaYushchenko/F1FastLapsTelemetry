@@ -206,20 +206,19 @@ export function SessionDetailPage() {
     }
   }, [sessionUid, loadTrace])
 
-  /** Quiet refresh of pedal trace and ERS for current lap (no loading state). */
+  /** Quiet refresh of pedal trace and ERS for current lap (no loading state). Each request is independent so an ERS failure does not block trace updates. */
   const refreshTraceInBackground = useCallback(
     async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
-      try {
-        const [points, ers] = await Promise.all([
-          getLapTrace(currentSessionUid, lapNumber, carIndex),
-          getLapErs(currentSessionUid, lapNumber, carIndex),
-        ])
-        if (!isCancelledRef.current) {
-          setTracePoints(points)
-          setErsPoints(ers)
-        }
-      } catch {
-        // keep current data on error
+      const [traceResult, ersResult] = await Promise.allSettled([
+        getLapTrace(currentSessionUid, lapNumber, carIndex),
+        getLapErs(currentSessionUid, lapNumber, carIndex),
+      ])
+      if (isCancelledRef.current) return
+      if (traceResult.status === 'fulfilled') {
+        setTracePoints(traceResult.value)
+      }
+      if (ersResult.status === 'fulfilled') {
+        setErsPoints(ersResult.value)
       }
     },
     [],

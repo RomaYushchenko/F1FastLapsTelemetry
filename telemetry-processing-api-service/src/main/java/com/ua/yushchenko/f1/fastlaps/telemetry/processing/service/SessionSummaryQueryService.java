@@ -47,11 +47,12 @@ public class SessionSummaryQueryService {
     private void enrichWithLeader(Session session, SessionSummaryDto result) {
         List<SessionFinishingPosition> positions =
                 finishingPositionRepository.findBySessionUidOrderByFinishingPositionAsc(session.getSessionUid());
-        if (positions.isEmpty()) {
-            return;
-        }
-        SessionFinishingPosition leader = positions.get(0);
-        if (leader.getFinishingPosition() == null || leader.getFinishingPosition() != 1) {
+        // We only persist the player car's finishing position; when we persist all cars, there will be a row with position=1.
+        SessionFinishingPosition leader = positions.stream()
+                .filter(p -> p.getFinishingPosition() != null && p.getFinishingPosition() == 1)
+                .findFirst()
+                .orElse(null);
+        if (leader == null) {
             return;
         }
         result.setLeaderPosition(1);
