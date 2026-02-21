@@ -71,28 +71,26 @@ class CarTelemetryPacketHandlerTest {
     }
 
     private ByteBuffer createCarTelemetryPayload() {
-        ByteBuffer buffer = ByteBuffer.allocate(1000).order(ByteOrder.LITTLE_ENDIAN);
-
-        // Speed (kph)
-        buffer.putShort((short) 285);
-        // Throttle (0-1)
-        buffer.putFloat(1.0f);
-        // Steer (-1 to 1)
-        buffer.putFloat(0.0f);
-        // Brake (0-1)
-        buffer.putFloat(0.0f);
-        // Clutch
-        buffer.put((byte) 0);
-        // Gear
-        buffer.put((byte) 7);
-        // Engine RPM
-        buffer.putShort((short) 11500);
-        // DRS
-        buffer.put((byte) 1);
-        // Rev lights
-        buffer.put((byte) 75);
-
-        buffer.rewind();
+        // Full 60 bytes of CarTelemetryData (F1 25) so parser advances correctly
+        ByteBuffer buffer = ByteBuffer.allocate(CarTelemetryPacketParser.CAR_TELEMETRY_DATA_SIZE_BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN);
+        buffer.putShort((short) 285);       // speed
+        buffer.putFloat(1.0f);              // throttle
+        buffer.putFloat(0.0f);              // steer
+        buffer.putFloat(0.0f);              // brake
+        buffer.put((byte) 0);               // clutch
+        buffer.put((byte) 7);               // gear
+        buffer.putShort((short) 11500);     // engineRPM
+        buffer.put((byte) 1);               // drs
+        buffer.put((byte) 75);              // revLightsPercent
+        buffer.putShort((short) 0);         // revLightsBitValue
+        for (int i = 0; i < 4; i++) buffer.putShort((short) 400);  // brakesTemperature
+        for (int i = 0; i < 4; i++) buffer.put((byte) 100);        // tyresSurfaceTemperature
+        for (int i = 0; i < 4; i++) buffer.put((byte) 105);       // tyresInnerTemperature
+        buffer.putShort((short) 90);        // engineTemperature
+        for (int i = 0; i < 4; i++) buffer.putFloat(23.0f);        // tyresPressure
+        for (int i = 0; i < 4; i++) buffer.put((byte) 0);         // surfaceType
+        buffer.flip();
         return buffer;
     }
 }

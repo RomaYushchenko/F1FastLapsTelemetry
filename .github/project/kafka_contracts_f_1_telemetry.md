@@ -128,6 +128,29 @@ Topic: `telemetry.lap`
 
 Topic: `telemetry.carTelemetry`
 
+Payload maps F1 25 **CarTelemetryData** (60 bytes per car). Field semantics: `.github/docs/F1 25 Telemetry Output Structures.txt` (PacketCarTelemetryData, CarTelemetryData).
+
+| Field | Type | Description |
+|-------|------|--------------|
+| speedKph | int | Speed of car in km/h (m_speed) |
+| throttle | float | Throttle applied (0.0–1.0) |
+| brake | float | Brake applied (0.0–1.0) |
+| steer | float | Steering (-1.0 full left to 1.0 full right) |
+| gear | int | Gear (1–8, N=0, R=-1) |
+| engineRpm | int | Engine RPM |
+| drs | int | DRS 0=off, 1=on |
+| clutch | int | Clutch applied (0–100) |
+| revLightsPercent | int | Rev lights indicator (percentage) |
+| revLightsBitValue | int | Rev lights bitmask (bit 0 = leftmost LED) |
+| brakesTemperature | int[4] | Brakes temperature °C, order RL, RR, FL, FR |
+| tyresSurfaceTemperature | int[4] | Tyres surface temperature °C, order RL, RR, FL, FR |
+| tyresInnerTemperature | int[4] | Tyres inner temperature °C, order RL, RR, FL, FR |
+| engineTemperature | int | Engine temperature °C |
+| tyresPressure | float[4] | Tyre pressure PSI, order RL, RR, FL, FR |
+| surfaceType | int[4] | Driving surface per appendices, order RL, RR, FL, FR |
+
+Example (full payload):
+
 ```json
 {
   "speedKph": 312,
@@ -136,7 +159,16 @@ Topic: `telemetry.carTelemetry`
   "steer": -0.12,
   "gear": 7,
   "engineRpm": 11543,
-  "drs": 1
+  "drs": 1,
+  "clutch": 0,
+  "revLightsPercent": 85,
+  "revLightsBitValue": 16383,
+  "brakesTemperature": [ 420, 418, 380, 382 ],
+  "tyresSurfaceTemperature": [ 105, 106, 102, 104 ],
+  "tyresInnerTemperature": [ 108, 109, 105, 107 ],
+  "engineTemperature": 95,
+  "tyresPressure": [ 23.1, 23.0, 22.9, 23.2 ],
+  "surfaceType": [ 0, 0, 0, 0 ]
 }
 ```
 
