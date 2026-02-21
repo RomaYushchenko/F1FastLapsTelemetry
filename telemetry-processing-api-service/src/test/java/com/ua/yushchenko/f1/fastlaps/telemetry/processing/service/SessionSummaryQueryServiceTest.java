@@ -104,7 +104,7 @@ class SessionSummaryQueryServiceTest {
 
         // Assert
         assertThat(dto.getLeaderPosition()).isEqualTo(1);
-        assertThat(dto.getLeaderCarIndex()).isEqualTo(CAR_INDEX.intValue());
+        assertThat(dto.getLeaderCarIndex()).isEqualTo((int) CAR_INDEX);
         assertThat(dto.getLeaderIsPlayer()).isTrue();
     }
 }
