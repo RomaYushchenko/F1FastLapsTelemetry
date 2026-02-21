@@ -2,7 +2,15 @@
 
 **Тема:** Фронтенд і бекенд — покращення сторінки деталей сесії: Summary (хто на 1-му місці), Lap pace (overflow, медіана), Tyre wear (відсотки, compound), таблиця кіл (дельта, місце, стрілки), ERS (інформація та графік).  
 **Джерело ідей:** [improvements-notes-structured.md](../improvements-notes-structured.md) § 2.3.  
-**Статус:** рішення прийнято (усі питання §4–5 заповнені); готово до визначення порядку етапів і реалізації.
+**Статус:** реалізовано (етапи 1–6 виконані на гілці `feature/session-summary-page-plan`).
+
+**Статус реалізації (чеклист):**
+- [x] **Етап 1** — Summary: `findBySessionUidOrderByFinishingPositionAsc`, SessionSummaryDto `leaderCarIndex`/`leaderIsPlayer`, `enrichWithLeader`, UI Leader (You / Car #N, highlight).
+- [x] **Етап 2** — Lap pace: margin у PaceChart, медіана з валідних кіл на фронті, горизонтальна лінія + тултип.
+- [x] **Етап 3** — Tyre wear: одиниці 0–1, UI `toPercent()`; compound у LastTyreCompoundState, CarStatusProcessor, міграція 16, TyreWearPerLap/LapMapper/TyreWearPointDto, UI compound у тултипі (Pirelli labels).
+- [x] **Етап 4** — Таблиця кіл: LapRuntimeState/LapAggregator `positionAtLapStart`, міграція 17, Lap/LapBuilder/LapResponseDto/LapMapper; UI Delta, Position, стрілки ↑/↓.
+- [x] **Етап 5** — ERS: ErsPointDto, `getLapErs` (merge car_telemetry_raw + car_status_raw по ts), GET `/laps/{lapNum}/ers`; UI ErsChart, блок ERS, спільний вибір кола з pedal trace.
+- [x] **Етап 6** — Документація: rest_web_socket_api_contracts (leader, positionAtLapStart, pace median, tyre compound, ERS); react_spa_ui_architecture (Session Detail blocks і endpoints).
 
 ---
 
