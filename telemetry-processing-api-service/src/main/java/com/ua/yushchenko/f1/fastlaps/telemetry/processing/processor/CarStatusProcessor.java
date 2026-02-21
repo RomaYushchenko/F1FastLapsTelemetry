@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Processes car status: watermark update, snapshot DRS, persist to car_status_raw when active.
+ * Processes car status: watermark update, snapshot DRS and ERS, persist to car_status_raw when active.
  * Called from CarStatusConsumer after ensureSession, shouldProcess, idempotency.
  * See: implementation_phases.md Phase 5.1.
  */
@@ -19,6 +19,13 @@ import java.time.Instant;
 @Component
 @RequiredArgsConstructor
 public class CarStatusProcessor {
+
+    /**
+     * ERS maximum energy store in Joules (F1 2022+ regulations: 4 MJ per lap).
+     * Used to compute ersEnergyPercent = 100 * ersStoreEnergy / ERS_MAX_ENERGY_J.
+     * Source: F1 25 Telemetry Output Structures (m_ersStoreEnergy in Joules); max from regulations.
+     */
+    private static final float ERS_MAX_ENERGY_J = 4_000_000f;
 
     private final SessionStateManager stateManager;
     private final CarStatusRawWriter carStatusRawWriter;
@@ -43,6 +50,15 @@ public class CarStatusProcessor {
             state.updateSnapshot(carIndex, snapshot);
         }
         snapshot.setDrs(Boolean.TRUE.equals(status.getDrsAllowed()));
+
+        if (status.getErsStoreEnergy() != null && ERS_MAX_ENERGY_J > 0) {
+            float percent = 100f * status.getErsStoreEnergy() / ERS_MAX_ENERGY_J;
+            snapshot.setErsEnergyPercent((int) Math.max(0, Math.min(100, Math.round(percent))));
+        } else {
+            snapshot.setErsEnergyPercent(null);
+        }
+        snapshot.setErsDeployActive(
+                status.getErsDeployMode() != null && status.getErsDeployMode() > 0);
 
         if (state.isActive()) {
             carStatusRawWriter.write(

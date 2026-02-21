@@ -203,6 +203,10 @@ public class SessionRuntimeState {
         private Integer currentLapTimeMs;
         /** Best lap time in session (ms). Enriched from SessionSummary when building WS snapshot. */
         private Integer bestLapTimeMs;
+        /** ERS energy 0–100%. Set from CarStatusProcessor (ersStoreEnergy / ERS_MAX_J). */
+        private Integer ersEnergyPercent;
+        /** ERS deploy active (ersDeployMode > 0). Set from CarStatusProcessor. */
+        private Boolean ersDeployActive;
         private Instant timestamp;
     }
 }

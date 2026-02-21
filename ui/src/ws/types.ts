@@ -15,6 +15,10 @@ export interface WsSnapshotMessage {
   bestLapTimeMs?: number | null
   /** Delta to best lap in ms (current − best). Negative = faster than best. */
   deltaMs?: number | null
+  /** ERS energy store 0–100%. */
+  ersEnergyPercent?: number | null
+  /** ERS deploy active (driver using ERS). */
+  ersDeployActive?: boolean | null
 }
 
 export interface WsSessionEndedMessage {

@@ -9,6 +9,7 @@ import { LiveThrottleWidget } from '../components/LiveThrottleWidget'
 import { LiveBrakeWidget } from '../components/LiveBrakeWidget'
 import { LiveDrsWidget } from '../components/LiveDrsWidget'
 import { LiveLapSectorWidget } from '../components/LiveLapSectorWidget'
+import { LiveErsWidget } from '../components/LiveErsWidget'
 import { LiveDeltaWidget } from '../components/LiveDeltaWidget'
 
 export function LiveDashboardPage() {
@@ -91,10 +92,14 @@ export function LiveDashboardPage() {
             <LiveGearWidget gear={snapshot?.gear} />
           </div>
 
-          <div className="grid-4">
+          <div className="grid-5">
             <LiveThrottleWidget throttle={snapshot?.throttle} />
             <LiveBrakeWidget brake={snapshot?.brake} />
             <LiveDrsWidget drs={snapshot?.drs} />
+            <LiveErsWidget
+              ersEnergyPercent={snapshot?.ersEnergyPercent}
+              ersDeployActive={snapshot?.ersDeployActive}
+            />
             <LiveLapSectorWidget
               currentLap={snapshot?.currentLap}
               currentSector={snapshot?.currentSector}

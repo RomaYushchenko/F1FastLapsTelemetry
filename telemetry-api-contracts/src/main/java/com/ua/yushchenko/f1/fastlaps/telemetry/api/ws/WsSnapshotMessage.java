@@ -36,4 +36,8 @@ public class WsSnapshotMessage {
     private Integer bestLapTimeMs;
     /** Delta to best lap in ms: currentLapTimeMs - bestLapTimeMs. Negative = faster than best. */
     private Integer deltaMs;
+    /** ERS energy store 0–100%. From CarStatus ersStoreEnergy. */
+    private Integer ersEnergyPercent;
+    /** ERS deploy active (driver using ERS). From CarStatus ersDeployMode > 0. */
+    private Boolean ersDeployActive;
 }

@@ -43,6 +43,8 @@ public final class WsSnapshotMessageBuilder {
                 .currentLapTimeMs(currentLapTimeMs)
                 .bestLapTimeMs(bestLapTimeMs)
                 .deltaMs(deltaMs)
+                .ersEnergyPercent(snapshot.getErsEnergyPercent())
+                .ersDeployActive(snapshot.getErsDeployActive())
                 .build();
     }
 }

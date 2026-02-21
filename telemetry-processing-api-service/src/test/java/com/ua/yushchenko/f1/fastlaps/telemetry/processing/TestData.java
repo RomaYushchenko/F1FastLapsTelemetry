@@ -121,6 +121,8 @@ public final class TestData {
         snapshot.setLapDistanceM(LAP_DISTANCE_M);
         snapshot.setCurrentLapTimeMs(45_000);
         snapshot.setBestLapTimeMs(43_000);
+        snapshot.setErsEnergyPercent(75);
+        snapshot.setErsDeployActive(false);
         snapshot.setTimestamp(RAW_TS);
         return snapshot;
     }

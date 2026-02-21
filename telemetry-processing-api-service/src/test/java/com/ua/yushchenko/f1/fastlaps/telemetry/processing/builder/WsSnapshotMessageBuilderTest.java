@@ -45,6 +45,8 @@ class WsSnapshotMessageBuilderTest {
         assertThat(msg.getCurrentLapTimeMs()).isEqualTo(45_000);
         assertThat(msg.getBestLapTimeMs()).isEqualTo(43_000);
         assertThat(msg.getDeltaMs()).isEqualTo(2_000); // current - best = +2s slower
+        assertThat(msg.getErsEnergyPercent()).isEqualTo(75);
+        assertThat(msg.getErsDeployActive()).isFalse();
     }
 
     @Test
