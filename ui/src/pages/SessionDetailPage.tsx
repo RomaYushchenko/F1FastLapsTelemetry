@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
+import { getLapErs, getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
 import { isValidSessionId } from '../api/sessionId'
 import type { Lap, Session, SessionSummary } from '../api/types'
 import { HttpError } from '../api/types'
 import { getTrackName } from '../constants/tracks'
-import type { PacePoint, PedalTracePoint, TyreWearPoint } from '../charts/types'
+import type { ErsPoint, PacePoint, PedalTracePoint, TyreWearPoint } from '../charts/types'
+import { ErsChart } from '../charts/ers-chart'
 import { PaceChart } from '../charts/pace-chart'
 import { ThrottleBrakeChart } from '../charts/throttle-brake-chart'
 import { TyreWearChart } from '../charts/tyre-wear-chart'
@@ -28,6 +29,8 @@ export function SessionDetailPage() {
   const [tracePoints, setTracePoints] = useState<PedalTracePoint[] | null>(null)
   const [traceStatus, setTraceStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
   const [traceError, setTraceError] = useState<string | null>(null)
+  const [ersPoints, setErsPoints] = useState<ErsPoint[]>([])
+  const [ersStatus, setErsStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
 
   const loadTrace = useCallback(
     async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
@@ -42,6 +45,23 @@ export function SessionDetailPage() {
         if (isCancelledRef.current) return
         setTraceStatus('error')
         setTraceError(error instanceof Error ? error.message : 'Failed to load pedal trace')
+      }
+    },
+    [],
+  )
+
+  const loadErs = useCallback(
+    async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
+      setErsStatus('loading')
+      try {
+        const points = await getLapErs(currentSessionUid, lapNumber, carIndex)
+        if (isCancelledRef.current) return
+        setErsPoints(points)
+        setErsStatus('loaded')
+      } catch {
+        if (isCancelledRef.current) return
+        setErsStatus('error')
+        setErsPoints([])
       }
     },
     [],
@@ -89,6 +109,7 @@ export function SessionDetailPage() {
       if (initialLapForTrace != null) {
         setSelectedLapForTrace(initialLapForTrace)
         void loadTrace(id, initialLapForTrace, carIndex)
+        void loadErs(id, initialLapForTrace, carIndex)
       }
       prevLapsLengthRef.current = lapsRes.length
 
@@ -162,6 +183,7 @@ export function SessionDetailPage() {
           prevLapsLengthRef.current = currentLength
           setSelectedLapForTrace(newLapNumber)
           void loadTrace(id, newLapNumber, carIndex)
+          void loadErs(id, newLapNumber, carIndex)
         }
       } else {
         prevLapsLengthRef.current = currentLength
@@ -184,14 +206,19 @@ export function SessionDetailPage() {
     }
   }, [sessionUid, loadTrace])
 
-  /** Quiet refresh of pedal trace for current lap (no loading state) so chart updates in real time. */
+  /** Quiet refresh of pedal trace and ERS for current lap (no loading state). Each request is independent so an ERS failure does not block trace updates. */
   const refreshTraceInBackground = useCallback(
     async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
-      try {
-        const points = await getLapTrace(currentSessionUid, lapNumber, carIndex)
-        if (!isCancelledRef.current) setTracePoints(points)
-      } catch {
-        // keep current trace on error
+      const [traceResult, ersResult] = await Promise.allSettled([
+        getLapTrace(currentSessionUid, lapNumber, carIndex),
+        getLapErs(currentSessionUid, lapNumber, carIndex),
+      ])
+      if (isCancelledRef.current) return
+      if (traceResult.status === 'fulfilled') {
+        setTracePoints(traceResult.value)
+      }
+      if (ersResult.status === 'fulfilled') {
+        setErsPoints(ersResult.value)
       }
     },
     [],
@@ -263,6 +290,17 @@ export function SessionDetailPage() {
       s3: findLapNumberForSector(effectiveSummary.bestSector3Ms, lap => lap.sector3Ms),
     }
   }, [laps, effectiveSummary])
+
+  /** Median lap time (ms) of valid laps for pace chart reference line. */
+  const medianLapTimeMs = useMemo((): number | null => {
+    const validTimes = laps
+      .filter(l => !l.isInvalid && l.lapTimeMs != null && l.lapTimeMs > 0)
+      .map(l => l.lapTimeMs as number)
+    if (validTimes.length === 0) return null
+    const sorted = [...validTimes].sort((a, b) => a - b)
+    const mid = Math.floor(sorted.length / 2)
+    return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
+  }, [laps])
 
   const titleIdPart =
     sessionUid != null && sessionUid.length > 0 ? `${sessionUid.slice(0, 12)}…` : '—'
@@ -379,6 +417,22 @@ export function SessionDetailPage() {
                 label="Total laps"
                 value={effectiveSummary.totalLaps != null ? String(effectiveSummary.totalLaps) : undefined}
               />
+              {effectiveSummary.leaderPosition != null && (
+                <SummaryItem
+                  label="Leader"
+                  value={
+                    effectiveSummary.leaderIsPlayer
+                      ? 'You'
+                      : effectiveSummary.leaderDriverName ?? effectiveSummary.leaderTeamName
+                        ? [effectiveSummary.leaderDriverName, effectiveSummary.leaderTeamName].filter(Boolean).join(' · ')
+                        : effectiveSummary.leaderCarIndex != null
+                          ? `Car #${effectiveSummary.leaderCarIndex}`
+                          : 'P1'
+                  }
+                  extra={effectiveSummary.leaderIsPlayer ? undefined : 'P1'}
+                  highlight={effectiveSummary.leaderIsPlayer ?? undefined}
+                />
+              )}
               <SummaryItem
                 label="Best S1"
                 value={
@@ -424,7 +478,7 @@ export function SessionDetailPage() {
           {/* Pace chart */}
           <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
             <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-3)' }}>Lap pace</h2>
-            <PaceChart points={pacePoints} />
+            <PaceChart points={pacePoints} medianTimeMs={medianLapTimeMs} />
           </div>
 
           <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
@@ -466,7 +520,9 @@ export function SessionDetailPage() {
                       if (!Number.isFinite(value)) return
                       setSelectedLapForTrace(value)
                       if (sessionUid != null) {
-                        void loadTrace(sessionUid, value, session?.playerCarIndex ?? 0)
+                        const car = session?.playerCarIndex ?? 0
+                        void loadTrace(sessionUid, value, car)
+                        void loadErs(sessionUid, value, car)
                       }
                     }}
                     style={{
@@ -499,9 +555,11 @@ export function SessionDetailPage() {
                 {selectedLapForTrace != null && sessionUid != null && (
                   <button
                     type="button"
-                    onClick={() =>
-                      loadTrace(sessionUid, selectedLapForTrace, session?.playerCarIndex ?? 0)
-                    }
+                    onClick={() => {
+                      const car = session?.playerCarIndex ?? 0
+                      void loadTrace(sessionUid, selectedLapForTrace, car)
+                      void loadErs(sessionUid, selectedLapForTrace, car)
+                    }}
                     style={{
                       marginTop: 'var(--space-2)',
                       padding: '6px 12px',
@@ -522,6 +580,24 @@ export function SessionDetailPage() {
             )}
           </div>
 
+          {/* ERS (Energy Recovery System) */}
+          <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-1)' }}>ERS</h2>
+            <p className="text-muted" style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
+              Stored energy along the lap (merged from telemetry and car status). Same lap as pedal trace above.
+            </p>
+            {ersStatus === 'loading' && <p className="text-muted">Loading ERS…</p>}
+            {ersStatus === 'error' && (
+              <p className="text-error">Failed to load ERS for this lap.</p>
+            )}
+            {(ersStatus === 'loaded' || ersStatus === 'idle') && ersPoints.length > 0 && (
+              <ErsChart points={ersPoints} />
+            )}
+            {(ersStatus === 'loaded' || ersStatus === 'idle') && ersPoints.length === 0 && selectedLapForTrace != null && (
+              <p className="text-muted">No ERS data for lap {selectedLapForTrace}.</p>
+            )}
+          </div>
+
           {/* Laps table */}
           <div className="card card-table">
             <table className="table">
@@ -529,6 +605,8 @@ export function SessionDetailPage() {
                 <tr>
                   <th style={{ textAlign: 'left' }}>Lap</th>
                   <th>Time</th>
+                  <th>Delta</th>
+                  <th>Position</th>
                   <th>S1</th>
                   <th>S2</th>
                   <th>S3</th>
@@ -536,7 +614,7 @@ export function SessionDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {laps.map(lap => {
+                {laps.map((lap, index) => {
                   const isBestLap = bestLapNumber != null && lap.lapNumber === bestLapNumber
                   const isBestS1 =
                     bestSectors.s1 != null && lap.sector1Ms === bestSectors.s1 && !lap.isInvalid
@@ -544,6 +622,18 @@ export function SessionDetailPage() {
                     bestSectors.s2 != null && lap.sector2Ms === bestSectors.s2 && !lap.isInvalid
                   const isBestS3 =
                     bestSectors.s3 != null && lap.sector3Ms === bestSectors.s3 && !lap.isInvalid
+                  const bestLapTimeMs = effectiveSummary?.bestLapTimeMs ?? null
+                  const deltaMs =
+                    lap.lapTimeMs != null && bestLapTimeMs != null && !lap.isInvalid
+                      ? lap.lapTimeMs - bestLapTimeMs
+                      : null
+                  const prevLap = index > 0 ? laps[index - 1] : null
+                  const position = lap.positionAtLapStart ?? null
+                  const prevPosition = prevLap?.positionAtLapStart ?? null
+                  const positionChange =
+                    position != null && prevPosition != null
+                      ? position - prevPosition
+                      : null
 
                   return (
                     <tr
@@ -582,6 +672,35 @@ export function SessionDetailPage() {
                           >
                             BEST
                           </span>
+                        )}
+                      </td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>
+                        {deltaMs != null ? (
+                          <span style={{ color: deltaMs <= 0 ? 'var(--success)' : 'var(--text-secondary)' }}>
+                            {deltaMs >= 0 ? '+' : ''}{(deltaMs / 1000).toFixed(3)}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>
+                        {position != null ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {positionChange !== null && positionChange !== 0 && (
+                              <span
+                                style={{
+                                  color: positionChange < 0 ? 'var(--success)' : 'var(--error)',
+                                  fontSize: 'var(--text-sm)',
+                                }}
+                                title={positionChange < 0 ? 'Gained position' : 'Lost position'}
+                              >
+                                {positionChange < 0 ? '↑' : '↓'}
+                              </span>
+                            )}
+                            {position}
+                          </span>
+                        ) : (
+                          '—'
                         )}
                       </td>
                       <td>
@@ -639,6 +758,7 @@ interface SummaryItemProps {
   label: string
   value?: string
   extra?: string
+  highlight?: boolean
 }
 
 function SummaryItem(props: SummaryItemProps) {
@@ -661,8 +781,9 @@ function SummaryItem(props: SummaryItemProps) {
       <div
         style={{
           fontSize: 'var(--text-base)',
-          color: 'var(--text-primary)',
+          color: props.highlight ? 'var(--success)' : 'var(--text-primary)',
           fontFamily: 'var(--font-mono)',
+          fontWeight: props.highlight ? 'var(--font-weight-medium)' : undefined,
         }}
       >
         {props.value ?? '—'}

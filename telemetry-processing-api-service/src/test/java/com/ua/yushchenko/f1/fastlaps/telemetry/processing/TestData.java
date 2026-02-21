@@ -141,6 +141,7 @@ public final class TestData {
                 .sector3TimeMs(SECTOR3_MS)
                 .isInvalid(false)
                 .penaltiesSeconds((short) 0)
+                .positionAtLapStart(3)
                 .endedAt(LAP_ENDED_AT)
                 .build();
     }
@@ -197,6 +198,7 @@ public final class TestData {
                 .wearFR(WEAR_FR)
                 .wearRL(WEAR_RL)
                 .wearRR(WEAR_RR)
+                .compound((short) 18)
                 .build();
     }
 

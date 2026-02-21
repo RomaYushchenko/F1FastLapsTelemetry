@@ -51,6 +51,7 @@ class LapMapperTest {
         assertThat(dto.getSector2Ms()).isEqualTo(SECTOR2_MS);
         assertThat(dto.getSector3Ms()).isEqualTo(SECTOR3_MS);
         assertThat(dto.isInvalid()).isFalse();
+        assertThat(dto.getPositionAtLapStart()).isEqualTo(3);
     }
 
     @Test
@@ -178,5 +179,6 @@ class LapMapperTest {
         assertThat(dto.getWearFR()).isEqualTo(WEAR_FR);
         assertThat(dto.getWearRL()).isEqualTo(WEAR_RL);
         assertThat(dto.getWearRR()).isEqualTo(WEAR_RR);
+        assertThat(dto.getCompound()).isEqualTo(18);
     }
 }

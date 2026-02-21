@@ -24,6 +24,7 @@ class LapBuilderTest {
                 SECTOR3_MS,
                 false,
                 (short) 0,
+                3,
                 LAP_ENDED_AT
         );
 
@@ -38,6 +39,7 @@ class LapBuilderTest {
         assertThat(lap.getSector3TimeMs()).isEqualTo(SECTOR3_MS);
         assertThat(lap.getIsInvalid()).isFalse();
         assertThat(lap.getPenaltiesSeconds()).isEqualTo((short) 0);
+        assertThat(lap.getPositionAtLapStart()).isEqualTo(3);
         assertThat(lap.getEndedAt()).isEqualTo(LAP_ENDED_AT);
     }
 
@@ -55,6 +57,7 @@ class LapBuilderTest {
                 30_000,
                 true,
                 (short) 5,
+                null,
                 LAP_ENDED_AT
         );
 

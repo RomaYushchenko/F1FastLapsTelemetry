@@ -13,9 +13,11 @@ public final class TyreWearPerLapBuilder {
     }
 
     /**
-     * Build TyreWearPerLap entity from snapshot for the given lap.
+     * Build TyreWearPerLap entity from snapshot and optional compound for the given lap.
      */
-    public static TyreWearPerLap fromSnapshot(long sessionUid, short carIndex, short lapNumber, TyreWearSnapshot snapshot) {
+    public static TyreWearPerLap fromSnapshot(
+            long sessionUid, short carIndex, short lapNumber,
+            TyreWearSnapshot snapshot, Short compound) {
         if (snapshot == null) {
             return null;
         }
@@ -27,6 +29,7 @@ public final class TyreWearPerLapBuilder {
                 .wearFR(snapshot.getWearFR())
                 .wearRL(snapshot.getWearRL())
                 .wearRR(snapshot.getWearRR())
+                .compound(compound)
                 .build();
     }
 }

@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarStatusDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.CarStatusRawWriter;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.LastTyreCompoundState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class CarStatusProcessor {
 
     private final SessionStateManager stateManager;
     private final CarStatusRawWriter carStatusRawWriter;
+    private final LastTyreCompoundState lastTyreCompoundState;
 
     public void process(long sessionUid, short carIndex, int frameId, CarStatusDto status, float sessionTime) {
         log.debug("process: sessionUid={}, carIndex={}, frameId={}", sessionUid, carIndex, frameId);
@@ -59,6 +61,10 @@ public class CarStatusProcessor {
         }
         snapshot.setErsDeployActive(
                 status.getErsDeployMode() != null && status.getErsDeployMode() > 0);
+
+        if (status.getTyresCompound() != null) {
+            lastTyreCompoundState.update(sessionUid, carIndex, status.getTyresCompound());
+        }
 
         if (state.isActive()) {
             carStatusRawWriter.write(

@@ -1,5 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
@@ -68,6 +69,21 @@ public class LapController {
         }
         List<TracePointDto> trace = lapQueryService.getLapTrace(id, lapNum, carIndex);
         return ResponseEntity.ok(trace);
+    }
+
+    @GetMapping("/laps/{lapNum}/ers")
+    public ResponseEntity<List<ErsPointDto>> getLapErs(
+            @PathVariable("id") String id,
+            @PathVariable("lapNum") Integer lapNum,
+            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
+    ) {
+        log.debug("getLapErs: id={}, lapNum={}, carIndex={}", id, lapNum, carIndex);
+        if (lapNum == null) {
+            log.warn("lapNum is required");
+            throw new IllegalArgumentException("lapNum is required");
+        }
+        List<ErsPointDto> ers = lapQueryService.getLapErs(id, lapNum, carIndex);
+        return ResponseEntity.ok(ers);
     }
 
     @GetMapping("/sectors")

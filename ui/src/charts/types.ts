@@ -13,6 +13,12 @@ export interface PedalTracePoint {
   brake: number
 }
 
+/** Matches ErsPointDto from GET /api/sessions/{id}/laps/{lapNum}/ers. */
+export interface ErsPoint {
+  lapDistanceM: number
+  energyPercent: number
+}
+
 /** Matches TyreWearPointDto from GET /api/sessions/{id}/tyre-wear. */
 export interface TyreWearPoint {
   lapNumber: number
@@ -20,5 +26,7 @@ export interface TyreWearPoint {
   wearFR: number | null
   wearRL: number | null
   wearRR: number | null
+  /** F1 25 actual tyre compound code (e.g. 16=C5 soft, 18=C3 medium). Optional until API provides it. */
+  compound?: number | null
 }
 

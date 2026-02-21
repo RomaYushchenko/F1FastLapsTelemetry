@@ -27,6 +27,7 @@ public class LapMapper {
                 .sector2Ms(lap.getSector2TimeMs())
                 .sector3Ms(lap.getSector3TimeMs())
                 .isInvalid(lap.getIsInvalid() != null && lap.getIsInvalid())
+                .positionAtLapStart(lap.getPositionAtLapStart())
                 .build();
     }
 
@@ -64,6 +65,7 @@ public class LapMapper {
                 .wearFR(row.getWearFR())
                 .wearRL(row.getWearRL())
                 .wearRR(row.getWearRR())
+                .compound(row.getCompound() != null ? row.getCompound().intValue() : null)
                 .build();
     }
 }

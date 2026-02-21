@@ -27,6 +27,9 @@ public class LapRuntimeState {
     // Current sector (0 = not started, 1-3 = sector number)
     private int currentSector;
 
+    /** Race position at the start of the current lap (from LapData carPosition when lap was entered). */
+    private Integer positionAtLapStart;
+
     public LapRuntimeState(long sessionUid, short carIndex) {
         this.sessionUid = sessionUid;
         this.carIndex = carIndex;

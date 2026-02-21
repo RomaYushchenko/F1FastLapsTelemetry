@@ -32,6 +32,8 @@ export interface Lap {
   sector2Ms: number | null
   sector3Ms: number | null
   isInvalid: boolean
+  /** Race position at the start of this lap. Optional (from API). */
+  positionAtLapStart?: number | null
 }
 
 export interface SessionSummary {
@@ -41,6 +43,12 @@ export interface SessionSummary {
   bestSector1Ms: number | null
   bestSector2Ms: number | null
   bestSector3Ms: number | null
+  /** Leader (P1) at session end. From session_finishing_positions. */
+  leaderPosition?: number | null
+  leaderIsPlayer?: boolean | null
+  leaderCarIndex?: number | null
+  leaderDriverName?: string | null
+  leaderTeamName?: string | null
 }
 
 export interface ApiErrorBody {

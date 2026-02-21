@@ -15,6 +15,8 @@ public final class LapBuilder {
 
     /**
      * Build Lap entity from finalized lap data.
+     *
+     * @param positionAtLapStart race position at the start of this lap (from LapData carPosition); may be null.
      */
     public static Lap build(
             long sessionUid,
@@ -26,6 +28,7 @@ public final class LapBuilder {
             int sector3TimeMs,
             boolean isInvalid,
             short penaltiesSeconds,
+            Integer positionAtLapStart,
             Instant endedAt
     ) {
         return Lap.builder()
@@ -38,6 +41,7 @@ public final class LapBuilder {
                 .sector3TimeMs(sector3TimeMs)
                 .isInvalid(isInvalid)
                 .penaltiesSeconds(penaltiesSeconds)
+                .positionAtLapStart(positionAtLapStart)
                 .endedAt(endedAt)
                 .build();
     }
