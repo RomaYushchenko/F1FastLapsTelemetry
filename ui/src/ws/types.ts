@@ -9,6 +9,12 @@ export interface WsSnapshotMessage {
   drs: boolean | null
   currentLap: number | null
   currentSector: number | null
+  /** Current lap time in ms. Used for delta to best. */
+  currentLapTimeMs?: number | null
+  /** Best lap time in session (ms). */
+  bestLapTimeMs?: number | null
+  /** Delta to best lap in ms (current − best). Negative = faster than best. */
+  deltaMs?: number | null
 }
 
 export interface WsSessionEndedMessage {

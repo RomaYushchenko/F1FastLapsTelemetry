@@ -22,6 +22,13 @@ public final class WsSnapshotMessageBuilder {
         if (snapshot == null) {
             return null;
         }
+        Integer currentLapTimeMs = snapshot.getCurrentLapTimeMs();
+        Integer bestLapTimeMs = snapshot.getBestLapTimeMs();
+        Integer deltaMs = null;
+        if (currentLapTimeMs != null && bestLapTimeMs != null) {
+            deltaMs = currentLapTimeMs - bestLapTimeMs;
+        }
+
         return WsSnapshotMessage.builder()
                 .type(WsSnapshotMessage.TYPE)
                 .timestamp(snapshot.getTimestamp())
@@ -33,6 +40,9 @@ public final class WsSnapshotMessageBuilder {
                 .drs(snapshot.getDrs())
                 .currentLap(snapshot.getCurrentLap())
                 .currentSector(snapshot.getCurrentSector())
+                .currentLapTimeMs(currentLapTimeMs)
+                .bestLapTimeMs(bestLapTimeMs)
+                .deltaMs(deltaMs)
                 .build();
     }
 }

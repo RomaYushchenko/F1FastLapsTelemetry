@@ -42,5 +42,21 @@ class WsSnapshotMessageBuilderTest {
         assertThat(msg.getDrs()).isTrue();
         assertThat(msg.getCurrentLap()).isEqualTo(1);
         assertThat(msg.getCurrentSector()).isEqualTo(2);
+        assertThat(msg.getCurrentLapTimeMs()).isEqualTo(45_000);
+        assertThat(msg.getBestLapTimeMs()).isEqualTo(43_000);
+        assertThat(msg.getDeltaMs()).isEqualTo(2_000); // current - best = +2s slower
+    }
+
+    @Test
+    @DisplayName("build повертає null deltaMs коли currentLapTimeMs або bestLapTimeMs null")
+    void build_returnsNullDelta_whenLapTimesMissing() {
+        SessionRuntimeState.CarSnapshot snapshot = carSnapshot();
+        snapshot.setCurrentLapTimeMs(null);
+        snapshot.setBestLapTimeMs(43_000);
+
+        WsSnapshotMessage msg = WsSnapshotMessageBuilder.build(snapshot);
+
+        assertThat(msg).isNotNull();
+        assertThat(msg.getDeltaMs()).isNull();
     }
 }

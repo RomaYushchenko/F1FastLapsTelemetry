@@ -9,6 +9,7 @@ import { LiveThrottleWidget } from '../components/LiveThrottleWidget'
 import { LiveBrakeWidget } from '../components/LiveBrakeWidget'
 import { LiveDrsWidget } from '../components/LiveDrsWidget'
 import { LiveLapSectorWidget } from '../components/LiveLapSectorWidget'
+import { LiveDeltaWidget } from '../components/LiveDeltaWidget'
 
 export function LiveDashboardPage() {
   const { status, session, snapshot, sessionEnded, errorMessage, connectionMessage } =
@@ -98,6 +99,10 @@ export function LiveDashboardPage() {
               currentLap={snapshot?.currentLap}
               currentSector={snapshot?.currentSector}
             />
+          </div>
+
+          <div className="grid-3">
+            <LiveDeltaWidget deltaMs={snapshot?.deltaMs} />
           </div>
         </div>
       )}

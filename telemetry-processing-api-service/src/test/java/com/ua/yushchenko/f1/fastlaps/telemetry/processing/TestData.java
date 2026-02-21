@@ -119,6 +119,8 @@ public final class TestData {
         snapshot.setCurrentLap(1);
         snapshot.setCurrentSector(2);
         snapshot.setLapDistanceM(LAP_DISTANCE_M);
+        snapshot.setCurrentLapTimeMs(45_000);
+        snapshot.setBestLapTimeMs(43_000);
         snapshot.setTimestamp(RAW_TS);
         return snapshot;
     }
