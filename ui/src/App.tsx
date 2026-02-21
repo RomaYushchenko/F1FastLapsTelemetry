@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { AppLayout } from './components/AppLayout'
 import { LiveDashboardPage } from './pages/LiveDashboardPage'
 import { SessionListPage } from './pages/SessionListPage'
@@ -14,6 +15,23 @@ function App() {
           <Route path="sessions/:sessionUid" element={<SessionDetailPage />} />
         </Route>
       </Routes>
+      <Toaster
+        position="bottom-right"
+        richColors={false}
+        offset={24}
+        toastOptions={{
+          style: {
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--text-primary)',
+            boxShadow: 'var(--shadow-md)',
+          },
+          classNames: {
+            toast: 'toast-app',
+          },
+        }}
+      />
     </BrowserRouter>
   )
 }

@@ -429,3 +429,21 @@ a:hover {
   background-color: var(--bg-elevated);
   color: var(--text-secondary);
 }
+
+/* Global toast notifications (sonner) — design tokens */
+.toast-app[data-type='error'] {
+  border-left: 4px solid var(--error);
+}
+
+.toast-app[data-type='success'] {
+  border-left: 4px solid var(--success);
+}
+
+.toast-app[data-type='warning'] {
+  border-left: 4px solid var(--warning);
+}
+
+.toast-app[data-type='info'],
+.toast-app:not([data-type]) {
+  border-left: 4px solid var(--text-secondary);
+}

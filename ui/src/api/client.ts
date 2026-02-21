@@ -1,3 +1,4 @@
+import { toast } from 'sonner'
 import { API_BASE_URL } from './config'
 import { HttpError } from './types'
 import type { ApiErrorBody, Lap, Session, SessionSummary } from './types'
@@ -35,6 +36,9 @@ async function requestJson<T>(path: string, init?: RequestOptions): Promise<T> {
       ? (body as ApiErrorBody).message
       : `Request to ${path} failed with status ${response.status}`) ?? ''
 
+  if (response.status !== 404) {
+    toast.error(message)
+  }
   throw new HttpError(response.status, message, body ?? undefined)
 }
 
@@ -98,6 +102,9 @@ export async function getActiveSession(options?: RequestOptions): Promise<Sessio
       ? (body as ApiErrorBody).message
       : `Request to /api/sessions/active failed with status ${response.status}`) ?? ''
 
+  if (response.status !== 404) {
+    toast.error(message)
+  }
   throw new HttpError(response.status, message, body ?? undefined)
 }
 
