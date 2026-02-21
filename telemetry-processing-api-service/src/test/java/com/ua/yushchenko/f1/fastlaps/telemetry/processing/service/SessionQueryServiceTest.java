@@ -3,9 +3,12 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFoundException;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionMapper;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,6 +38,8 @@ class SessionQueryServiceTest {
 
     @Mock
     private SessionRepository sessionRepository;
+    @Mock
+    private LapRepository lapRepository;
     @Mock
     private SessionStateManager stateManager;
     @Mock
@@ -53,6 +59,7 @@ class SessionQueryServiceTest {
         when(sessionRepository.findAllByOrderByCreatedAtDesc(any(Pageable.class)))
                 .thenReturn(List.of(session));
         when(stateManager.get(SESSION_UID)).thenReturn(state);
+        when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
 
         // Act
         List<SessionDto> result = service.listSessions(0, 50);
@@ -86,6 +93,7 @@ class SessionQueryServiceTest {
         SessionRuntimeState state = runtimeStateActive();
         when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
         when(stateManager.get(SESSION_UID)).thenReturn(state);
+        when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
 
         // Act
         SessionDto dto = service.getSession(SESSION_PUBLIC_ID_STR);
@@ -136,6 +144,7 @@ class SessionQueryServiceTest {
         when(stateManager.getAllActive()).thenReturn(Map.of(SESSION_UID, state));
         when(sessionRepository.findById(SESSION_UID)).thenReturn(Optional.of(session));
         when(stateManager.get(SESSION_UID)).thenReturn(state);
+        when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
 
         // Act
         Optional<SessionDto> result = service.getActiveSession();
@@ -143,6 +152,21 @@ class SessionQueryServiceTest {
         // Assert
         assertThat(result).isPresent();
         assertThat(result.get().getId()).isEqualTo(SESSION_PUBLIC_ID_STR);
+    }
+
+    @Test
+    @DisplayName("getActiveSession повертає empty коли є лише сесія в ENDING (не показувати минулу кваліфікацію замість гонки)")
+    void getActiveSession_returnsEmpty_whenOnlyEnding() {
+        // Arrange: session in ENDING (e.g. qualification just finished) must not be returned as "active"
+        SessionRuntimeState state = new SessionRuntimeState(SESSION_UID);
+        state.transitionTo(SessionState.ENDING);
+        when(stateManager.getAllActive()).thenReturn(Map.of(SESSION_UID, state));
+
+        // Act
+        Optional<SessionDto> result = service.getActiveSession();
+
+        // Assert
+        assertThat(result).isEmpty();
     }
 
     @Test
@@ -180,5 +204,23 @@ class SessionQueryServiceTest {
 
         // Assert
         assertThat(result).contains(SESSION_PUBLIC_ID_STR);
+    }
+
+    @Test
+    @DisplayName("getSession виводить playerCarIndex з laps коли в сесії null (старі сесії)")
+    void getSession_infersPlayerCarIndex_fromLaps_whenNull() {
+        // Arrange: session without player_car_index (e.g. created before we added the column)
+        Session session = session();
+        session.setPlayerCarIndex(null);
+        Lap lap = Lap.builder().sessionUid(SESSION_UID).carIndex((short) 5).lapNumber((short) 1).build();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(stateManager.get(SESSION_UID)).thenReturn(runtimeStateActive());
+        when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(SESSION_UID)).thenReturn(List.of(lap));
+
+        // Act
+        SessionDto dto = service.getSession(SESSION_PUBLIC_ID_STR);
+
+        // Assert: UI will use this to request laps/summary for car 5
+        assertThat(dto.getPlayerCarIndex()).isEqualTo(5);
     }
 }

@@ -29,8 +29,13 @@ public class SessionRuntimeState {
     private volatile Instant endedAt;
     private volatile Instant lastSeenAt;
 
-    // Watermarks: per carIndex, tracks highest processed frameIdentifier
-    private final Map<Integer, AtomicInteger> watermarks = new ConcurrentHashMap<>();
+    /**
+     * Watermarks per packet type and carIndex, to allow out-of-order arrival across Kafka topics.
+     * Each topic (lap data, car telemetry, car status) can advance independently.
+     */
+    private final Map<Integer, AtomicInteger> lapWatermarks = new ConcurrentHashMap<>();
+    private final Map<Integer, AtomicInteger> telemetryWatermarks = new ConcurrentHashMap<>();
+    private final Map<Integer, AtomicInteger> statusWatermarks = new ConcurrentHashMap<>();
 
     // Snapshot for WebSocket (per carIndex)
     private final Map<Integer, CarSnapshot> snapshots = new ConcurrentHashMap<>();
@@ -53,20 +58,45 @@ public class SessionRuntimeState {
     }
 
     /**
-     * Update watermark for carIndex (idempotent, only increases).
+     * Lap data: get/update watermark for carIndex (idempotent, only increases).
      */
-    public void updateWatermark(int carIndex, int frameIdentifier) {
-        watermarks.computeIfAbsent(carIndex, k -> new AtomicInteger(0))
+    public int getLapWatermark(int carIndex) {
+        AtomicInteger w = lapWatermarks.get(carIndex);
+        return w != null ? w.get() : 0;
+    }
+
+    public void updateLapWatermark(int carIndex, int frameIdentifier) {
+        lapWatermarks.computeIfAbsent(carIndex, k -> new AtomicInteger(0))
                 .updateAndGet(current -> Math.max(current, frameIdentifier));
         this.lastSeenAt = Instant.now();
     }
 
     /**
-     * Get current watermark for carIndex.
+     * Car telemetry: get/update watermark for carIndex.
      */
-    public int getWatermark(int carIndex) {
-        AtomicInteger watermark = watermarks.get(carIndex);
-        return watermark != null ? watermark.get() : 0;
+    public int getTelemetryWatermark(int carIndex) {
+        AtomicInteger w = telemetryWatermarks.get(carIndex);
+        return w != null ? w.get() : 0;
+    }
+
+    public void updateTelemetryWatermark(int carIndex, int frameIdentifier) {
+        telemetryWatermarks.computeIfAbsent(carIndex, k -> new AtomicInteger(0))
+                .updateAndGet(current -> Math.max(current, frameIdentifier));
+        this.lastSeenAt = Instant.now();
+    }
+
+    /**
+     * Car status: get/update watermark for carIndex.
+     */
+    public int getStatusWatermark(int carIndex) {
+        AtomicInteger w = statusWatermarks.get(carIndex);
+        return w != null ? w.get() : 0;
+    }
+
+    public void updateStatusWatermark(int carIndex, int frameIdentifier) {
+        statusWatermarks.computeIfAbsent(carIndex, k -> new AtomicInteger(0))
+                .updateAndGet(current -> Math.max(current, frameIdentifier));
+        this.lastSeenAt = Instant.now();
     }
 
     /**
@@ -99,15 +129,15 @@ public class SessionRuntimeState {
     }
 
     /**
-     * Get latest snapshot for all cars (for WebSocket broadcast).
-     * Returns null if no snapshots available.
+     * Get latest snapshot for WebSocket broadcast.
+     * Ingest sends only the player car; in Time Trial that is carIndex 0, in Practice/Quali/Race it can be any.
+     * Returns the first available snapshot (player car) or null if none.
      */
     public com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage getLatestSnapshot() {
         if (snapshots.isEmpty()) {
             return null;
         }
-        // For MVP, return first available snapshot (carIndex 0 typically)
-        CarSnapshot snapshot = snapshots.get(0);
+        CarSnapshot snapshot = snapshots.values().stream().findFirst().orElse(null);
         return com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.WsSnapshotMessageBuilder.build(snapshot);
     }
 

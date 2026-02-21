@@ -50,6 +50,7 @@ public class CarStatusConsumer {
             short carIndex = (short) event.getCarIndex();
 
             lifecycleService.ensureSessionActive(sessionUid);
+            lifecycleService.setPlayerCarIndex(sessionUid, carIndex);
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
                 log.debug("Skipping car status packet: sessionUid={}, frame={}, reason=shouldNotProcess", sessionUid, frameId);
                 acknowledgment.acknowledge();

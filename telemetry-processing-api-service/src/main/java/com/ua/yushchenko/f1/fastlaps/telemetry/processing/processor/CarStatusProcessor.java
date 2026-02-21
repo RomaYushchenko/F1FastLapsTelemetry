@@ -26,13 +26,13 @@ public class CarStatusProcessor {
     public void process(long sessionUid, short carIndex, int frameId, CarStatusDto status, float sessionTime) {
         log.debug("process: sessionUid={}, carIndex={}, frameId={}", sessionUid, carIndex, frameId);
         SessionRuntimeState state = stateManager.getOrCreate(sessionUid);
-        int currentWatermark = state.getWatermark(carIndex);
+        int currentWatermark = state.getStatusWatermark(carIndex);
         if (frameId < currentWatermark) {
             log.debug("Out-of-order status packet ignored: sessionUid={}, frame={}, watermark={}",
                     sessionUid, frameId, currentWatermark);
             return;
         }
-        state.updateWatermark(carIndex, frameId);
+        state.updateStatusWatermark(carIndex, frameId);
 
         log.debug("Car status: sessionUid={}, carIndex={}, fuel={}, drsAllowed={}",
                 sessionUid, carIndex, status.getFuelInTank(), status.getDrsAllowed());

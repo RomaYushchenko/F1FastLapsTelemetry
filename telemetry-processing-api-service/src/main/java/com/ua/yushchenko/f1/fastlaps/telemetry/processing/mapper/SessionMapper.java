@@ -71,6 +71,7 @@ public class SessionMapper {
                 .trackId(session.getTrackId() != null ? session.getTrackId().intValue() : null)
                 .trackLengthM(session.getTrackLengthM())
                 .totalLaps(session.getTotalLaps() != null ? session.getTotalLaps().intValue() : null)
+                .playerCarIndex(session.getPlayerCarIndex() != null ? session.getPlayerCarIndex().intValue() : null)
                 .aiDifficulty(session.getAiDifficulty() != null ? session.getAiDifficulty().intValue() : null)
                 .startedAt(session.getStartedAt())
                 .endedAt(session.getEndedAt())

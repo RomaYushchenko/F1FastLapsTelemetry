@@ -29,20 +29,23 @@ export function SessionDetailPage() {
   const [traceStatus, setTraceStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
   const [traceError, setTraceError] = useState<string | null>(null)
 
-  const loadTrace = useCallback(async (currentSessionUid: string, lapNumber: number) => {
-    setTraceStatus('loading')
-    setTraceError(null)
-    try {
-      const points = await getLapTrace(currentSessionUid, lapNumber)
-      if (isCancelledRef.current) return
-      setTracePoints(points)
-      setTraceStatus('loaded')
-    } catch (error) {
-      if (isCancelledRef.current) return
-      setTraceStatus('error')
-      setTraceError(error instanceof Error ? error.message : 'Failed to load pedal trace')
-    }
-  }, [])
+  const loadTrace = useCallback(
+    async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
+      setTraceStatus('loading')
+      setTraceError(null)
+      try {
+        const points = await getLapTrace(currentSessionUid, lapNumber, carIndex)
+        if (isCancelledRef.current) return
+        setTracePoints(points)
+        setTraceStatus('loaded')
+      } catch (error) {
+        if (isCancelledRef.current) return
+        setTraceStatus('error')
+        setTraceError(error instanceof Error ? error.message : 'Failed to load pedal trace')
+      }
+    },
+    [],
+  )
 
   /** Full load: shows loading state, used on mount and retry. */
   const load = useCallback(async () => {
@@ -64,10 +67,13 @@ export function SessionDetailPage() {
 
     try {
       const id = sessionUid
-      const [sessionRes, lapsRes, summaryRes] = await Promise.all([
-        getSession(id),
-        getSessionLaps(id, 0),
-        getSessionSummary(id, 0),
+      const sessionRes = await getSession(id)
+      if (isCancelledRef.current) return
+      const carIndex = sessionRes.playerCarIndex ?? 0
+
+      const [lapsRes, summaryRes] = await Promise.all([
+        getSessionLaps(id, carIndex),
+        getSessionSummary(id, carIndex),
       ])
 
       if (isCancelledRef.current) return
@@ -82,14 +88,14 @@ export function SessionDetailPage() {
       const initialLapForTrace = initialSummary.bestLapNumber ?? (lapsRes[0]?.lapNumber ?? null)
       if (initialLapForTrace != null) {
         setSelectedLapForTrace(initialLapForTrace)
-        void loadTrace(id, initialLapForTrace)
+        void loadTrace(id, initialLapForTrace, carIndex)
       }
       prevLapsLengthRef.current = lapsRes.length
 
       // Pace and tyre wear APIs are optional: load separately so failures do not block core session details.
       void (async () => {
         try {
-          const paceRes = await getSessionPace(id)
+          const paceRes = await getSessionPace(id, carIndex)
           if (isCancelledRef.current) return
           setPacePoints(paceRes)
         } catch {
@@ -98,7 +104,7 @@ export function SessionDetailPage() {
       })()
       void (async () => {
         try {
-          const tyreWearRes = await getSessionTyreWear(id)
+          const tyreWearRes = await getSessionTyreWear(id, carIndex)
           if (isCancelledRef.current) return
           setTyreWearPoints(tyreWearRes)
         } catch {
@@ -128,10 +134,13 @@ export function SessionDetailPage() {
 
     const id = sessionUid
     try {
-      const [sessionRes, lapsRes, summaryRes] = await Promise.all([
-        getSession(id),
-        getSessionLaps(id, 0),
-        getSessionSummary(id, 0),
+      const sessionRes = await getSession(id)
+      if (isCancelledRef.current) return
+      const carIndex = sessionRes.playerCarIndex ?? 0
+
+      const [lapsRes, summaryRes] = await Promise.all([
+        getSessionLaps(id, carIndex),
+        getSessionSummary(id, carIndex),
       ])
 
       if (isCancelledRef.current) return
@@ -152,20 +161,20 @@ export function SessionDetailPage() {
         if (newLapNumber != null) {
           prevLapsLengthRef.current = currentLength
           setSelectedLapForTrace(newLapNumber)
-          void loadTrace(id, newLapNumber)
+          void loadTrace(id, newLapNumber, carIndex)
         }
       } else {
         prevLapsLengthRef.current = currentLength
       }
 
       try {
-        const paceRes = await getSessionPace(id)
+        const paceRes = await getSessionPace(id, carIndex)
         if (!isCancelledRef.current) setPacePoints(paceRes)
       } catch {
         // ignore
       }
       try {
-        const tyreWearRes = await getSessionTyreWear(id)
+        const tyreWearRes = await getSessionTyreWear(id, carIndex)
         if (!isCancelledRef.current) setTyreWearPoints(tyreWearRes)
       } catch {
         // ignore
@@ -177,9 +186,9 @@ export function SessionDetailPage() {
 
   /** Quiet refresh of pedal trace for current lap (no loading state) so chart updates in real time. */
   const refreshTraceInBackground = useCallback(
-    async (currentSessionUid: string, lapNumber: number) => {
+    async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
       try {
-        const points = await getLapTrace(currentSessionUid, lapNumber)
+        const points = await getLapTrace(currentSessionUid, lapNumber, carIndex)
         if (!isCancelledRef.current) setTracePoints(points)
       } catch {
         // keep current trace on error
@@ -200,17 +209,18 @@ export function SessionDetailPage() {
 
   // Background refresh while session is active: update data without loading state or full reload
   const isActiveSession = session?.state === 'ACTIVE'
+  const playerCarIndex = session?.playerCarIndex ?? 0
   useEffect(() => {
     if (!isActiveSession || status !== 'loaded') return
     const intervalMs = 5000
     const t = setInterval(() => {
       void refreshInBackground()
       if (sessionUid != null && selectedLapForTrace != null) {
-        void refreshTraceInBackground(sessionUid, selectedLapForTrace)
+        void refreshTraceInBackground(sessionUid, selectedLapForTrace, playerCarIndex)
       }
     }, intervalMs)
     return () => clearInterval(t)
-  }, [isActiveSession, status, refreshInBackground, refreshTraceInBackground, sessionUid, selectedLapForTrace])
+  }, [isActiveSession, status, refreshInBackground, refreshTraceInBackground, sessionUid, selectedLapForTrace, playerCarIndex])
 
   // Always derive best lap and best sectors from current laps so table and summary show real best per column
   const effectiveSummary = useMemo((): SessionSummary | null => {
@@ -455,7 +465,7 @@ export function SessionDetailPage() {
                       if (!Number.isFinite(value)) return
                       setSelectedLapForTrace(value)
                       if (sessionUid != null) {
-                        void loadTrace(sessionUid, value)
+                        void loadTrace(sessionUid, value, session?.playerCarIndex ?? 0)
                       }
                     }}
                     style={{
@@ -488,7 +498,9 @@ export function SessionDetailPage() {
                 {selectedLapForTrace != null && sessionUid != null && (
                   <button
                     type="button"
-                    onClick={() => loadTrace(sessionUid, selectedLapForTrace)}
+                    onClick={() =>
+                      loadTrace(sessionUid, selectedLapForTrace, session?.playerCarIndex ?? 0)
+                    }
                     style={{
                       marginTop: 'var(--space-2)',
                       padding: '6px 12px',

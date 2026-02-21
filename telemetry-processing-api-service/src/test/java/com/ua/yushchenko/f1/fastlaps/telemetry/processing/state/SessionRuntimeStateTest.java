@@ -39,22 +39,34 @@ class SessionRuntimeStateTest {
     }
 
     @Test
-    @DisplayName("updateWatermark та getWatermark зберігають тільки більше значення")
-    void updateWatermark_andGetWatermark() {
+    @DisplayName("lap watermark зберігає тільки більше значення")
+    void lapWatermark_onlyIncreases() {
         // Act
-        state.updateWatermark(0, 100);
-        state.updateWatermark(0, 150);
-        state.updateWatermark(0, 120); // idempotent: only increases
+        state.updateLapWatermark(0, 100);
+        state.updateLapWatermark(0, 150);
+        state.updateLapWatermark(0, 120); // idempotent: only increases
 
         // Assert
-        assertThat(state.getWatermark(0)).isEqualTo(150);
+        assertThat(state.getLapWatermark(0)).isEqualTo(150);
     }
 
     @Test
-    @DisplayName("getWatermark повертає 0 для невідомого carIndex")
-    void getWatermark_returnsZero_forUnknownCar() {
+    @DisplayName("telemetry та status watermarks незалежні від lap")
+    void watermarksIndependentPerType() {
+        state.updateLapWatermark(0, 100);
+        state.updateTelemetryWatermark(0, 200);
+        state.updateStatusWatermark(0, 50);
+
+        assertThat(state.getLapWatermark(0)).isEqualTo(100);
+        assertThat(state.getTelemetryWatermark(0)).isEqualTo(200);
+        assertThat(state.getStatusWatermark(0)).isEqualTo(50);
+    }
+
+    @Test
+    @DisplayName("getLapWatermark повертає 0 для невідомого carIndex")
+    void getLapWatermark_returnsZero_forUnknownCar() {
         // Act
-        int result = state.getWatermark(5);
+        int result = state.getLapWatermark(5);
 
         // Assert
         assertThat(result).isEqualTo(0);
@@ -95,6 +107,19 @@ class SessionRuntimeStateTest {
         // Assert
         assertThat(msg).isNotNull();
         assertThat(msg.getType()).isEqualTo(WsSnapshotMessage.TYPE);
+        assertThat(msg.getSpeedKph()).isEqualTo((int) SPEED_KPH);
+    }
+
+    @Test
+    @DisplayName("getLatestSnapshot повертає snapshot гравця при carIndex != 0 (Practice)")
+    void getLatestSnapshot_returnsPlayerSnapshot_whenCarIndexNotZero() {
+        // In Practice player can be carIndex 5; ingest sends only player car
+        SessionRuntimeState.CarSnapshot playerSnapshot = carSnapshot();
+        state.updateSnapshot(5, playerSnapshot);
+
+        WsSnapshotMessage msg = state.getLatestSnapshot();
+
+        assertThat(msg).isNotNull();
         assertThat(msg.getSpeedKph()).isEqualTo((int) SPEED_KPH);
     }
 

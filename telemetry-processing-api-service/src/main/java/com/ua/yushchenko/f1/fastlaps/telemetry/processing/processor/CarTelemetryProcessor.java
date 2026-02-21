@@ -37,13 +37,13 @@ public class CarTelemetryProcessor {
     public void process(long sessionUid, short carIndex, int frameId, CarTelemetryDto telemetry, float sessionTime) {
         log.debug("process: sessionUid={}, carIndex={}, frameId={}", sessionUid, carIndex, frameId);
         SessionRuntimeState state = stateManager.getOrCreate(sessionUid);
-        int currentWatermark = state.getWatermark(carIndex);
+        int currentWatermark = state.getTelemetryWatermark(carIndex);
         if (frameId < currentWatermark) {
             log.debug("Out-of-order telemetry packet ignored: sessionUid={}, frame={}, watermark={}",
                     sessionUid, frameId, currentWatermark);
             return;
         }
-        state.updateWatermark(carIndex, frameId);
+        state.updateTelemetryWatermark(carIndex, frameId);
 
         SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
         if (snapshot == null) {

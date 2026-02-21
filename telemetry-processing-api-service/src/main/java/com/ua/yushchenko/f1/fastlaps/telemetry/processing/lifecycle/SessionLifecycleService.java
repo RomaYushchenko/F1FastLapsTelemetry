@@ -1,5 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionDataDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
@@ -155,6 +156,46 @@ public class SessionLifecycleService {
     }
 
     /**
+     * Handle full session data (PacketSessionData, 724 bytes).
+     * Ensures session exists and updates metadata (session type, track, laps).
+     * Used when the game sends full session packet at start of practice/qualifying/race before SSTA or lap data.
+     */
+    public void onSessionData(long sessionUID, SessionDataDto dto) {
+        if (dto == null) {
+            return;
+        }
+        ensureSessionActive(sessionUID);
+        sessionRepository.findById(sessionUID).ifPresent(session -> {
+            boolean updated = false;
+            if (session.getSessionType() == null && dto.getSessionType() != null) {
+                session.setSessionType(dto.getSessionType().shortValue());
+                updated = true;
+            }
+            if (session.getTrackId() == null && dto.getTrackId() != null) {
+                session.setTrackId(dto.getTrackId().shortValue());
+                updated = true;
+            }
+            if (session.getTotalLaps() == null && dto.getTotalLaps() != null) {
+                session.setTotalLaps(dto.getTotalLaps().shortValue());
+                updated = true;
+            }
+            if (session.getTrackLengthM() == null && dto.getTrackLength() != null) {
+                session.setTrackLengthM(dto.getTrackLength());
+                updated = true;
+            }
+            if (session.getAiDifficulty() == null && dto.getAiDifficulty() != null) {
+                session.setAiDifficulty(dto.getAiDifficulty().shortValue());
+                updated = true;
+            }
+            if (updated) {
+                sessionRepository.save(session);
+                log.info("Updated session from SessionData: sessionUID={}, sessionType={}, trackId={}",
+                        sessionUID, session.getSessionType(), session.getTrackId());
+            }
+        });
+    }
+
+    /**
      * Ensure session has runtime state and is ACTIVE.
      * If no SSTA was received, create state and transition to ACTIVE on first data packet (implicit session start).
      * This allows processing when the game does not send session events or telemetry.session is empty.
@@ -184,6 +225,27 @@ public class SessionLifecycleService {
         synchronized (sessionCreationLock) {
             sessionPersistenceService.persistSessionIfAbsent(session);
         }
+    }
+
+    /**
+     * Update player car index for the session from incoming telemetry.
+     * Ingest sends only the player car; the game puts current player index in every packet header.
+     * We always persist the latest value so that if the index ever changes mid-session (e.g. car switch),
+     * the UI keeps showing data for the current player. First set is logged at INFO; changes at DEBUG.
+     */
+    public void setPlayerCarIndex(long sessionUID, short carIndex) {
+        sessionRepository.findById(sessionUID).ifPresent(session -> {
+            Short current = session.getPlayerCarIndex();
+            if (current == null) {
+                session.setPlayerCarIndex(carIndex);
+                sessionRepository.save(session);
+                log.info("Set player car index: sessionUID={}, playerCarIndex={}", sessionUID, carIndex);
+            } else if (current.shortValue() != carIndex) {
+                session.setPlayerCarIndex(carIndex);
+                sessionRepository.save(session);
+                log.debug("Player car index changed: sessionUID={}, previous={}, current={}", sessionUID, current, carIndex);
+            }
+        });
     }
 
     /**

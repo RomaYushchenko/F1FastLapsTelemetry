@@ -55,6 +55,10 @@ public class Session {
     @Column(name = "total_laps")
     private Short totalLaps;
 
+    /** Player car index (0–19) from F1 header; ingest sends only this car. Null until first telemetry. */
+    @Column(name = "player_car_index")
+    private Short playerCarIndex;
+
     @Column(name = "ai_difficulty")
     private Short aiDifficulty;
 

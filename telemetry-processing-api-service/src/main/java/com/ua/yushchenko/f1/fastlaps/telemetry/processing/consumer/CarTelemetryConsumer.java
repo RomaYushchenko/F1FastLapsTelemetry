@@ -50,6 +50,7 @@ public class CarTelemetryConsumer {
             short carIndex = (short) event.getCarIndex();
 
             lifecycleService.ensureSessionActive(sessionUid);
+            lifecycleService.setPlayerCarIndex(sessionUid, carIndex);
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
                 log.debug("Skipping car telemetry packet: sessionUid={}, frame={}, reason=shouldNotProcess", sessionUid, frameId);
                 acknowledgment.acknowledge();

@@ -27,13 +27,13 @@ public class LapDataProcessor {
     public void process(long sessionUid, short carIndex, int frameId, LapDto lap) {
         log.debug("process: sessionUid={}, carIndex={}, frameId={}", sessionUid, carIndex, frameId);
         SessionRuntimeState state = stateManager.getOrCreate(sessionUid);
-        int currentWatermark = state.getWatermark(carIndex);
+        int currentWatermark = state.getLapWatermark(carIndex);
         if (frameId < currentWatermark) {
             log.debug("Out-of-order lap packet ignored: sessionUid={}, frame={}, watermark={}",
                     sessionUid, frameId, currentWatermark);
             return;
         }
-        state.updateWatermark(carIndex, frameId);
+        state.updateLapWatermark(carIndex, frameId);
 
         log.debug("Lap data: sessionUid={}, carIndex={}, lap={}, sector={}, lapTime={}ms",
                 sessionUid, carIndex, lap.getLapNumber(), lap.getSector(), lap.getCurrentLapTimeMs());

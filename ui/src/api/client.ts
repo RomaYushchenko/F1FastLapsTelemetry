@@ -92,15 +92,23 @@ export async function getActiveSession(options?: RequestOptions): Promise<Sessio
 
 export async function getSessionPace(
   sessionUid: string | undefined,
+  carIndex = 0,
 ): Promise<PacePoint[]> {
-  return requestJson<PacePoint[]>(`/api/sessions/${sessionUid}/pace`)
+  const search = new URLSearchParams()
+  if (carIndex !== 0) search.set('carIndex', String(carIndex))
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  return requestJson<PacePoint[]>(`/api/sessions/${sessionUid}/pace${suffix}`)
 }
 
 export async function getLapTrace(
   sessionUid: string | undefined,
   lapNum: number,
+  carIndex = 0,
 ): Promise<PedalTracePoint[]> {
-  return requestJson<PedalTracePoint[]>(`/api/sessions/${sessionUid}/laps/${lapNum}/trace`)
+  const search = new URLSearchParams()
+  if (carIndex !== 0) search.set('carIndex', String(carIndex))
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  return requestJson<PedalTracePoint[]>(`/api/sessions/${sessionUid}/laps/${lapNum}/trace${suffix}`)
 }
 
 export async function getSessionTyreWear(
