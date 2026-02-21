@@ -16,6 +16,11 @@ import java.util.List;
 public class WebMvcConfig {
 
     @Bean
+    public TraceIdFilter traceIdFilter() {
+        return new TraceIdFilter();
+    }
+
+    @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);

@@ -3,9 +3,11 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.consumer;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionLifecycleEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.config.TraceIdFilter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor.SessionEventProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
@@ -29,10 +31,17 @@ public class SessionEventConsumer {
     )
     public void consume(SessionLifecycleEvent event, Acknowledgment acknowledgment) {
         if (event == null) {
-            log.warn("Skipping record: deserialization failed (e.g. old format without @type)");
-            acknowledgment.acknowledge();
+            MDC.put(TraceIdFilter.MDC_TRACE_ID, "kafka-ev-null");
+            try {
+                log.warn("Skipping record: deserialization failed (e.g. old format without @type)");
+                acknowledgment.acknowledge();
+            } finally {
+                MDC.clear();
+            }
             return;
         }
+        String traceId = "kafka-ev-" + event.getSessionUID() + "-" + event.getFrameIdentifier();
+        MDC.put(TraceIdFilter.MDC_TRACE_ID, traceId);
         try {
             long sessionUid = event.getSessionUID();
             int frameId = event.getFrameIdentifier();
@@ -52,6 +61,8 @@ public class SessionEventConsumer {
         } catch (Exception e) {
             log.error("Error processing session event", e);
             throw e;
+        } finally {
+            MDC.clear();
         }
     }
 }

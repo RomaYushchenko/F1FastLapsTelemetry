@@ -45,10 +45,12 @@ alwaysApply: true
 - **Маппери, білдери, entity, DTO**: за замовчуванням не додавати логи; якщо потрібен дуже детальний дебаг — лише TRACE (наприклад toDto з ключовими полями).
 - **Репозиторії (Spring Data)**: не логувати вручну.
 
-## Конфігурація для дебагу
+## Трасування (traceId)
 
-- У Docker Compose для сервісів увімкнено профіль **dev** (`SPRING_PROFILES_ACTIVE: dev`), щоб у контейнерах були видимі DEBUG-логи.
-- У `telemetry-processing-api-service` профіль dev підключає `application-dev.yml` з `logging.level.com.ua.yushchenko.f1.fastlaps.telemetry: DEBUG`.
+- Кожен рядок лога містить **traceId** у квадратних дужках (формат заданий у `logging.pattern.console`). По ньому можна відфільтрувати всі логи одного запиту або одного Kafka-повідомлення.
+- **REST**: для кожного HTTP-запиту фільтр `TraceIdFilter` кладе в MDC `traceId` — з заголовка `X-Trace-Id` (якщо клієнт передав) або згенерований UUID. Після відповіді MDC очищається.
+- **Kafka**: у кожному консьюмері на початку обробки в MDC ставиться `traceId` формату `kafka-<topic>-<sessionUid>-<frameId>` (наприклад `kafka-ct-12345-67` для car telemetry); у `finally` викликається `MDC.clear()`.
+- Для відслідковування: `grep '\[kafka-ct-12345-67\]' app.log` або `grep '\[abc-uuid\]' app.log` для REST.
 
 ## Короткий чеклист для нового коду
 
