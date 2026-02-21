@@ -72,50 +72,35 @@ class CarStatusPacketHandlerTest {
     }
 
     private ByteBuffer createCarStatusPayload() {
-        ByteBuffer buffer = ByteBuffer.allocate(1000).order(ByteOrder.LITTLE_ENDIAN);
-
-        // Traction control
-        buffer.put((byte) 1);
-        // ABS
-        buffer.put((byte) 1);
-        // Fuel mix
-        buffer.put((byte) 2);
-        // Front brake bias
-        buffer.put((byte) 55);
-        // Pit limiter
-        buffer.put((byte) 0);
-        // Fuel in tank
-        buffer.putFloat(45.5f);
-        // Fuel capacity
-        buffer.putFloat(110.0f);
-        // Fuel remaining laps
-        buffer.putFloat(15.2f);
-        // Max RPM
-        buffer.putShort((short) 12000);
-        // Idle RPM
-        buffer.putShort((short) 7000);
-        // Max gears
-        buffer.put((byte) 8);
-        // DRS allowed
-        buffer.put((byte) 1);
-        // DRS activation distance
-        buffer.putShort((short) 0);
-        // Actual tyre compound
-        buffer.put((byte) 16);
-        // Visual tyre compound
-        buffer.put((byte) 16);
-        // Tyres age laps
-        buffer.put((byte) 5);
-        // Vehicle FIA flags
-        buffer.put((byte) 0);
-        // Engine power ICE
-        buffer.putFloat(750000.0f);
-        // Engine power MGUK
-        buffer.putFloat(120000.0f);
-        // ERS store energy
-        buffer.putFloat(2500000.0f);
-
-        buffer.rewind();
+        // Full 55 bytes of CarStatusData (F1 25) per CarStatusPacketParser.CAR_STATUS_DATA_SIZE_BYTES
+        ByteBuffer buffer = ByteBuffer.allocate(CarStatusPacketParser.CAR_STATUS_DATA_SIZE_BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN);
+        buffer.put((byte) 1);                    // tractionControl
+        buffer.put((byte) 1);                    // abs
+        buffer.put((byte) 2);                    // fuelMix
+        buffer.put((byte) 55);                   // frontBrakeBias
+        buffer.put((byte) 0);                    // pitLimiterStatus
+        buffer.putFloat(45.5f);                  // fuelInTank
+        buffer.putFloat(110.0f);                 // fuelCapacity
+        buffer.putFloat(15.2f);                  // fuelRemainingLaps
+        buffer.putShort((short) 12000);          // maxRPM
+        buffer.putShort((short) 7000);           // idleRPM
+        buffer.put((byte) 8);                    // maxGears
+        buffer.put((byte) 1);                    // drsAllowed
+        buffer.putShort((short) 0);             // drsActivationDistance
+        buffer.put((byte) 16);                   // actualTyreCompound
+        buffer.put((byte) 16);                   // visualTyreCompound
+        buffer.put((byte) 5);                    // tyresAgeLaps
+        buffer.put((byte) 0);                    // vehicleFIAFlags
+        buffer.putFloat(750000.0f);              // enginePowerICE
+        buffer.putFloat(120000.0f);              // enginePowerMGUK
+        buffer.putFloat(2500000.0f);             // ersStoreEnergy
+        buffer.put((byte) 0);                    // ersDeployMode
+        buffer.putFloat(0.0f);                   // ersHarvestedThisLapMGUK
+        buffer.putFloat(0.0f);                   // ersHarvestedThisLapMGUH
+        buffer.putFloat(0.0f);                   // ersDeployedThisLap
+        buffer.put((byte) 0);                    // networkPaused
+        buffer.flip();
         return buffer;
     }
 }

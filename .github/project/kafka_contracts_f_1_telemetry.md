@@ -217,6 +217,35 @@ Example (full payload):
 
 Topic: `telemetry.carStatus`
 
+Payload maps F1 25 **CarStatusData** (55 bytes per car). Field semantics: `.github/docs/F1 25 Telemetry Output Structures.txt` (PacketCarStatusData, CarStatusData).
+
+| Field | Type | Description |
+|-------|------|--------------|
+| tractionControl | int | 0 = off, 1 = medium, 2 = full |
+| abs | int | 0 = off, 1 = on |
+| fuelInTank | float | Current fuel mass |
+| fuelMix | int | 0 = lean, 1 = standard, 2 = rich, 3 = max |
+| drsAllowed | bool | 0 = not allowed, 1 = allowed |
+| tyresCompound | int | m_actualTyreCompound (e.g. 16 = C5, 7 = inter, 8 = wet) |
+| tyresAgeLaps | int | Age in laps of current set |
+| ersStoreEnergy | float | ERS energy store (J) |
+| frontBrakeBias | int | Front brake bias (%) |
+| pitLimiterStatus | int | 0 = off, 1 = on |
+| fuelCapacity | float | Fuel capacity |
+| fuelRemainingLaps | float | Fuel remaining in laps (MFD value) |
+| maxRpm, idleRpm | int | Max / idle RPM |
+| maxGears | int | Maximum number of gears |
+| drsActivationDistance | int | Metres; 0 = DRS not available |
+| visualTyreCompound | int | Visual compound (can differ from actual) |
+| vehicleFiaFlags | int | -1 = invalid, 0 = none, 1 = green, 2 = blue, 3 = yellow |
+| enginePowerIce, enginePowerMguk | float | Power output (W) |
+| ersDeployMode | int | 0 = none, 1 = medium, 2 = hotlap, 3 = overtake |
+| ersHarvestedThisLapMguk, ersHarvestedThisLapMguh | float | ERS harvested this lap |
+| ersDeployedThisLap | float | ERS deployed this lap |
+| networkPaused | int | Car paused in network game |
+
+Example (subset):
+
 ```json
 {
   "tractionControl": 2,
@@ -225,7 +254,13 @@ Topic: `telemetry.carStatus`
   "fuelMix": 1,
   "drsAllowed": true,
   "tyresCompound": 16,
-  "ersStoreEnergy": 2.34
+  "tyresAgeLaps": 5,
+  "ersStoreEnergy": 2.34,
+  "frontBrakeBias": 55,
+  "fuelCapacity": 110.0,
+  "maxRpm": 12000,
+  "idleRpm": 7000,
+  "maxGears": 8
 }
 ```
 
