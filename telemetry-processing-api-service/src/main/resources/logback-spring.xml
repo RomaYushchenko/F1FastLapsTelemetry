@@ -17,11 +17,11 @@
         </encoder>
     </appender>
 
-    <!-- Application log file: new file per run (STARTUP_TS), rotation by day, retention 5 days -->
+    <!-- Application log: active file per run (STARTUP_TS); roll pattern without STARTUP_TS so maxHistory cleans all runs -->
     <appender name="FILE_APPLICATION" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/${SERVICE_NAME}-application-${STARTUP_TS}.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/${SERVICE_NAME}-application-${STARTUP_TS}.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${LOG_PATH}/${SERVICE_NAME}-application.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>5</maxHistory>
         </rollingPolicy>
         <encoder>
@@ -34,7 +34,7 @@
     <appender name="FILE_DB" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/${SERVICE_NAME}-db-${STARTUP_TS}.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/${SERVICE_NAME}-db-${STARTUP_TS}.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${LOG_PATH}/${SERVICE_NAME}-db.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>5</maxHistory>
         </rollingPolicy>
         <encoder>
@@ -47,7 +47,7 @@
     <appender name="FILE_INBOUND_EVENTS" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_PATH}/${SERVICE_NAME}-inbound-events-${STARTUP_TS}.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_PATH}/${SERVICE_NAME}-inbound-events-${STARTUP_TS}.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>${LOG_PATH}/${SERVICE_NAME}-inbound-events.%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>5</maxHistory>
         </rollingPolicy>
         <encoder>
