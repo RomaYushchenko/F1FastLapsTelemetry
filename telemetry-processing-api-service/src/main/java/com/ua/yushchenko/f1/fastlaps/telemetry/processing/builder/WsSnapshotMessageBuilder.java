@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.LapDataMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState.CarSnapshot;
 
 /**
@@ -40,6 +41,7 @@ public final class WsSnapshotMessageBuilder {
                 .drs(snapshot.getDrs())
                 .currentLap(snapshot.getCurrentLap())
                 .currentSector(snapshot.getCurrentSector())
+                .currentSectorDisplayName(LapDataMapper.sectorDisplayName(snapshot.getCurrentSector()))
                 .currentLapTimeMs(currentLapTimeMs)
                 .bestLapTimeMs(bestLapTimeMs)
                 .deltaMs(deltaMs)

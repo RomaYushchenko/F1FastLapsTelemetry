@@ -2,7 +2,7 @@
 
 **Goal:** Replace raw integer fields from **PacketLapData** (packet 2) with **reference enums** for Pit Status, Sector, Current Lap Invalid, Driver Status, Result Status, and Pit Lane Timer Active. Ingest keeps sending raw codes; processing and API use enums for display and logic.
 
-**Status:** Proposal.
+**Status:** Implemented.
 
 **Reference:** `.github/draft/other-enume-types-deep-research-report.md` (§ Lap Data Packet Enums); `.github/docs/F1 25 Telemetry Output Structures.txt` (LapData struct).
 

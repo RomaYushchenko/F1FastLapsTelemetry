@@ -30,6 +30,8 @@ public class WsSnapshotMessage {
     private Boolean drs;
     private Integer currentLap;
     private Integer currentSector;
+    /** Human-readable sector (e.g. "Sector 1") from LapData m_sector; see plan 10. */
+    private String currentSectorDisplayName;
     /** Current lap time in ms (from LapData). Used for delta to best. */
     private Integer currentLapTimeMs;
     /** Best lap time in session (ms). From SessionSummary. */

@@ -42,6 +42,7 @@ class WsSnapshotMessageBuilderTest {
         assertThat(msg.getDrs()).isTrue();
         assertThat(msg.getCurrentLap()).isEqualTo(1);
         assertThat(msg.getCurrentSector()).isEqualTo(2);
+        assertThat(msg.getCurrentSectorDisplayName()).isEqualTo("Sector 3");
         assertThat(msg.getCurrentLapTimeMs()).isEqualTo(45_000);
         assertThat(msg.getBestLapTimeMs()).isEqualTo(43_000);
         assertThat(msg.getDeltaMs()).isEqualTo(2_000); // current - best = +2s slower

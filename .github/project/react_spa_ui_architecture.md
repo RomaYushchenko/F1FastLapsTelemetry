@@ -149,7 +149,7 @@ ui/
 - **Throttle / Brake** — progress bar або відсотки.
 - **DRS** — текст "ON" / "OFF" або індикатор.
 - **ERS** — заряд 0–100% (progress bar або %), індикатор "Deploy" коли гравець використовує ERS.
-- **Current lap / Sector** — з SNAPSHOT (`currentLap`, `currentSector`).
+- **Current lap / Sector** — з SNAPSHOT (`currentLap`, `currentSector`). Для відображення сектора текстом (наприклад "Sector 2") backend передає `currentSectorDisplayName` (LapDataMapper, plan 10).
 - **Delta to best** — дельта до кращого часу сесії (±секунди); зелений = швидше best, червоний = повільніше.
 - Якщо **немає активной сесії** — повідомлення замість даних; кнопка "View past sessions" → `/sessions`.
 
