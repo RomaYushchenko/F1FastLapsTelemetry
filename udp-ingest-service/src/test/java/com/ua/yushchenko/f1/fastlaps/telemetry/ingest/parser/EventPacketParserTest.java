@@ -35,6 +35,7 @@ class EventPacketParserTest {
         ByteBuffer buffer = ByteBuffer.allocate(EventPacketParser.EVENT_PAYLOAD_SIZE).order(ByteOrder.LITTLE_ENDIAN);
         buffer.put("DRSD".getBytes());
         buffer.put((byte) 1); // reason = Safety car
+        while (buffer.position() < EventPacketParser.EVENT_PAYLOAD_SIZE) buffer.put((byte) 0);
         buffer.flip();
 
         EventDto dto = parser.parse(buffer);
@@ -50,6 +51,7 @@ class EventPacketParserTest {
         buffer.put("SCAR".getBytes());
         buffer.put((byte) 2); // Full SC = 1, VSC = 2
         buffer.put((byte) 0); // Deployed
+        while (buffer.position() < EventPacketParser.EVENT_PAYLOAD_SIZE) buffer.put((byte) 0);
         buffer.flip();
 
         EventDto dto = parser.parse(buffer);
@@ -66,6 +68,7 @@ class EventPacketParserTest {
         buffer.put("RTMT".getBytes());
         buffer.put((byte) 5);  // vehicleIdx
         buffer.put((byte) 8);  // reason = mechanical failure
+        while (buffer.position() < EventPacketParser.EVENT_PAYLOAD_SIZE) buffer.put((byte) 0);
         buffer.flip();
 
         EventDto dto = parser.parse(buffer);
@@ -82,6 +85,7 @@ class EventPacketParserTest {
         buffer.put("FTLP".getBytes());
         buffer.put((byte) 0);  // vehicleIdx
         buffer.putFloat(88.123f); // lapTime seconds
+        while (buffer.position() < EventPacketParser.EVENT_PAYLOAD_SIZE) buffer.put((byte) 0);
         buffer.flip();
 
         EventDto dto = parser.parse(buffer);
