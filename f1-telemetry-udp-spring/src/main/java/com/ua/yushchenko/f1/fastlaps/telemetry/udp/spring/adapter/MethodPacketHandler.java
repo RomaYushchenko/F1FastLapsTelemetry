@@ -3,7 +3,6 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.adapter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.dispatcher.UdpPacketConsumer;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.lang.reflect.InvocationTargetException;
@@ -30,9 +29,6 @@ public class MethodPacketHandler implements UdpPacketConsumer {
     /** MDC key for trace ID (same as in REST/Kafka so log pattern %X{traceId:-} works). */
     private static final String MDC_TRACE_ID = "traceId";
 
-    /** Named logger for inbound UDP so ingest service can route to inbound-udp log file. */
-    private static final org.slf4j.Logger INBOUND_UDP_LOG = LoggerFactory.getLogger("inbound-udp");
-
     private final Object bean;
     private final Method method;
     private final short packetId;
@@ -58,8 +54,8 @@ public class MethodPacketHandler implements UdpPacketConsumer {
         String traceId = UUID.randomUUID().toString();
         MDC.put(MDC_TRACE_ID, traceId);
         try {
-            INBOUND_UDP_LOG.debug("handle: packetId={}, sessionUID={}, frame={}",
-                    packetId, header.getSessionUID(), header.getFrameIdentifier());
+            // Inbound UDP logging (header + payload size, parsed payload as JSON) is done by
+            // InboundUdpLoggingAspect in udp-ingest-service.
             switch (signature) {
                 case HEADER_AND_PAYLOAD:
                     method.invoke(bean, header, payload);
