@@ -159,7 +159,7 @@ Live має **дашбордний** стиль: більші цифри, кар
 
 Перелік live-віджетів, поля з WebSocket SNAPSHOT та критерії готовності описані в **[telemetry_diagrams_plan.md](telemetry_diagrams_plan.md)** (розділ 3) та в **План реалізації діаграм телеметрії EA SPORTS F1 25.pdf**. Під час реалізації Етапу 11 слід дотримуватися цього плану:
 
-- **Speed** (speedKph), **RPM** (engineRpm), **Gear** (gear), **Throttle** (throttle), **Brake** (brake), **DRS** (drs), **ERS** (ersEnergyPercent, ersDeployActive), **Current lap / Sector** (currentLap, currentSector), **Delta to best** (deltaMs).
+- **Speed** (speedKph), **RPM** (engineRpm), **Gear** (gear), **Throttle** (throttle), **Brake** (brake), **DRS** (drs), **ERS** (ersEnergyPercent, ersDeployActive, ersDeployModeDisplayName — e.g. "Hotlap", "Overtake" from plan 11 enums), **Current lap / Sector** (currentLap, currentSector), **Delta to best** (deltaMs).
 - Оновлення ~10 Hz з backend; стани екрану: є активна сесія / немає активной сесії.
 
 ---

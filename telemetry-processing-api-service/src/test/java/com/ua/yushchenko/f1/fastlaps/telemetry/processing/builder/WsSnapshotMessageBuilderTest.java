@@ -48,6 +48,7 @@ class WsSnapshotMessageBuilderTest {
         assertThat(msg.getDeltaMs()).isEqualTo(2_000); // current - best = +2s slower
         assertThat(msg.getErsEnergyPercent()).isEqualTo(75);
         assertThat(msg.getErsDeployActive()).isFalse();
+        assertThat(msg.getErsDeployModeDisplayName()).isEqualTo("Hotlap");
     }
 
     @Test

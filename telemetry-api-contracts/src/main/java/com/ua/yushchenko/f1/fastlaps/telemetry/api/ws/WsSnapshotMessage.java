@@ -40,6 +40,8 @@ public class WsSnapshotMessage {
     private Integer deltaMs;
     /** ERS energy store 0–100%. From CarStatus ersStoreEnergy. */
     private Integer ersEnergyPercent;
-    /** ERS deploy active (driver using ERS). From CarStatus ersDeployMode > 0. */
+    /** ERS deploy active (driver using ERS). From CarStatus ersDeployMode != None. */
     private Boolean ersDeployActive;
+    /** ERS deploy mode display name (e.g. "Hotlap", "Overtake"). Plan 11. */
+    private String ersDeployModeDisplayName;
 }

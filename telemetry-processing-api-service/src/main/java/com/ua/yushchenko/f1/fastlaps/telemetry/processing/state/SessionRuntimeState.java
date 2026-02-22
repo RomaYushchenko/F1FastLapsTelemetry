@@ -236,8 +236,10 @@ public class SessionRuntimeState {
         private Integer bestLapTimeMs;
         /** ERS energy 0–100%. Set from CarStatusProcessor (ersStoreEnergy / ERS_MAX_J). */
         private Integer ersEnergyPercent;
-        /** ERS deploy active (ersDeployMode > 0). Set from CarStatusProcessor. */
+        /** ERS deploy active (ersDeployMode != NONE). Set from CarStatusProcessor. */
         private Boolean ersDeployActive;
+        /** ERS deploy mode code (0=none, 1=medium, 2=hotlap, 3=overtake); for display name in WS. */
+        private Integer ersDeployMode;
         private Instant timestamp;
     }
 }

@@ -2,7 +2,7 @@
 
 **Goal:** Replace raw integer fields in **CarTelemetryDto**, **CarStatusDto**, and **CarDamageDto** with **reference enums** where values have defined meanings. Ingest keeps sending raw codes; processing uses enums for snapshot, REST, and Live UI.
 
-**Status:** Proposal.
+**Status:** Implemented.
 
 **Reference:** `.github/docs/F1 25 Telemetry Output Structures.txt` (CarTelemetryData, CarStatusData, CarDamageData); `.github/draft/other-enume-types-deep-research-report.md`.
 

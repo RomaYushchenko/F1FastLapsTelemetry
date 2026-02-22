@@ -127,6 +127,7 @@ public final class TestData {
         snapshot.setBestLapTimeMs(43_000);
         snapshot.setErsEnergyPercent(75);
         snapshot.setErsDeployActive(false);
+        snapshot.setErsDeployMode(2); // 2 = Hotlap (plan 11)
         snapshot.setTimestamp(RAW_TS);
         return snapshot;
     }

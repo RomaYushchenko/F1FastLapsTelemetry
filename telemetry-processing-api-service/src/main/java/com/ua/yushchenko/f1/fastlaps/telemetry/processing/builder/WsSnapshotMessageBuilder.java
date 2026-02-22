@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.CarStatusMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.LapDataMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState.CarSnapshot;
 
@@ -47,6 +48,7 @@ public final class WsSnapshotMessageBuilder {
                 .deltaMs(deltaMs)
                 .ersEnergyPercent(snapshot.getErsEnergyPercent())
                 .ersDeployActive(snapshot.getErsDeployActive())
+                .ersDeployModeDisplayName(CarStatusMapper.ersDeployModeDisplayName(snapshot.getErsDeployMode()))
                 .build();
     }
 }

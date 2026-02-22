@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarStatusDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.ErsDeployMode;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.CarStatusRawWriter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.LastTyreCompoundState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
@@ -59,8 +60,9 @@ public class CarStatusProcessor {
         } else {
             snapshot.setErsEnergyPercent(null);
         }
-        snapshot.setErsDeployActive(
-                status.getErsDeployMode() != null && status.getErsDeployMode() > 0);
+        ErsDeployMode ersMode = ErsDeployMode.fromCode(status.getErsDeployMode());
+        snapshot.setErsDeployActive(ersMode.isDeployActive());
+        snapshot.setErsDeployMode(status.getErsDeployMode());
 
         if (status.getTyresCompound() != null) {
             lastTyreCompoundState.update(sessionUid, carIndex, status.getTyresCompound());
