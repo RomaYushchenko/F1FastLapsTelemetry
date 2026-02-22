@@ -26,8 +26,10 @@ public class WsSnapshotMessage {
     private Integer engineRpm;
     private Float throttle;
     private Float brake;
-    /** DRS active (from car status); null if not yet received */
+    /** DRS wing open (from Car Telemetry m_drs). Plan 12. */
     private Boolean drs;
+    /** DRS zone allowed (from Car Status m_drsAllowed). Optional for UI "DRS available". Plan 12. */
+    private Boolean drsAllowed;
     private Integer currentLap;
     private Integer currentSector;
     /** Human-readable sector (e.g. "Sector 1") from LapData m_sector; see plan 10. */

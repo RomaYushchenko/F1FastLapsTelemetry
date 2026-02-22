@@ -224,8 +224,10 @@ public class SessionRuntimeState {
         private Integer engineRpm;
         private Float throttle;
         private Float brake;
-        /** DRS active; set from CarStatusConsumer */
+        /** DRS wing open (from Car Telemetry m_drs). Set in CarTelemetryProcessor. */
         private Boolean drs;
+        /** DRS zone allowed (from Car Status m_drsAllowed). Set in CarStatusProcessor. Plan 12. */
+        private Boolean drsAllowed;
         private Integer currentLap;
         private Integer currentSector;
         /** Lap distance in metres (from LapData); used for pedal trace. */

@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarTelemetryDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.DrsState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.RawTelemetryWriter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
@@ -13,9 +14,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Processes car telemetry: watermark update, merge snapshot, pedal trace (with lap attribution).
+ * Processes car telemetry: watermark update, merge snapshot (including DRS wing state), pedal trace (with lap attribution).
+ * Snapshot DRS (wing open/closed) is set from telemetry m_drs (0=off, 1=on); DRS allowed (zone) is set from Car Status in CarStatusProcessor.
  * Called from CarTelemetryConsumer after ensureSession, shouldProcess, idempotency.
- * See: implementation_phases.md Phase 5.1.
+ * See: implementation_phases.md Phase 5.1, plan 12.
  */
 @Slf4j
 @Component
@@ -54,6 +56,7 @@ public class CarTelemetryProcessor {
         snapshot.setEngineRpm(telemetry.getEngineRpm());
         snapshot.setThrottle(telemetry.getThrottle());
         snapshot.setBrake(telemetry.getBrake());
+        snapshot.setDrs(DrsState.fromCode(telemetry.getDrs()) == DrsState.ON);
         snapshot.setTimestamp(Instant.now());
         state.updateSnapshot(carIndex, snapshot);
 

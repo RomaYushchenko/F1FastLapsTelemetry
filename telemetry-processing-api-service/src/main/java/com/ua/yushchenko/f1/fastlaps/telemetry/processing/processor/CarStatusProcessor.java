@@ -13,9 +13,11 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Processes car status: watermark update, snapshot DRS and ERS, persist to car_status_raw when active.
+ * Processes car status: watermark update, snapshot ERS and drsAllowed (zone); persist to car_status_raw when active.
+ * Snapshot DRS (wing open/closed) is set in {@link CarTelemetryProcessor} from Car Telemetry m_drs; this processor sets only drsAllowed (zone active) and ERS.
+ * ERS_MAX_ENERGY_J (4 MJ) from F1 25 spec / regulations; used to compute ersEnergyPercent.
  * Called from CarStatusConsumer after ensureSession, shouldProcess, idempotency.
- * See: implementation_phases.md Phase 5.1.
+ * See: implementation_phases.md Phase 5.1, plan 12.
  */
 @Slf4j
 @Component
@@ -52,7 +54,7 @@ public class CarStatusProcessor {
             snapshot = new SessionRuntimeState.CarSnapshot();
             state.updateSnapshot(carIndex, snapshot);
         }
-        snapshot.setDrs(Boolean.TRUE.equals(status.getDrsAllowed()));
+        snapshot.setDrsAllowed(Boolean.TRUE.equals(status.getDrsAllowed()));
 
         if (status.getErsStoreEnergy() != null && ERS_MAX_ENERGY_J > 0) {
             float percent = 100f * status.getErsStoreEnergy() / ERS_MAX_ENERGY_J;

@@ -40,6 +40,7 @@ class WsSnapshotMessageBuilderTest {
         assertThat(msg.getThrottle()).isEqualTo(THROTTLE);
         assertThat(msg.getBrake()).isEqualTo(BRAKE);
         assertThat(msg.getDrs()).isTrue();
+        assertThat(msg.getDrsAllowed()).isTrue();
         assertThat(msg.getCurrentLap()).isEqualTo(1);
         assertThat(msg.getCurrentSector()).isEqualTo(2);
         assertThat(msg.getCurrentSectorDisplayName()).isEqualTo("Sector 3");

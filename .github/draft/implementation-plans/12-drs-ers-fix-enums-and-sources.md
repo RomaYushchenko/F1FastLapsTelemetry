@@ -2,7 +2,7 @@
 
 **Goal:** Fix the current **DRS and ERS** behaviour so that (1) **DRS** shows the **actual wing state** (open/closed) from Car Telemetry, and "DRS allowed" from Car Status is used only where relevant; (2) **ERS** remains from Car Status with correct interpretation using **enums**; (3) optional: show **DRS disabled reason** when we consume Event packet (DRSD).
 
-**Status:** Proposal.
+**Status:** Implemented.
 
 **Reference:** `.github/docs/F1 25 Telemetry Output Structures.txt` (CarTelemetryData.m_drs, CarStatusData.m_drsAllowed, m_ersStoreEnergy, m_ersDeployMode); `.github/draft/other-enume-types-deep-research-report.md` (DRS Disabled Reason in Event packet).
 

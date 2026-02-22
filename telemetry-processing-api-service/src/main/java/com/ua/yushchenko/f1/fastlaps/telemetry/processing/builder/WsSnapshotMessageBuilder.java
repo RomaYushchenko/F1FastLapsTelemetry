@@ -40,6 +40,7 @@ public final class WsSnapshotMessageBuilder {
                 .throttle(snapshot.getThrottle())
                 .brake(snapshot.getBrake())
                 .drs(snapshot.getDrs())
+                .drsAllowed(snapshot.getDrsAllowed())
                 .currentLap(snapshot.getCurrentLap())
                 .currentSector(snapshot.getCurrentSector())
                 .currentSectorDisplayName(LapDataMapper.sectorDisplayName(snapshot.getCurrentSector()))

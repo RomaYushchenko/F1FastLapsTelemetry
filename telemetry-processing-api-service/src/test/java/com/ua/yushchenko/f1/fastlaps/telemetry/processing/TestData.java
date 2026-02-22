@@ -120,6 +120,7 @@ public final class TestData {
         snapshot.setThrottle(THROTTLE);
         snapshot.setBrake(BRAKE);
         snapshot.setDrs(true);
+        snapshot.setDrsAllowed(true);
         snapshot.setCurrentLap(1);
         snapshot.setCurrentSector(2);
         snapshot.setLapDistanceM(LAP_DISTANCE_M);
