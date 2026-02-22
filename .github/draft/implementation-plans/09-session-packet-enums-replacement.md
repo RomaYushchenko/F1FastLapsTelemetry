@@ -2,7 +2,7 @@
 
 **Goal:** Replace raw integer fields from **PacketSessionData** (packet 1) with **reference enums** where values have defined meanings. Ingest continues to send raw codes (Integer); processing and API use enums for mapping and display.
 
-**Status:** Proposal.
+**Status:** Implemented.
 
 **Reference:** `.github/draft/other-enume-types-deep-research-report.md` (Weather, Track/Air Temp Change, Zone Flag, Formula, SLI Pro, Safety Car Status, Network Game, Forecast Accuracy, Steering/Braking/Gearbox/Pit/ERS/DRS Assist, Dynamic Racing Line, Session Length, Speed/Temperature Units, etc.).
 

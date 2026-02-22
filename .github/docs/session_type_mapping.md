@@ -39,3 +39,7 @@
 - **telemetry-processing-api-service:** `SessionMapper.toDto()` uses `F1SessionType.fromCode(session.getSessionType()).getDisplayName()` for REST `SessionDto.sessionType`.
 
 When adding or changing a value, update **only** `F1SessionType` in telemetry-api-contracts; then this doc.
+
+## Session options (weather, formula, assists, etc.)
+
+**Session type** and **track** are above (F1SessionType, F1Track). Other PacketSessionData fields (weather, formula, safetyCarStatus, assists, sessionLength, units, game rules) are mapped via **reference enums** from **plan 09** in `telemetry-api-contracts` (package `api.reference`). Display names for REST or logs: use **SessionDataMapper** in telemetry-processing-api-service (`SessionDataMapper.weatherDisplayName(code)`, etc.). See `.github/draft/implementation-plans/09-session-packet-enums-replacement.md`.
