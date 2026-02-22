@@ -58,39 +58,6 @@ class SessionMapperTest {
     }
 
     @Test
-    @DisplayName("sessionTypeToDisplayString повертає null коли sessionType null")
-    void sessionTypeToDisplayString_returnsNull_whenNull() {
-        // Act
-        String result = SessionMapper.sessionTypeToDisplayString(null);
-
-        // Assert
-        assertThat(result).isNull();
-    }
-
-    @Test
-    @DisplayName("sessionTypeToDisplayString мапить відомі типи сесій")
-    void sessionTypeToDisplayString_mapsKnownTypes() {
-        // Act & Assert
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 0)).isEqualTo("UNKNOWN");
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 1)).isEqualTo("PRACTICE_1");
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 2)).isEqualTo("PRACTICE_2");
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 10)).isEqualTo("RACE");
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 12)).isEqualTo("TIME_TRIAL");
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 13)).isEqualTo("SPRINT");
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 14)).isEqualTo("SPRINT_SHOOTOUT");
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 15)).isEqualTo("SPRINT");
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 16)).isEqualTo("SPRINT_SHOOTOUT");
-    }
-
-    @Test
-    @DisplayName("sessionTypeToDisplayString повертає UNKNOWN для невідомого id")
-    void sessionTypeToDisplayString_returnsUnknown_forUnknownId() {
-        // Act & Assert
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) 99)).isEqualTo("UNKNOWN");
-        assertThat(SessionMapper.sessionTypeToDisplayString((short) -1)).isEqualTo("UNKNOWN"); // 255 as byte
-    }
-
-    @Test
     @DisplayName("toDto повертає null коли session null")
     void toDto_returnsNull_whenSessionNull() {
         // Act
@@ -115,7 +82,8 @@ class SessionMapperTest {
         assertThat(dto.getId()).isEqualTo(SESSION_PUBLIC_ID_STR);
         assertThat(dto.getSessionDisplayName()).isEqualTo(SESSION_PUBLIC_ID_STR);
         assertThat(dto.getSessionType()).isEqualTo("RACE");
-        assertThat(dto.getTrackId()).isEqualTo(TRACK_ID);
+        assertThat(dto.getTrackId()).isEqualTo((int) TRACK_ID);
+        assertThat(dto.getTrackDisplayName()).isEqualTo("Silverstone");
         assertThat(dto.getTrackLengthM()).isEqualTo(TRACK_LENGTH_M);
         assertThat(dto.getTotalLaps()).isEqualTo((int) TOTAL_LAPS);
         assertThat(dto.getAiDifficulty()).isEqualTo((int) AI_DIFFICULTY);
@@ -166,7 +134,24 @@ class SessionMapperTest {
 
         // Assert
         assertThat(dto.getTrackId()).isNull();
+        assertThat(dto.getTrackDisplayName()).isNull();
         assertThat(dto.getTotalLaps()).isNull();
         assertThat(dto.getAiDifficulty()).isNull();
+    }
+
+    @Test
+    @DisplayName("toDto повертає null sessionType і trackDisplayName коли entity має null")
+    void toDto_returnsNullDisplayNames_whenEntityFieldsNull() {
+        // Arrange
+        Session session = session();
+        session.setSessionType(null);
+        session.setTrackId(null);
+
+        // Act
+        SessionDto dto = mapper.toDto(session, runtimeStateActive());
+
+        // Assert
+        assertThat(dto.getSessionType()).isNull();
+        assertThat(dto.getTrackDisplayName()).isNull();
     }
 }

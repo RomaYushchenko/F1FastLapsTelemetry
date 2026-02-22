@@ -24,8 +24,10 @@ public final class TestData {
     public static final long SESSION_UID = 123456789L;
     public static final UUID SESSION_PUBLIC_ID = UUID.fromString("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
     public static final String SESSION_PUBLIC_ID_STR = SESSION_PUBLIC_ID.toString();
-    public static final short SESSION_TYPE_RACE = 10;
-    public static final short TRACK_ID = 1;
+    /** F1 25: Race = 15. */
+    public static final short SESSION_TYPE_RACE = 15;
+    /** F1 25: Silverstone = 7. */
+    public static final short TRACK_ID = 7;
     public static final Integer TRACK_LENGTH_M = 5000;
     public static final short TOTAL_LAPS = 58;
     public static final short AI_DIFFICULTY = 90;

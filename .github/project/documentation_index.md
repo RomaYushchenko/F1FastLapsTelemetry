@@ -41,7 +41,7 @@
 
 **Інвестігейт помилок по логах (правило для агента):** [.cursor/rules/log-investigation.mdc](../../.cursor/rules/log-investigation.mdc) — коли та як проводити розслідування по логах: traceId, розміщення файлів, grep по різних файлах, на що звертати увагу (ERROR/WARN, REST/Kafka/UDP, DB). Застосовувати, коли потрібно дослідити причину помилки або простежити запит/повідомлення.
 
-**Чернетки планів покращень (draft):** [.github/draft/implementation-plans/](../../.github/draft/implementation-plans/) — 01 Logging, 02 Live page, 03 Session page (list), **04 Session Summary page** (Summary лідер, Lap pace overflow/медіана, Tyre wear %/compound, таблиця дельта/місце/стрілки, ERS), **05 UI notifications (toast)** — глобальні попап-повідомлення для помилок та фонових подій. Джерело ідей: [improvements-notes-structured.md](../../.github/draft/improvements-notes-structured.md).
+**Чернетки планів покращень (draft):** [.github/draft/implementation-plans/](../../.github/draft/implementation-plans/) — 01 Logging, 02 Live page, 03 Session page (list), **04 Session Summary page** (Summary лідер, Lap pace overflow/медіана, Tyre wear %/compound, таблиця дельта/місце/стрілки, ERS), **05 UI notifications (toast)** — глобальні попап-повідомлення для помилок та фонових подій, **06 session type and track F1 25 alignment** — приведення маппінгу `m_sessionType` та (опційно) `m_trackId` до офіційної специфікації F1 25, **07 single place for session type and track display names** — одна точка на бекенді (telemetry-api-contracts + SessionMapper) для перетворення id → читабельні назви; фронт отримує готові `sessionType` та `trackDisplayName`. Джерело ідей: [improvements-notes-structured.md](../../.github/draft/improvements-notes-structured.md).
 
 ---
 
@@ -49,7 +49,7 @@
 
 **Розділення логіки:** маппери, білдери, парсери, процесори, сервіси — описані в [code_skeleton_java_packages_interfaces.md](code_skeleton_java_packages_interfaces.md) (розділ 1.2) та в правилі Cursor [.cursor/rules/architecture-layering.mdc](../../.cursor/rules/architecture-layering.mdc). Entry points (контролери, консьюмери, хендлери) мають залишатися тонкими; парсинг і збірка подій — у парсерах і білдерах.
 
-**F1 UDP session type:** канонічний маппінг `m_sessionType` (uint8) → display string: [session_type_mapping.md](../docs/session_type_mapping.md). Використовується в ingest (SessionPacketParser, SessionDataPacketParser) та processing (SessionMapper); при зміні типів оновлювати спочатку цей документ.
+**F1 UDP session type:** канонічний маппінг `m_sessionType` (uint8) → display string: [session_type_mapping.md](../docs/session_type_mapping.md). Використовується в ingest (SessionPacketParser, SessionDataPacketParser) та processing (SessionMapper); при зміні типів оновлювати спочатку цей документ. **План вирівнювання з F1 25:** [06-session-type-track-f1-25-alignment.md](../../.github/draft/implementation-plans/06-session-type-track-f1-25-alignment.md) — розбіжності з офіційною специфікацією та кроки фіксу.
 
 ---
 

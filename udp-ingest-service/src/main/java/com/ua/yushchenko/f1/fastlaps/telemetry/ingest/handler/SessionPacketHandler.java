@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.ingest.handler;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.EventCode;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionDataEvent;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1SessionType;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionLifecycleEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.builder.SessionDataEventBuilder;
@@ -55,19 +56,18 @@ public class SessionPacketHandler {
             if (eventCode == EventCode.SSTA || eventCode == EventCode.SEND) {
                 publishSessionEvent(header, sessionEvent);
                 log.info("Published session event: eventCode={}, sessionType={}, sessionUID={}",
-                        eventCode, sessionEvent.getSessionType(), header.getSessionUID());
+                        eventCode, F1SessionType.fromCode(sessionEvent.getSessionTypeId()).getDisplayName(), header.getSessionUID());
             } else if (eventCode == EventCode.SESSION_TIMEOUT
                     && (sessionEvent.getSessionTypeId() != null || sessionEvent.getTrackId() != null)) {
                 SessionEventDto infoPayload = SessionEventDto.builder()
                         .eventCode(EventCode.SESSION_INFO)
-                        .sessionType(sessionEvent.getSessionType())
                         .sessionTypeId(sessionEvent.getSessionTypeId())
                         .trackId(sessionEvent.getTrackId())
                         .totalLaps(sessionEvent.getTotalLaps())
                         .build();
                 publishSessionEvent(header, infoPayload);
-                log.debug("Published SESSION_INFO: sessionType={}, trackId={}, sessionUID={}",
-                        infoPayload.getSessionType(), infoPayload.getTrackId(), header.getSessionUID());
+                log.debug("Published SESSION_INFO: sessionTypeId={}, trackId={}, sessionUID={}",
+                        infoPayload.getSessionTypeId(), infoPayload.getTrackId(), header.getSessionUID());
             }
         } catch (Exception e) {
             log.error("Failed to parse session packet: sessionUID={}, frame={}",

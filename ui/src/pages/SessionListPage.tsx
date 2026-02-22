@@ -200,7 +200,7 @@ export function SessionListPage() {
                       </span>
                     </td>
                     <td className="text-muted">{session.sessionType ?? '—'}</td>
-                    <td className="text-muted">{getTrackName(session.trackId)}</td>
+                    <td className="text-muted">{session.trackDisplayName ?? getTrackName(session.trackId)}</td>
                     <td className="text-muted">{startedLabel}</td>
                     <td className="text-muted">{endedLabel}</td>
                     <td className="text-muted">

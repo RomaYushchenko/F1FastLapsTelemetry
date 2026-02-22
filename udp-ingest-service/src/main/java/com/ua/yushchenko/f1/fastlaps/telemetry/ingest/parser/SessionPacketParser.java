@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 /**
  * Parses F1 2025 Session packet payload (ByteBuffer) into {@link SessionEventDto}.
  * Packet layout: event code (4 bytes), skip 20, session type, track id, total laps.
+ * Session type and track display names are resolved from ids in processing (F1SessionType, F1Track).
  */
 @Component
 public class SessionPacketParser {
@@ -18,6 +19,7 @@ public class SessionPacketParser {
     /**
      * Parse session packet payload into SessionEventDto.
      * Buffer position advances; caller must ensure sufficient remaining bytes.
+     * Only raw ids are set; no display strings (single place for mapping is telemetry-api-contracts).
      */
     public SessionEventDto parse(ByteBuffer buffer) {
         byte[] eventCodeBytes = new byte[4];
@@ -26,16 +28,13 @@ public class SessionPacketParser {
         EventCode eventCode = parseEventCode(eventCodeStr);
 
         buffer.position(buffer.position() + SKIP_AFTER_EVENT_CODE);
-        byte sessionTypeId = buffer.get();
-        String sessionType = parseSessionType(sessionTypeId);
-
-        int trackId = Byte.toUnsignedInt(buffer.get());
-        int totalLaps = Byte.toUnsignedInt(buffer.get());
+        int sessionTypeId = buffer.get() & 0xFF;
+        int trackId = buffer.get(); // int8: -1 = unknown
+        int totalLaps = buffer.get() & 0xFF;
 
         return SessionEventDto.builder()
                 .eventCode(eventCode)
-                .sessionType(sessionType)
-                .sessionTypeId(Byte.toUnsignedInt(sessionTypeId))
+                .sessionTypeId(sessionTypeId)
                 .trackId(trackId)
                 .totalLaps(totalLaps)
                 .build();
@@ -50,34 +49,6 @@ public class SessionPacketParser {
             case "SEND" -> EventCode.SEND;
             case "FLBK" -> EventCode.FLBK;
             default -> EventCode.SESSION_TIMEOUT;
-        };
-    }
-
-    /**
-     * Map F1 session type id (m_sessionType, uint8) to display string.
-     * Canonical mapping: .github/docs/session_type_mapping.md. Must match SessionMapper.sessionTypeToDisplayString.
-     */
-    public static String parseSessionType(byte sessionTypeId) {
-        int id = sessionTypeId & 0xFF;
-        return switch (id) {
-            case 0 -> "UNKNOWN";
-            case 1 -> "PRACTICE_1";
-            case 2 -> "PRACTICE_2";
-            case 3 -> "PRACTICE_3";
-            case 4 -> "SHORT_PRACTICE";
-            case 5 -> "QUALIFYING_1";
-            case 6 -> "QUALIFYING_2";
-            case 7 -> "QUALIFYING_3";
-            case 8 -> "SHORT_QUALIFYING";
-            case 9 -> "ONE_SHOT_QUALIFYING";
-            case 10 -> "RACE";
-            case 11 -> "RACE_2";
-            case 12 -> "TIME_TRIAL";
-            case 13 -> "SPRINT";
-            case 14 -> "SPRINT_SHOOTOUT";
-            case 15 -> "SPRINT";
-            case 16 -> "SPRINT_SHOOTOUT";
-            default -> "UNKNOWN";
         };
     }
 }

@@ -67,7 +67,7 @@ class SessionPacketHandlerTest {
         SessionLifecycleEvent event = eventCaptor.getValue();
         assertThat(event.getSessionUID()).isEqualTo(123456789L);
         assertThat(event.getPayload().getEventCode()).isEqualTo(EventCode.SSTA);
-        assertThat(event.getPayload().getSessionType()).isNotNull();
+        assertThat(event.getPayload().getSessionTypeId()).isNotNull();
     }
 
     @Test
