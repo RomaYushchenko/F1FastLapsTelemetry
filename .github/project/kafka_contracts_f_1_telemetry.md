@@ -52,6 +52,7 @@
 | `telemetry.carTelemetry` | Live телеметрія авто | ingest | processing |
 | `telemetry.carStatus` | Статус авто | ingest | processing |
 | `telemetry.carDamage` | Пошкодження/знос шин (tyre wear % per wheel) | ingest | processing |
+| `telemetry.event` | Session-wide events (DRSD, SCAR, RTMT, FTLP, PENA, etc.). See [Plan 08](../draft/implementation-plans/08-packet-event-ingest-and-processing.md) § 1.1–1.2 (why and where to use). | ingest | processing |
 
 ---
 
@@ -304,6 +305,26 @@ Example (subset):
   "ersFault": 0
 }
 ```
+
+---
+
+### 5.6 EventDto (EventEvent)
+
+Topic: `telemetry.event`
+
+Payload for **Packet Event (packetId = 3)**. Message type: **EventEvent** (envelope + EventDto). Used for session-wide game events: DRS disabled (DRSD), Safety car (SCAR), Retirement (RTMT), Fastest lap (FTLP), Penalty (PENA), Speed trap (SPTP), Overtake (OVTK), Collision (COLL), etc.
+
+**Why and where to use:** See [Plan 08](../draft/implementation-plans/08-packet-event-ingest-and-processing.md) § 1.1 (why EventEvent is needed) and § 1.2 (where it is used and where to use it next). Main use: **DRS disabled reason** for Live/Session UI (plan 12); optional: event history, Safety car status.
+
+| Field | Type | Description |
+|-------|------|--------------|
+| eventCode | string | 4-char code: DRSD, SCAR, RTMT, FTLP, PENA, SPTP, STLG, OVTK, COLL, … |
+| vehicleIdx | int | Per-event (e.g. retiring car, fastest lap car). |
+| retirementReason | int | RTMT: 0–10 (see RetirementReason enum). |
+| drsDisabledReason | int | DRSD: 0–3 (see DrsDisabledReason enum). |
+| safetyCarType, safetyCarEventType | int | SCAR: type 0–3, event 0–3 (see SafetyCarType, SafetyCarEventType). |
+| lapTime | float | FTLP: lap time in seconds. |
+| (other) | … | penaltyType, speedTrapSpeedKph, numLights, flashbackFrameIdentifier, vehicle1Idx/2Idx, etc. |
 
 ---
 

@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionDataDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1SessionType;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
@@ -47,7 +48,7 @@ public class SessionLifecycleService {
 
         if (state.getState() == SessionState.INIT) {
             log.info("Session started: sessionUID={}, sessionType={}, trackId={}",
-                    sessionUID, event.getSessionType(), event.getTrackId());
+                    sessionUID, F1SessionType.fromCode(event.getSessionTypeId()).getDisplayName(), event.getTrackId());
 
             state.setStartedAt(Instant.now());
             state.transitionTo(SessionState.ACTIVE);

@@ -317,7 +317,7 @@ export function SessionDetailPage() {
 
       {session && (
         <p className="text-muted" style={{ marginBottom: 'var(--space-4)' }}>
-          {session.sessionType ?? '—'} · {getTrackName(session.trackId)}{' '}
+          {session.sessionType ?? '—'} · {session.trackDisplayName ?? getTrackName(session.trackId)}{' '}
           {session.startedAt && (
             <>
               ·{' '}

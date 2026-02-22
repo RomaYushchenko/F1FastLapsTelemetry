@@ -26,10 +26,14 @@ public class WsSnapshotMessage {
     private Integer engineRpm;
     private Float throttle;
     private Float brake;
-    /** DRS active (from car status); null if not yet received */
+    /** DRS wing open (from Car Telemetry m_drs). Plan 12. */
     private Boolean drs;
+    /** DRS zone allowed (from Car Status m_drsAllowed). Optional for UI "DRS available". Plan 12. */
+    private Boolean drsAllowed;
     private Integer currentLap;
     private Integer currentSector;
+    /** Human-readable sector (e.g. "Sector 1") from LapData m_sector; see plan 10. */
+    private String currentSectorDisplayName;
     /** Current lap time in ms (from LapData). Used for delta to best. */
     private Integer currentLapTimeMs;
     /** Best lap time in session (ms). From SessionSummary. */
@@ -38,6 +42,8 @@ public class WsSnapshotMessage {
     private Integer deltaMs;
     /** ERS energy store 0–100%. From CarStatus ersStoreEnergy. */
     private Integer ersEnergyPercent;
-    /** ERS deploy active (driver using ERS). From CarStatus ersDeployMode > 0. */
+    /** ERS deploy active (driver using ERS). From CarStatus ersDeployMode != None. */
     private Boolean ersDeployActive;
+    /** ERS deploy mode display name (e.g. "Hotlap", "Overtake"). Plan 11. */
+    private String ersDeployModeDisplayName;
 }

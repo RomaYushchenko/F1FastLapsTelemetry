@@ -10,6 +10,8 @@ export interface Session {
   sessionDisplayName?: string | null
   sessionType?: string | null
   trackId?: number | null
+  /** Human-readable track name from backend (F1Track). Prefer over trackId for display. */
+  trackDisplayName?: string | null
   trackLengthM?: number
   totalLaps?: number
   /** Player car index (0–19); use for laps/summary/tyre-wear so data is for the driver. */

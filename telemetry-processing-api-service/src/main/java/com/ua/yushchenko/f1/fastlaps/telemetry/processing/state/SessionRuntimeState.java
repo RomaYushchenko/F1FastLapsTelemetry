@@ -224,8 +224,10 @@ public class SessionRuntimeState {
         private Integer engineRpm;
         private Float throttle;
         private Float brake;
-        /** DRS active; set from CarStatusConsumer */
+        /** DRS wing open (from Car Telemetry m_drs). Set in CarTelemetryProcessor. */
         private Boolean drs;
+        /** DRS zone allowed (from Car Status m_drsAllowed). Set in CarStatusProcessor. Plan 12. */
+        private Boolean drsAllowed;
         private Integer currentLap;
         private Integer currentSector;
         /** Lap distance in metres (from LapData); used for pedal trace. */
@@ -236,8 +238,10 @@ public class SessionRuntimeState {
         private Integer bestLapTimeMs;
         /** ERS energy 0–100%. Set from CarStatusProcessor (ersStoreEnergy / ERS_MAX_J). */
         private Integer ersEnergyPercent;
-        /** ERS deploy active (ersDeployMode > 0). Set from CarStatusProcessor. */
+        /** ERS deploy active (ersDeployMode != NONE). Set from CarStatusProcessor. */
         private Boolean ersDeployActive;
+        /** ERS deploy mode code (0=none, 1=medium, 2=hotlap, 3=overtake); for display name in WS. */
+        private Integer ersDeployMode;
         private Instant timestamp;
     }
 }

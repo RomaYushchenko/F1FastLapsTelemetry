@@ -6,9 +6,14 @@ export interface WsSnapshotMessage {
   engineRpm: number | null
   throttle: number | null
   brake: number | null
+  /** DRS wing open (from Car Telemetry). Plan 12. */
   drs: boolean | null
+  /** DRS zone allowed (from Car Status). Optional "DRS available" when in zone. Plan 12. */
+  drsAllowed?: boolean | null
   currentLap: number | null
   currentSector: number | null
+  /** Human-readable sector (e.g. "Sector 1") from backend. Plan 10. */
+  currentSectorDisplayName?: string | null
   /** Current lap time in ms. Used for delta to best. */
   currentLapTimeMs?: number | null
   /** Best lap time in session (ms). */
@@ -19,6 +24,8 @@ export interface WsSnapshotMessage {
   ersEnergyPercent?: number | null
   /** ERS deploy active (driver using ERS). */
   ersDeployActive?: boolean | null
+  /** ERS deploy mode label (e.g. "Hotlap", "Overtake"). Plan 11. */
+  ersDeployModeDisplayName?: string | null
 }
 
 export interface WsSessionEndedMessage {

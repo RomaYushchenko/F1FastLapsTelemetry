@@ -95,14 +95,16 @@ export function LiveDashboardPage() {
           <div className="grid-5">
             <LiveThrottleWidget throttle={snapshot?.throttle} />
             <LiveBrakeWidget brake={snapshot?.brake} />
-            <LiveDrsWidget drs={snapshot?.drs} />
+            <LiveDrsWidget drs={snapshot?.drs} drsAllowed={snapshot?.drsAllowed} />
             <LiveErsWidget
               ersEnergyPercent={snapshot?.ersEnergyPercent}
               ersDeployActive={snapshot?.ersDeployActive}
+              ersDeployModeDisplayName={snapshot?.ersDeployModeDisplayName}
             />
             <LiveLapSectorWidget
               currentLap={snapshot?.currentLap}
               currentSector={snapshot?.currentSector}
+              currentSectorDisplayName={snapshot?.currentSectorDisplayName}
             />
           </div>
 

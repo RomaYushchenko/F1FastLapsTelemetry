@@ -24,6 +24,8 @@ public class SessionDto {
     private String sessionDisplayName;
     private String sessionType;
     private Integer trackId;
+    /** Human-readable track name (from F1Track). Prefer for display; use trackId for filtering. */
+    private String trackDisplayName;
     private Integer trackLengthM;
     private Integer totalLaps;
     private Integer aiDifficulty;

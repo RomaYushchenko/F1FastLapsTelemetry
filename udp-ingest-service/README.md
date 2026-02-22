@@ -5,8 +5,8 @@ Core service for F1 25 UDP telemetry ingestion: receives UDP packets, parses the
 ## Role
 
 - **Listens** to the F1 25 UDP port (default 20777).
-- **Parses** binary packets using handler classes (Session, Lap Data, Car Telemetry, Car Status, Car Damage).
-- **Publishes** events to Kafka topics (`telemetry.session`, `telemetry.lap`, `telemetry.carTelemetry`, `telemetry.carStatus`, `telemetry.carDamage`).
+- **Parses** binary packets using handler classes (Session, Lap Data, Car Telemetry, Car Status, Car Damage, Event).
+- **Publishes** events to Kafka topics (`telemetry.session`, `telemetry.lap`, `telemetry.carTelemetry`, `telemetry.carStatus`, `telemetry.carDamage`, `telemetry.event`).
 
 Downstream services (e.g. telemetry-processing-api-service) consume from Kafka. This service does not write to a database.
 
@@ -31,6 +31,7 @@ Parsers and Kafka payload DTOs cover the **full F1 25 packet payload** for the f
 | Lap Data      | 57 bytes    | LapDataPacketParser       | telemetry.lap        |
 | Car Status    | 55 bytes    | CarStatusPacketParser     | telemetry.carStatus  |
 | Car Damage    | 46 bytes    | CarDamagePacketParser     | telemetry.carDamage  |
+| Event         | 45 bytes    | EventPacketParser         | telemetry.event      |
 | Session       | (event)     | SessionPacketParser       | telemetry.session    |
 | Session (full)| 724 bytes   | SessionDataPacketParser   | telemetry.sessionData |
 

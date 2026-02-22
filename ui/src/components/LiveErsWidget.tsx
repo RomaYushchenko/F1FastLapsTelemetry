@@ -5,14 +5,25 @@ interface LiveErsWidgetProps {
   ersEnergyPercent: number | null | undefined
   /** ERS deploy active (driver using ERS). */
   ersDeployActive: boolean | null | undefined
+  /** ERS deploy mode label from backend (e.g. "Hotlap", "Overtake"). Plan 11. */
+  ersDeployModeDisplayName?: string | null | undefined
 }
 
 /**
  * ERS widget: energy bar (0–100%) and Deploy indicator when active.
+ * When deploy active, shows backend label (e.g. "Hotlap") when available, else "Deploy".
  */
-export function LiveErsWidget({ ersEnergyPercent, ersDeployActive }: LiveErsWidgetProps) {
+export function LiveErsWidget({
+  ersEnergyPercent,
+  ersDeployActive,
+  ersDeployModeDisplayName,
+}: LiveErsWidgetProps) {
   const percent = ersEnergyPercent != null ? Math.max(0, Math.min(100, ersEnergyPercent)) / 100 : 0
   const isDeploy = ersDeployActive === true
+  const deployLabel =
+    isDeploy && ersDeployModeDisplayName && ersDeployModeDisplayName !== 'None' && ersDeployModeDisplayName !== 'Unknown'
+      ? ersDeployModeDisplayName
+      : 'Deploy'
 
   return (
     <div className="card live-widget live-widget--compact">
@@ -29,7 +40,7 @@ export function LiveErsWidget({ ersEnergyPercent, ersDeployActive }: LiveErsWidg
             className="live-widget__badge live-widget__badge--on"
             style={{ fontSize: 'var(--text-xs)' }}
           >
-            Deploy
+            {deployLabel}
           </span>
         )}
       </div>

@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarStatusDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.ErsDeployMode;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.CarStatusRawWriter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.LastTyreCompoundState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
@@ -12,9 +13,11 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Processes car status: watermark update, snapshot DRS and ERS, persist to car_status_raw when active.
+ * Processes car status: watermark update, snapshot ERS and drsAllowed (zone); persist to car_status_raw when active.
+ * Snapshot DRS (wing open/closed) is set in {@link CarTelemetryProcessor} from Car Telemetry m_drs; this processor sets only drsAllowed (zone active) and ERS.
+ * ERS_MAX_ENERGY_J (4 MJ) from F1 25 spec / regulations; used to compute ersEnergyPercent.
  * Called from CarStatusConsumer after ensureSession, shouldProcess, idempotency.
- * See: implementation_phases.md Phase 5.1.
+ * See: implementation_phases.md Phase 5.1, plan 12.
  */
 @Slf4j
 @Component
@@ -51,7 +54,7 @@ public class CarStatusProcessor {
             snapshot = new SessionRuntimeState.CarSnapshot();
             state.updateSnapshot(carIndex, snapshot);
         }
-        snapshot.setDrs(Boolean.TRUE.equals(status.getDrsAllowed()));
+        snapshot.setDrsAllowed(Boolean.TRUE.equals(status.getDrsAllowed()));
 
         if (status.getErsStoreEnergy() != null && ERS_MAX_ENERGY_J > 0) {
             float percent = 100f * status.getErsStoreEnergy() / ERS_MAX_ENERGY_J;
@@ -59,8 +62,9 @@ public class CarStatusProcessor {
         } else {
             snapshot.setErsEnergyPercent(null);
         }
-        snapshot.setErsDeployActive(
-                status.getErsDeployMode() != null && status.getErsDeployMode() > 0);
+        ErsDeployMode ersMode = ErsDeployMode.fromCode(status.getErsDeployMode());
+        snapshot.setErsDeployActive(ersMode.isDeployActive());
+        snapshot.setErsDeployMode(status.getErsDeployMode());
 
         if (status.getTyresCompound() != null) {
             lastTyreCompoundState.update(sessionUid, carIndex, status.getTyresCompound());
