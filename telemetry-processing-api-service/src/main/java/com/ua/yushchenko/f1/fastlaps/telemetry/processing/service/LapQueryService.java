@@ -13,8 +13,11 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.LapMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarStatusRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.LapCornerMetrics;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackCorner;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarStatusRawRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarTelemetryRawRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapCornerMetricsRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TyreWearPerLapRepository;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +50,8 @@ public class LapQueryService {
     private final TyreWearPerLapRepository tyreWearPerLapRepository;
     private final LapMapper lapMapper;
     private final SteerBasedCornerSegmenter cornerSegmenter;
+    private final TrackCornerMapService trackCornerMapService;
+    private final LapCornerMetricsRepository lapCornerMetricsRepository;
 
     public List<LapResponseDto> getLaps(String sessionId, Short carIndex) {
         log.debug("getLaps: sessionId={}, carIndex={}", sessionId, carIndex);
@@ -136,13 +141,17 @@ public class LapQueryService {
 
         List<CornerSegment> segments = cornerSegmenter.detect(points);
         List<LapCornerDto> result = new ArrayList<>();
+        Long sessionUid = session.getSessionUid();
+        short lapNumShort = (short) lapNum;
+
         for (int i = 0; i < segments.size(); i++) {
             CornerSegment seg = segments.get(i);
             int entryKph = speedAtDistance(rawList, seg.getStartDistanceM());
             int exitKph = speedAtDistance(rawList, seg.getEndDistanceM());
             int apexKph = speedAtDistance(rawList, seg.getApexDistanceM());
+            int cornerIdx = i + 1;
             result.add(LapCornerDto.builder()
-                    .cornerIndex(i + 1)
+                    .cornerIndex(cornerIdx)
                     .startDistanceM(seg.getStartDistanceM())
                     .endDistanceM(seg.getEndDistanceM())
                     .apexDistanceM(seg.getApexDistanceM())
@@ -151,6 +160,33 @@ public class LapQueryService {
                     .exitSpeedKph(exitKph)
                     .build());
         }
+
+        // Phase 3: find or create track corner map; enrich with names
+        var mapOpt = trackCornerMapService.findOrCreateMap(session.getTrackId(), session.getTrackLengthM(), segments);
+        if (mapOpt.isPresent()) {
+            List<TrackCorner> trackCorners = trackCornerMapService.getCornersByMapId(mapOpt.get().getId());
+            for (LapCornerDto dto : result) {
+                trackCorners.stream()
+                        .filter(tc -> tc.getCornerIndex() == dto.getCornerIndex())
+                        .findFirst()
+                        .ifPresent(tc -> dto.setName(tc.getName()));
+            }
+        }
+
+        // Phase 3: persist metrics (idempotent upsert)
+        for (LapCornerDto dto : result) {
+            LapCornerMetrics metrics = LapCornerMetrics.builder()
+                    .sessionUid(sessionUid)
+                    .carIndex(carIndex)
+                    .lapNumber(lapNumShort)
+                    .cornerIndex((short) dto.getCornerIndex())
+                    .entrySpeedKph(dto.getEntrySpeedKph() != null ? dto.getEntrySpeedKph().shortValue() : null)
+                    .apexSpeedKph(dto.getApexSpeedKph() != null ? dto.getApexSpeedKph().shortValue() : null)
+                    .exitSpeedKph(dto.getExitSpeedKph() != null ? dto.getExitSpeedKph().shortValue() : null)
+                    .build();
+            lapCornerMetricsRepository.save(metrics);
+        }
+
         log.debug("getCorners: returning {} corners", result.size());
         return result;
     }

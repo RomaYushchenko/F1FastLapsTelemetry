@@ -68,7 +68,7 @@ export function SpeedChart(props: SpeedChartProps) {
             stroke="rgba(148,163,184,0.6)"
             strokeDasharray="2 2"
             label={{
-              value: `T${c.cornerIndex}`,
+              value: c.name ?? `T${c.cornerIndex}`,
               position: 'top',
               fill: 'var(--text-secondary)',
               fontSize: 11,

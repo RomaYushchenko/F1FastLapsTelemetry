@@ -25,4 +25,6 @@ public class LapCornerDto {
     private Integer exitSpeedKph;
     /** Optional duration in milliseconds within the corner segment. */
     private Integer durationMs;
+    /** Optional display name (e.g. "T1", "T2") from track corner map when available. */
+    private String name;
 }

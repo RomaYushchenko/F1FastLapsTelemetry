@@ -14,6 +14,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TyreWearPerLap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarStatusRawRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarTelemetryRawRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapCornerMetricsRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TyreWearPerLapRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -25,9 +26,11 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +52,10 @@ class LapQueryServiceTest {
     private LapMapper lapMapper = new LapMapper();
     @Spy
     private SteerBasedCornerSegmenter cornerSegmenter = new SteerBasedCornerSegmenter();
+    @Mock
+    private TrackCornerMapService trackCornerMapService;
+    @Mock
+    private LapCornerMetricsRepository lapCornerMetricsRepository;
 
     @InjectMocks
     private LapQueryService service;
@@ -162,6 +169,43 @@ class LapQueryServiceTest {
 
         // Assert
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getCorners повертає сегменти та зберігає метрики")
+    void getCorners_returnsSegmentsAndPersistsMetrics() {
+        // Arrange: several points with steer above threshold so segmenter finds one corner (length >= 20m)
+        Session session = session();
+        List<CarTelemetryRaw> raws = List.of(
+                carTelemetryRawWithSteer(50f, 200, 0.08f),
+                carTelemetryRawWithSteer(100f, 140, 0.12f),
+                carTelemetryRawWithSteer(150f, 180, 0.06f),
+                carTelemetryRawWithSteer(200f, 220, 0.02f)
+        );
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(carTelemetryRawRepository.findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
+                SESSION_UID, CAR_INDEX, (short) 1)).thenReturn(raws);
+        when(trackCornerMapService.findOrCreateMap(any(), any(), any())).thenReturn(Optional.empty());
+
+        // Act
+        List<LapCornerDto> result = service.getCorners(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX);
+
+        // Assert
+        assertThat(result).hasSize(1);
+        verify(lapCornerMetricsRepository).save(any());
+    }
+
+    private static CarTelemetryRaw carTelemetryRawWithSteer(float distanceM, int speedKph, float steer) {
+        return CarTelemetryRaw.builder()
+                .ts(RAW_TS)
+                .sessionUid(SESSION_UID)
+                .frameIdentifier(FRAME_ID)
+                .carIndex(CAR_INDEX)
+                .lapDistanceM(distanceM)
+                .speedKph((short) speedKph)
+                .steer(steer)
+                .lapNumber(LAP_NUMBER)
+                .build();
     }
 
     @Test

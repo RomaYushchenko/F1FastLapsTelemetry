@@ -35,6 +35,8 @@ export interface LapCorner {
   apexSpeedKph: number
   exitSpeedKph: number
   durationMs?: number | null
+  /** Optional name from track corner map (e.g. "T1", "T2"). */
+  name?: string | null
 }
 
 /** Matches TyreWearPointDto from GET /api/sessions/{id}/tyre-wear. */
