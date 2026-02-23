@@ -2,7 +2,7 @@ import { toast } from 'sonner'
 import { API_BASE_URL } from './config'
 import { HttpError } from './types'
 import type { ApiErrorBody, Lap, Session, SessionSummary } from './types'
-import type { ErsPoint, PacePoint, PedalTracePoint, SpeedTracePoint, TyreWearPoint } from '../charts/types'
+import type { ErsPoint, LapCorner, PacePoint, PedalTracePoint, SpeedTracePoint, TyreWearPoint } from '../charts/types'
 
 async function parseJsonOrNull(response: Response): Promise<unknown | null> {
   const contentType = response.headers.get('content-type')
@@ -149,6 +149,17 @@ export async function getLapSpeedTrace(
   if (carIndex !== 0) search.set('carIndex', String(carIndex))
   const suffix = search.toString() ? `?${search.toString()}` : ''
   return requestJson<SpeedTracePoint[]>(`/api/sessions/${sessionUid}/laps/${lapNum}/speed-trace${suffix}`)
+}
+
+export async function getLapCorners(
+  sessionUid: string | undefined,
+  lapNum: number,
+  carIndex = 0,
+): Promise<LapCorner[]> {
+  const search = new URLSearchParams()
+  if (carIndex !== 0) search.set('carIndex', String(carIndex))
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  return requestJson<LapCorner[]>(`/api/sessions/${sessionUid}/laps/${lapNum}/corners${suffix}`)
 }
 
 export async function getSessionTyreWear(

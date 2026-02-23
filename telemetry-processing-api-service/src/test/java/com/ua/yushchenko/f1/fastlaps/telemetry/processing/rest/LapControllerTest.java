@@ -1,5 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapCornerDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SpeedTracePointDto;
@@ -100,6 +101,24 @@ class LapControllerTest {
         assertThatThrownBy(() -> controller.getLapTrace(SESSION_PUBLIC_ID_STR, null, CAR_INDEX))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("lapNum is required");
+    }
+
+    @Test
+    @DisplayName("getLapCorners делегує сервісу та повертає 200")
+    void getLapCorners_delegatesAndReturnsOk() {
+        // Arrange
+        List<LapCornerDto> list = List.of(
+                LapCornerDto.builder().cornerIndex(1).startDistanceM(100f).apexDistanceM(150f).endDistanceM(200f).build());
+        when(lapQueryService.getCorners(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX)).thenReturn(list);
+
+        // Act
+        ResponseEntity<List<LapCornerDto>> response = controller.getLapCorners(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX);
+
+        // Assert
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).hasSize(1);
+        assertThat(response.getBody().get(0).getCornerIndex()).isEqualTo(1);
+        verify(lapQueryService).getCorners(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX);
     }
 
     @Test

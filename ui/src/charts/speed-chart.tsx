@@ -2,15 +2,18 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  ReferenceLine,
   XAxis,
   YAxis,
   Tooltip,
   CartesianGrid,
 } from 'recharts'
-import type { SpeedTracePoint } from './types'
+import type { LapCorner, SpeedTracePoint } from './types'
 
 interface SpeedChartProps {
   points: SpeedTracePoint[]
+  /** Optional corners to show turn numbers and vertical markers at apex. */
+  corners?: LapCorner[] | null
 }
 
 export function SpeedChart(props: SpeedChartProps) {
@@ -58,6 +61,20 @@ export function SpeedChart(props: SpeedChartProps) {
           dot={{ r: 1 }}
           activeDot={{ r: 4 }}
         />
+        {props.corners?.map(c => (
+          <ReferenceLine
+            key={c.cornerIndex}
+            x={c.apexDistanceM}
+            stroke="rgba(148,163,184,0.6)"
+            strokeDasharray="2 2"
+            label={{
+              value: `T${c.cornerIndex}`,
+              position: 'top',
+              fill: 'var(--text-secondary)',
+              fontSize: 11,
+            }}
+          />
+        ))}
       </LineChart>
     </ResponsiveContainer>
   )

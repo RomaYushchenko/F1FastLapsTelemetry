@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { getLapErs, getLapSpeedTrace, getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
+import { getLapCorners, getLapErs, getLapSpeedTrace, getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
 import { isValidSessionId } from '../api/sessionId'
 import type { Lap, Session, SessionSummary } from '../api/types'
 import { HttpError } from '../api/types'
 import { getTrackName } from '../constants/tracks'
-import type { ErsPoint, PacePoint, PedalTracePoint, SpeedTracePoint, TyreWearPoint } from '../charts/types'
+import type { ErsPoint, LapCorner, PacePoint, PedalTracePoint, SpeedTracePoint, TyreWearPoint } from '../charts/types'
 import { ErsChart } from '../charts/ers-chart'
 import { PaceChart } from '../charts/pace-chart'
 import { SpeedChart } from '../charts/speed-chart'
@@ -35,6 +35,7 @@ export function SessionDetailPage() {
   const [ersStatus, setErsStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
   const [speedTracePoints, setSpeedTracePoints] = useState<SpeedTracePoint[]>([])
   const [speedTraceStatus, setSpeedTraceStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
+  const [corners, setCorners] = useState<LapCorner[]>([])
 
   const loadTrace = useCallback(
     async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
@@ -94,6 +95,20 @@ export function SessionDetailPage() {
     [],
   )
 
+  const loadCorners = useCallback(
+    async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
+      try {
+        const list = await getLapCorners(currentSessionUid, lapNumber, carIndex)
+        if (isCancelledRef.current) return
+        setCorners(list)
+      } catch {
+        if (isCancelledRef.current) return
+        setCorners([])
+      }
+    },
+    [],
+  )
+
   /** Full load: shows loading state, used on mount and retry. */
   const load = useCallback(async () => {
     if (sessionUid == null) {
@@ -138,6 +153,7 @@ export function SessionDetailPage() {
         void loadTrace(id, initialLapForTrace, carIndex)
         void loadErs(id, initialLapForTrace, carIndex)
         void loadSpeedTrace(id, initialLapForTrace, carIndex)
+        void loadCorners(id, initialLapForTrace, carIndex)
       }
       prevLapsLengthRef.current = lapsRes.length
 
@@ -175,7 +191,7 @@ export function SessionDetailPage() {
         error instanceof Error ? error.message : 'Failed to load session details',
       )
     }
-  }, [sessionUid, loadTrace, loadSpeedTrace])
+  }, [sessionUid, loadTrace, loadSpeedTrace, loadCorners])
 
   /** Background refresh: updates data without loading state or re-mount feel. */
   const refreshInBackground = useCallback(async () => {
@@ -213,6 +229,7 @@ export function SessionDetailPage() {
           void loadTrace(id, newLapNumber, carIndex)
           void loadErs(id, newLapNumber, carIndex)
           void loadSpeedTrace(id, newLapNumber, carIndex)
+          void loadCorners(id, newLapNumber, carIndex)
         }
       } else {
         prevLapsLengthRef.current = currentLength
@@ -235,13 +252,14 @@ export function SessionDetailPage() {
     }
   }, [sessionUid, loadTrace])
 
-  /** Quiet refresh of pedal trace, ERS and speed trace for current lap (no loading state). */
+  /** Quiet refresh of pedal trace, ERS, speed trace and corners for current lap (no loading state). */
   const refreshTraceInBackground = useCallback(
     async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
-      const [traceResult, ersResult, speedResult] = await Promise.allSettled([
+      const [traceResult, ersResult, speedResult, cornersResult] = await Promise.allSettled([
         getLapTrace(currentSessionUid, lapNumber, carIndex),
         getLapErs(currentSessionUid, lapNumber, carIndex),
         getLapSpeedTrace(currentSessionUid, lapNumber, carIndex),
+        getLapCorners(currentSessionUid, lapNumber, carIndex),
       ])
       if (isCancelledRef.current) return
       if (traceResult.status === 'fulfilled') {
@@ -252,6 +270,9 @@ export function SessionDetailPage() {
       }
       if (speedResult.status === 'fulfilled') {
         setSpeedTracePoints(speedResult.value)
+      }
+      if (cornersResult.status === 'fulfilled') {
+        setCorners(cornersResult.value)
       }
     },
     [],
@@ -557,6 +578,7 @@ export function SessionDetailPage() {
                         void loadTrace(sessionUid, value, car)
                         void loadErs(sessionUid, value, car)
                         void loadSpeedTrace(sessionUid, value, car)
+                        void loadCorners(sessionUid, value, car)
                       }
                     }}
                     style={{
@@ -594,6 +616,7 @@ export function SessionDetailPage() {
                       void loadTrace(sessionUid, selectedLapForTrace, car)
                       void loadErs(sessionUid, selectedLapForTrace, car)
                       void loadSpeedTrace(sessionUid, selectedLapForTrace, car)
+                      void loadCorners(sessionUid, selectedLapForTrace, car)
                     }}
                     style={{
                       marginTop: 'var(--space-2)',
@@ -626,7 +649,7 @@ export function SessionDetailPage() {
               <p className="text-error">Failed to load speed trace for this lap.</p>
             )}
             {(speedTraceStatus === 'loaded' || speedTraceStatus === 'idle') && (
-              <SpeedChart points={speedTracePoints} />
+              <SpeedChart points={speedTracePoints} corners={corners} />
             )}
           </div>
 

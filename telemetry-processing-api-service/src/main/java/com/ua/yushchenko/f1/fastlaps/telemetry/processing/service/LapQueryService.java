@@ -1,11 +1,14 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsPointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapCornerDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SpeedTracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.corner.CornerSegment;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.corner.SteerBasedCornerSegmenter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.LapMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarStatusRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
@@ -43,6 +46,7 @@ public class LapQueryService {
     private final CarStatusRawRepository carStatusRawRepository;
     private final TyreWearPerLapRepository tyreWearPerLapRepository;
     private final LapMapper lapMapper;
+    private final SteerBasedCornerSegmenter cornerSegmenter;
 
     public List<LapResponseDto> getLaps(String sessionId, Short carIndex) {
         log.debug("getLaps: sessionId={}, carIndex={}", sessionId, carIndex);
@@ -107,6 +111,65 @@ public class LapQueryService {
                 .collect(Collectors.toList());
         log.debug("getSpeedTrace: returning {} speed trace points", result.size());
         return result;
+    }
+
+    /**
+     * Per-corner metrics (entry/apex/exit speed) for one lap. Steer-based corner detection.
+     * Plan: 13-session-summary-speed-corner-graph.md Phase 2.
+     */
+    public List<LapCornerDto> getCorners(String sessionId, int lapNum, Short carIndex) {
+        log.debug("getCorners: sessionId={}, lapNum={}, carIndex={}", sessionId, lapNum, carIndex);
+        Session session = sessionResolveService.getSessionByPublicIdOrUid(normalizeId(sessionId));
+        List<CarTelemetryRaw> rawList = carTelemetryRawRepository
+                .findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
+                        session.getSessionUid(), carIndex, (short) lapNum);
+
+        List<SteerBasedCornerSegmenter.Point> points = rawList.stream()
+                .filter(r -> r.getLapDistanceM() != null && r.getSpeedKph() != null && r.getSteer() != null)
+                .map(r -> new SteerBasedCornerSegmenter.Point(
+                        r.getLapDistanceM(), r.getSpeedKph().intValue(), r.getSteer()))
+                .collect(Collectors.toList());
+        if (points.isEmpty()) {
+            log.debug("getCorners: no valid points, returning empty");
+            return List.of();
+        }
+
+        List<CornerSegment> segments = cornerSegmenter.detect(points);
+        List<LapCornerDto> result = new ArrayList<>();
+        for (int i = 0; i < segments.size(); i++) {
+            CornerSegment seg = segments.get(i);
+            int entryKph = speedAtDistance(rawList, seg.getStartDistanceM());
+            int exitKph = speedAtDistance(rawList, seg.getEndDistanceM());
+            int apexKph = speedAtDistance(rawList, seg.getApexDistanceM());
+            result.add(LapCornerDto.builder()
+                    .cornerIndex(i + 1)
+                    .startDistanceM(seg.getStartDistanceM())
+                    .endDistanceM(seg.getEndDistanceM())
+                    .apexDistanceM(seg.getApexDistanceM())
+                    .entrySpeedKph(entryKph)
+                    .apexSpeedKph(apexKph)
+                    .exitSpeedKph(exitKph)
+                    .build());
+        }
+        log.debug("getCorners: returning {} corners", result.size());
+        return result;
+    }
+
+    /** Nearest speed (kph) at given distance from raw list (ordered by lap_distance_m). */
+    private static int speedAtDistance(List<CarTelemetryRaw> rawList, float distanceM) {
+        if (rawList.isEmpty()) return 0;
+        CarTelemetryRaw best = rawList.get(0);
+        float bestDist = best.getLapDistanceM() != null ? Math.abs(best.getLapDistanceM() - distanceM) : Float.MAX_VALUE;
+        for (int i = 1; i < rawList.size(); i++) {
+            CarTelemetryRaw r = rawList.get(i);
+            if (r.getLapDistanceM() == null || r.getSpeedKph() == null) continue;
+            float d = Math.abs(r.getLapDistanceM() - distanceM);
+            if (d < bestDist) {
+                bestDist = d;
+                best = r;
+            }
+        }
+        return best.getSpeedKph() != null ? best.getSpeedKph().intValue() : 0;
     }
 
     /**
