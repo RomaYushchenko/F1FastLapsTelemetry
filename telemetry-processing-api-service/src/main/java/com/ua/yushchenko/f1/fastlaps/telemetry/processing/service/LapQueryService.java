@@ -3,6 +3,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SpeedTracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.LapMapper;
@@ -87,6 +88,24 @@ public class LapQueryService {
                 .map(lapMapper::toTracePointDto)
                 .collect(Collectors.toList());
         log.debug("getLapTrace: returning {} trace points", result.size());
+        return result;
+    }
+
+    /**
+     * Speed vs lap distance for one lap (GET .../laps/{lapNum}/speed-trace).
+     * Plan: 13-session-summary-speed-corner-graph.md Phase 1.
+     */
+    public List<SpeedTracePointDto> getSpeedTrace(String sessionId, int lapNum, Short carIndex) {
+        log.debug("getSpeedTrace: sessionId={}, lapNum={}, carIndex={}", sessionId, lapNum, carIndex);
+        Session session = sessionResolveService.getSessionByPublicIdOrUid(normalizeId(sessionId));
+        List<SpeedTracePointDto> result = carTelemetryRawRepository
+                .findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
+                        session.getSessionUid(), carIndex, (short) lapNum)
+                .stream()
+                .map(lapMapper::toSpeedTracePointDto)
+                .filter(p -> p != null)
+                .collect(Collectors.toList());
+        log.debug("getSpeedTrace: returning {} speed trace points", result.size());
         return result;
     }
 

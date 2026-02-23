@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SpeedTracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
@@ -134,6 +135,47 @@ class LapMapperTest {
         assertThat(dto.getDistance()).isEqualTo(LAP_DISTANCE_M);
         assertThat(dto.getThrottle()).isEqualTo(THROTTLE);
         assertThat(dto.getBrake()).isEqualTo(BRAKE);
+    }
+
+    @Test
+    @DisplayName("toSpeedTracePointDto повертає null коли row null")
+    void toSpeedTracePointDto_returnsNull_whenRowNull() {
+        // Act
+        SpeedTracePointDto result = mapper.toSpeedTracePointDto((CarTelemetryRaw) null);
+
+        // Assert
+        assertThat(result).isNull();
+    }
+
+    @Test
+    @DisplayName("toSpeedTracePointDto повертає null коли distance або speed null")
+    void toSpeedTracePointDto_returnsNull_whenDistanceOrSpeedNull() {
+        // Arrange
+        CarTelemetryRaw noDistance = CarTelemetryRaw.builder()
+                .sessionUid(SESSION_UID).frameIdentifier(FRAME_ID).carIndex(CAR_INDEX).ts(RAW_TS)
+                .lapDistanceM(null).speedKph(SPEED_KPH).build();
+        CarTelemetryRaw noSpeed = CarTelemetryRaw.builder()
+                .sessionUid(SESSION_UID).frameIdentifier(FRAME_ID).carIndex(CAR_INDEX).ts(RAW_TS)
+                .lapDistanceM(LAP_DISTANCE_M).speedKph(null).build();
+
+        // Act & Assert
+        assertThat(mapper.toSpeedTracePointDto(noDistance)).isNull();
+        assertThat(mapper.toSpeedTracePointDto(noSpeed)).isNull();
+    }
+
+    @Test
+    @DisplayName("toSpeedTracePointDto мапить distance та speed")
+    void toSpeedTracePointDto_mapsDistanceAndSpeed() {
+        // Arrange
+        CarTelemetryRaw raw = carTelemetryRaw();
+
+        // Act
+        SpeedTracePointDto dto = mapper.toSpeedTracePointDto(raw);
+
+        // Assert
+        assertThat(dto).isNotNull();
+        assertThat(dto.getDistanceM()).isEqualTo(LAP_DISTANCE_M);
+        assertThat(dto.getSpeedKph()).isEqualTo(SPEED_KPH);
     }
 
     @Test

@@ -19,6 +19,12 @@ export interface ErsPoint {
   energyPercent: number
 }
 
+/** Matches SpeedTracePointDto from GET /api/sessions/{id}/laps/{lapNum}/speed-trace. */
+export interface SpeedTracePoint {
+  distanceM: number
+  speedKph: number
+}
+
 /** Matches TyreWearPointDto from GET /api/sessions/{id}/tyre-wear. */
 export interface TyreWearPoint {
   lapNumber: number

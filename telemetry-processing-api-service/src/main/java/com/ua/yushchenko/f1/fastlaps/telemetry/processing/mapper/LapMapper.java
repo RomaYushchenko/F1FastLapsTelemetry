@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SpeedTracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
@@ -52,6 +53,20 @@ public class LapMapper {
                 .distance(distance)
                 .throttle(throttle)
                 .brake(brake)
+                .build();
+    }
+
+    /**
+     * Maps raw telemetry row to speed-trace point (distance, speed).
+     * Returns null if distance or speed is null (filtered out in service).
+     */
+    public SpeedTracePointDto toSpeedTracePointDto(CarTelemetryRaw row) {
+        if (row == null || row.getLapDistanceM() == null || row.getSpeedKph() == null) {
+            return null;
+        }
+        return SpeedTracePointDto.builder()
+                .distanceM(row.getLapDistanceM())
+                .speedKph(row.getSpeedKph().intValue())
                 .build();
     }
 

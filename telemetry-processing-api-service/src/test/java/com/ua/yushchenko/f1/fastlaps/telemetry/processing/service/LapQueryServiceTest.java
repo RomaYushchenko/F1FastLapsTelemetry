@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SpeedTracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.LapMapper;
@@ -120,5 +121,42 @@ class LapQueryServiceTest {
         // Assert
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getDistance()).isEqualTo(LAP_DISTANCE_M);
+    }
+
+    @Test
+    @DisplayName("getSpeedTrace повертає змаплені speed trace points")
+    void getSpeedTrace_returnsMappedSpeedTracePoints() {
+        // Arrange
+        Session session = session();
+        CarTelemetryRaw raw = carTelemetryRaw();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(carTelemetryRawRepository.findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
+                SESSION_UID, CAR_INDEX, (short) 1)).thenReturn(List.of(raw));
+
+        // Act
+        List<SpeedTracePointDto> result = service.getSpeedTrace(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX);
+
+        // Assert
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getDistanceM()).isEqualTo(LAP_DISTANCE_M);
+        assertThat(result.get(0).getSpeedKph()).isEqualTo(SPEED_KPH);
+        verify(carTelemetryRawRepository).findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
+                SESSION_UID, CAR_INDEX, (short) 1);
+    }
+
+    @Test
+    @DisplayName("getSpeedTrace повертає порожній список коли немає телеметрії")
+    void getSpeedTrace_returnsEmpty_whenNoTelemetry() {
+        // Arrange
+        Session session = session();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(carTelemetryRawRepository.findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
+                SESSION_UID, CAR_INDEX, (short) 1)).thenReturn(List.of());
+
+        // Act
+        List<SpeedTracePointDto> result = service.getSpeedTrace(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX);
+
+        // Assert
+        assertThat(result).isEmpty();
     }
 }

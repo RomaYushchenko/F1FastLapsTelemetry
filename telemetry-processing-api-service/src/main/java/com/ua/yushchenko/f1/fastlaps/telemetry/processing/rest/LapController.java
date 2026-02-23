@@ -3,6 +3,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SpeedTracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.LapQueryService;
@@ -68,6 +69,21 @@ public class LapController {
             throw new IllegalArgumentException("lapNum is required");
         }
         List<TracePointDto> trace = lapQueryService.getLapTrace(id, lapNum, carIndex);
+        return ResponseEntity.ok(trace);
+    }
+
+    @GetMapping("/laps/{lapNum}/speed-trace")
+    public ResponseEntity<List<SpeedTracePointDto>> getLapSpeedTrace(
+            @PathVariable("id") String id,
+            @PathVariable("lapNum") Integer lapNum,
+            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
+    ) {
+        log.debug("getLapSpeedTrace: id={}, lapNum={}, carIndex={}", id, lapNum, carIndex);
+        if (lapNum == null) {
+            log.warn("lapNum is required");
+            throw new IllegalArgumentException("lapNum is required");
+        }
+        List<SpeedTracePointDto> trace = lapQueryService.getSpeedTrace(id, lapNum, carIndex);
         return ResponseEntity.ok(trace);
     }
 

@@ -202,6 +202,27 @@ Response: масив семплів по дистанції кола (distance, 
 
 ---
 
+#### 3.5.1 Speed trace (швидкість по дистанції кола)
+
+```
+GET /api/sessions/{sessionUid}/laps/{lapNum}/speed-trace
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: масив семплів (distanceM, speedKph), відсортований по дистанції. Для графіка «швидкість vs дистанція» на Session Summary (план 13-session-summary-speed-corner-graph).
+```json
+[
+  { "distanceM": 0.0, "speedKph": 120 },
+  { "distanceM": 50.5, "speedKph": 285 }
+]
+```
+
+- Джерело даних: таблиця `telemetry.car_telemetry_raw` (поля `lap_distance_m`, `speed_kph` за session_uid, car_index, lap_number). Якщо для обраного кола записів немає або всі точки мають null distance/speed — 200 і порожній масив `[]`. 404 якщо сесії немає.
+
+---
+
 ### 3.6 Tyre wear (діаграма зносу шин по колах)
 
 ```

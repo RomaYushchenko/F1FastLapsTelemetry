@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SpeedTracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.LapQueryService;
@@ -97,6 +98,34 @@ class LapControllerTest {
     void getLapTrace_throws_whenLapNumNull() {
         // Act & Assert
         assertThatThrownBy(() -> controller.getLapTrace(SESSION_PUBLIC_ID_STR, null, CAR_INDEX))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("lapNum is required");
+    }
+
+    @Test
+    @DisplayName("getLapSpeedTrace делегує сервісу та повертає 200")
+    void getLapSpeedTrace_delegatesAndReturnsOk() {
+        // Arrange
+        List<SpeedTracePointDto> list = List.of(
+                SpeedTracePointDto.builder().distanceM(100f).speedKph(250).build());
+        when(lapQueryService.getSpeedTrace(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX)).thenReturn(list);
+
+        // Act
+        ResponseEntity<List<SpeedTracePointDto>> response = controller.getLapSpeedTrace(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX);
+
+        // Assert
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).hasSize(1);
+        assertThat(response.getBody().get(0).getDistanceM()).isEqualTo(100f);
+        assertThat(response.getBody().get(0).getSpeedKph()).isEqualTo(250);
+        verify(lapQueryService).getSpeedTrace(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX);
+    }
+
+    @Test
+    @DisplayName("getLapSpeedTrace кидає виняток коли lapNum null")
+    void getLapSpeedTrace_throws_whenLapNumNull() {
+        // Act & Assert
+        assertThatThrownBy(() -> controller.getLapSpeedTrace(SESSION_PUBLIC_ID_STR, null, CAR_INDEX))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("lapNum is required");
     }
