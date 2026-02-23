@@ -47,6 +47,7 @@ docker-compose up -d
 - `16-tyre-wear-per-lap-compound.sql` — колонка `compound` у `telemetry.tyre_wear_per_lap`
 - `17-laps-position-at-lap-start.sql` — колонка `position_at_lap_start` у `telemetry.laps`
 - `18-track-corner-maps-and-lap-metrics.sql` — таблиці `track_corner_maps`, `track_corners`, `lap_corner_metrics` (план 13 Phase 3)
+- `19-motion-raw.sql` — таблиця `motion_raw` (план 13 Phase 4)
 
 Документація DDL: [f_1_telemetry_project_architecture.md](../.github/project/f_1_telemetry_project_architecture.md) § 9.
 
@@ -61,6 +62,8 @@ Init scripts run **only on first Postgres start** (empty data dir). If the DB wa
 - `15-session-finishing-positions.sql` — table `telemetry.session_finishing_positions`
 - `16-tyre-wear-per-lap-compound.sql` — column `compound` on `telemetry.tyre_wear_per_lap`
 - `17-laps-position-at-lap-start.sql` — column `position_at_lap_start` on `telemetry.laps`
+- `18-track-corner-maps-and-lap-metrics.sql` — tables `track_corner_maps`, `track_corners`, `lap_corner_metrics`
+- `19-motion-raw.sql` — table `motion_raw` (Plan 13 Phase 4)
 
 **Docker (from project root) — run all migration scripts:**
 
@@ -72,6 +75,8 @@ docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init
 docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/15-session-finishing-positions.sql
 docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/16-tyre-wear-per-lap-compound.sql
 docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/17-laps-position-at-lap-start.sql
+docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/18-track-corner-maps-and-lap-metrics.sql
+docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/19-motion-raw.sql
 ```
 
 **Local psql — run all migration scripts:**
@@ -84,4 +89,6 @@ psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/14-session-
 psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/15-session-finishing-positions.sql
 psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/16-tyre-wear-per-lap-compound.sql
 psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/17-laps-position-at-lap-start.sql
+psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/18-track-corner-maps-and-lap-metrics.sql
+psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/19-motion-raw.sql
 ```

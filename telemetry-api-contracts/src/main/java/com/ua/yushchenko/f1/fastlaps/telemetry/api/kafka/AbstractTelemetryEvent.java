@@ -25,6 +25,7 @@ import java.time.Instant;
 @JsonSubTypes({
         @JsonSubTypes.Type(value = LapDataEvent.class, name = "LapDataEvent"),
         @JsonSubTypes.Type(value = CarTelemetryEvent.class, name = "CarTelemetryEvent"),
+        @JsonSubTypes.Type(value = MotionEvent.class, name = "MotionEvent"),
         @JsonSubTypes.Type(value = CarStatusEvent.class, name = "CarStatusEvent"),
         @JsonSubTypes.Type(value = CarDamageEvent.class, name = "CarDamageEvent"),
         @JsonSubTypes.Type(value = SessionLifecycleEvent.class, name = "SessionLifecycleEvent"),

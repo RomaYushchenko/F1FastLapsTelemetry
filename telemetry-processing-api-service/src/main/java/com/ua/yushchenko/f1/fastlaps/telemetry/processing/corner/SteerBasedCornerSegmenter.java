@@ -29,9 +29,13 @@ public class SteerBasedCornerSegmenter {
     private float steerOff = DEFAULT_STEER_OFF;
 
     /**
-     * One point with distance, speed and steer for segmenter input.
+     * One point with distance, speed, steer and optional G-force lateral (for combined corner detection).
      */
-    public record Point(float distanceM, int speedKph, float steer) {}
+    public record Point(float distanceM, int speedKph, float steer, Float gForceLateral) {
+        public Point(float distanceM, int speedKph, float steer) {
+            this(distanceM, speedKph, steer, null);
+        }
+    }
 
     /**
      * Detect corner segments from ordered points. Points must be sorted by distanceM.

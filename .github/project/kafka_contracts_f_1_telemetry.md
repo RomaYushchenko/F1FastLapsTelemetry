@@ -50,6 +50,7 @@
 | `telemetry.sessionData` | Повний PacketSessionData (724 B) при packetId=1 | ingest | optional |
 | `telemetry.lap` | Дані по колах | ingest | processing |
 | `telemetry.carTelemetry` | Live телеметрія авто | ingest | processing |
+| `telemetry.motion` | Motion data (world position, G-force lateral, yaw) for corner detection. Plan: 13-session-summary-speed-corner-graph.md Phase 4. | ingest | processing |
 | `telemetry.carStatus` | Статус авто | ingest | processing |
 | `telemetry.carDamage` | Пошкодження/знос шин (tyre wear % per wheel) | ingest | processing |
 | `telemetry.event` | Session-wide events (DRSD, SCAR, RTMT, FTLP, PENA, etc.). See [Plan 08](../draft/implementation-plans/08-packet-event-ingest-and-processing.md) § 1.1–1.2 (why and where to use). | ingest | processing |

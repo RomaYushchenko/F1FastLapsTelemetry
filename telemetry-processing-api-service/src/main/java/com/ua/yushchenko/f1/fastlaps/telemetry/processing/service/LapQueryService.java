@@ -18,6 +18,8 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Tra
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarStatusRawRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.CarTelemetryRawRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapCornerMetricsRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.MotionRawRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.MotionRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TyreWearPerLapRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -52,6 +55,7 @@ public class LapQueryService {
     private final SteerBasedCornerSegmenter cornerSegmenter;
     private final TrackCornerMapService trackCornerMapService;
     private final LapCornerMetricsRepository lapCornerMetricsRepository;
+    private final MotionRawRepository motionRawRepository;
 
     public List<LapResponseDto> getLaps(String sessionId, Short carIndex) {
         log.debug("getLaps: sessionId={}, carIndex={}", sessionId, carIndex);
@@ -129,10 +133,19 @@ public class LapQueryService {
                 .findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
                         session.getSessionUid(), carIndex, (short) lapNum);
 
+        Map<Integer, MotionRaw> motionByFrame = loadMotionByFrame(session.getSessionUid(), carIndex, rawList);
+
         List<SteerBasedCornerSegmenter.Point> points = rawList.stream()
                 .filter(r -> r.getLapDistanceM() != null && r.getSpeedKph() != null && r.getSteer() != null)
-                .map(r -> new SteerBasedCornerSegmenter.Point(
-                        r.getLapDistanceM(), r.getSpeedKph().intValue(), r.getSteer()))
+                .map(r -> {
+                    Float gLat = null;
+                    MotionRaw motion = motionByFrame.get(r.getFrameIdentifier());
+                    if (motion != null && motion.getGForceLateral() != null) {
+                        gLat = motion.getGForceLateral();
+                    }
+                    return new SteerBasedCornerSegmenter.Point(
+                            r.getLapDistanceM(), r.getSpeedKph().intValue(), r.getSteer(), gLat);
+                })
                 .collect(Collectors.toList());
         if (points.isEmpty()) {
             log.debug("getCorners: no valid points, returning empty");
@@ -271,6 +284,21 @@ public class LapQueryService {
             }
         }
         return best;
+    }
+
+    /**
+     * Load motion for the same session/car and frame range as the telemetry list. Returns map frameId -> MotionRaw for merge in getCorners.
+     */
+    private Map<Integer, MotionRaw> loadMotionByFrame(Long sessionUid, Short carIndex, List<CarTelemetryRaw> rawList) {
+        if (rawList.isEmpty()) {
+            return Map.of();
+        }
+        int minFrame = rawList.get(0).getFrameIdentifier();
+        int maxFrame = rawList.get(rawList.size() - 1).getFrameIdentifier();
+        List<MotionRaw> motionList = motionRawRepository
+                .findBySessionUidAndCarIndexAndFrameIdentifierBetweenOrderByFrameIdentifierAsc(
+                        sessionUid, carIndex, minFrame, maxFrame);
+        return motionList.stream().collect(Collectors.toMap(MotionRaw::getFrameIdentifier, m -> m, (a, b) -> a));
     }
 
     private static String normalizeId(String id) {

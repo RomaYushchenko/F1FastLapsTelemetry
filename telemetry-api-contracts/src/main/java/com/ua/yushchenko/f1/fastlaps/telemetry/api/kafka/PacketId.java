@@ -10,5 +10,6 @@ public enum PacketId {
     CAR_STATUS,
     CAR_DAMAGE,
     SESSION,
-    EVENT
+    EVENT,
+    MOTION
 }
