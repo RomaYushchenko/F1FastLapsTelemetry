@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { getLapErs, getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
+import { getLapCorners, getLapErs, getLapSpeedTrace, getLapTrace, getSession, getSessionLaps, getSessionPace, getSessionSummary, getSessionTyreWear } from '../api/client'
 import { isValidSessionId } from '../api/sessionId'
 import type { Lap, Session, SessionSummary } from '../api/types'
 import { HttpError } from '../api/types'
 import { getTrackName } from '../constants/tracks'
-import type { ErsPoint, PacePoint, PedalTracePoint, TyreWearPoint } from '../charts/types'
+import type { ErsPoint, LapCorner, PacePoint, PedalTracePoint, SpeedTracePoint, TyreWearPoint } from '../charts/types'
 import { ErsChart } from '../charts/ers-chart'
 import { PaceChart } from '../charts/pace-chart'
+import { SpeedChart } from '../charts/speed-chart'
 import { ThrottleBrakeChart } from '../charts/throttle-brake-chart'
 import { TyreWearChart } from '../charts/tyre-wear-chart'
 
@@ -32,6 +33,9 @@ export function SessionDetailPage() {
   const [traceError, setTraceError] = useState<string | null>(null)
   const [ersPoints, setErsPoints] = useState<ErsPoint[]>([])
   const [ersStatus, setErsStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
+  const [speedTracePoints, setSpeedTracePoints] = useState<SpeedTracePoint[]>([])
+  const [speedTraceStatus, setSpeedTraceStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
+  const [corners, setCorners] = useState<LapCorner[]>([])
 
   const loadTrace = useCallback(
     async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
@@ -67,6 +71,39 @@ export function SessionDetailPage() {
         toast.error(msg)
         setErsStatus('error')
         setErsPoints([])
+      }
+    },
+    [],
+  )
+
+  const loadSpeedTrace = useCallback(
+    async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
+      setSpeedTraceStatus('loading')
+      try {
+        const points = await getLapSpeedTrace(currentSessionUid, lapNumber, carIndex)
+        if (isCancelledRef.current) return
+        setSpeedTracePoints(points)
+        setSpeedTraceStatus('loaded')
+      } catch (error) {
+        if (isCancelledRef.current) return
+        const msg = error instanceof Error ? error.message : 'Failed to load speed trace'
+        toast.error(msg)
+        setSpeedTraceStatus('error')
+        setSpeedTracePoints([])
+      }
+    },
+    [],
+  )
+
+  const loadCorners = useCallback(
+    async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
+      try {
+        const list = await getLapCorners(currentSessionUid, lapNumber, carIndex)
+        if (isCancelledRef.current) return
+        setCorners(list)
+      } catch {
+        if (isCancelledRef.current) return
+        setCorners([])
       }
     },
     [],
@@ -115,6 +152,8 @@ export function SessionDetailPage() {
         setSelectedLapForTrace(initialLapForTrace)
         void loadTrace(id, initialLapForTrace, carIndex)
         void loadErs(id, initialLapForTrace, carIndex)
+        void loadSpeedTrace(id, initialLapForTrace, carIndex)
+        void loadCorners(id, initialLapForTrace, carIndex)
       }
       prevLapsLengthRef.current = lapsRes.length
 
@@ -152,7 +191,7 @@ export function SessionDetailPage() {
         error instanceof Error ? error.message : 'Failed to load session details',
       )
     }
-  }, [sessionUid, loadTrace])
+  }, [sessionUid, loadTrace, loadSpeedTrace, loadCorners])
 
   /** Background refresh: updates data without loading state or re-mount feel. */
   const refreshInBackground = useCallback(async () => {
@@ -189,6 +228,8 @@ export function SessionDetailPage() {
           setSelectedLapForTrace(newLapNumber)
           void loadTrace(id, newLapNumber, carIndex)
           void loadErs(id, newLapNumber, carIndex)
+          void loadSpeedTrace(id, newLapNumber, carIndex)
+          void loadCorners(id, newLapNumber, carIndex)
         }
       } else {
         prevLapsLengthRef.current = currentLength
@@ -211,12 +252,14 @@ export function SessionDetailPage() {
     }
   }, [sessionUid, loadTrace])
 
-  /** Quiet refresh of pedal trace and ERS for current lap (no loading state). Each request is independent so an ERS failure does not block trace updates. */
+  /** Quiet refresh of pedal trace, ERS, speed trace and corners for current lap (no loading state). */
   const refreshTraceInBackground = useCallback(
     async (currentSessionUid: string, lapNumber: number, carIndex = 0) => {
-      const [traceResult, ersResult] = await Promise.allSettled([
+      const [traceResult, ersResult, speedResult, cornersResult] = await Promise.allSettled([
         getLapTrace(currentSessionUid, lapNumber, carIndex),
         getLapErs(currentSessionUid, lapNumber, carIndex),
+        getLapSpeedTrace(currentSessionUid, lapNumber, carIndex),
+        getLapCorners(currentSessionUid, lapNumber, carIndex),
       ])
       if (isCancelledRef.current) return
       if (traceResult.status === 'fulfilled') {
@@ -224,6 +267,12 @@ export function SessionDetailPage() {
       }
       if (ersResult.status === 'fulfilled') {
         setErsPoints(ersResult.value)
+      }
+      if (speedResult.status === 'fulfilled') {
+        setSpeedTracePoints(speedResult.value)
+      }
+      if (cornersResult.status === 'fulfilled') {
+        setCorners(cornersResult.value)
       }
     },
     [],
@@ -528,6 +577,8 @@ export function SessionDetailPage() {
                         const car = session?.playerCarIndex ?? 0
                         void loadTrace(sessionUid, value, car)
                         void loadErs(sessionUid, value, car)
+                        void loadSpeedTrace(sessionUid, value, car)
+                        void loadCorners(sessionUid, value, car)
                       }
                     }}
                     style={{
@@ -564,6 +615,8 @@ export function SessionDetailPage() {
                       const car = session?.playerCarIndex ?? 0
                       void loadTrace(sessionUid, selectedLapForTrace, car)
                       void loadErs(sessionUid, selectedLapForTrace, car)
+                      void loadSpeedTrace(sessionUid, selectedLapForTrace, car)
+                      void loadCorners(sessionUid, selectedLapForTrace, car)
                     }}
                     style={{
                       marginTop: 'var(--space-2)',
@@ -582,6 +635,21 @@ export function SessionDetailPage() {
             )}
             {(traceStatus === 'loaded' || traceStatus === 'idle') && tracePoints && (
               <ThrottleBrakeChart points={tracePoints} />
+            )}
+          </div>
+
+          {/* Speed vs distance */}
+          <div className="card" style={{ marginBottom: 'var(--space-4)', padding: 'var(--space-4)' }}>
+            <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 'var(--space-1)' }}>Speed vs distance</h2>
+            <p className="text-muted" style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
+              Speed (km/h) along the lap. Same lap as pedal trace above.
+            </p>
+            {speedTraceStatus === 'loading' && <p className="text-muted">Loading speed trace…</p>}
+            {speedTraceStatus === 'error' && (
+              <p className="text-error">Failed to load speed trace for this lap.</p>
+            )}
+            {(speedTraceStatus === 'loaded' || speedTraceStatus === 'idle') && (
+              <SpeedChart points={speedTracePoints} corners={corners} />
             )}
           </div>
 

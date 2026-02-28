@@ -19,6 +19,26 @@ export interface ErsPoint {
   energyPercent: number
 }
 
+/** Matches SpeedTracePointDto from GET /api/sessions/{id}/laps/{lapNum}/speed-trace. */
+export interface SpeedTracePoint {
+  distanceM: number
+  speedKph: number
+}
+
+/** Matches LapCornerDto from GET /api/sessions/{id}/laps/{lapNum}/corners. */
+export interface LapCorner {
+  cornerIndex: number
+  startDistanceM: number
+  endDistanceM: number
+  apexDistanceM: number
+  entrySpeedKph: number
+  apexSpeedKph: number
+  exitSpeedKph: number
+  durationMs?: number | null
+  /** Optional name from track corner map (e.g. "T1", "T2"). */
+  name?: string | null
+}
+
 /** Matches TyreWearPointDto from GET /api/sessions/{id}/tyre-wear. */
 export interface TyreWearPoint {
   lapNumber: number

@@ -202,6 +202,80 @@ Response: масив семплів по дистанції кола (distance, 
 
 ---
 
+#### 3.5.1 Speed trace (швидкість по дистанції кола)
+
+```
+GET /api/sessions/{sessionUid}/laps/{lapNum}/speed-trace
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: масив семплів (distanceM, speedKph), відсортований по дистанції. Для графіка «швидкість vs дистанція» на Session Summary (план 13-session-summary-speed-corner-graph).
+```json
+[
+  { "distanceM": 0.0, "speedKph": 120 },
+  { "distanceM": 50.5, "speedKph": 285 }
+]
+```
+
+- Джерело даних: таблиця `telemetry.car_telemetry_raw` (поля `lap_distance_m`, `speed_kph` за session_uid, car_index, lap_number). Якщо для обраного кола записів немає або всі точки мають null distance/speed — 200 і порожній масив `[]`. 404 якщо сесії немає.
+
+---
+
+#### 3.5.2 Corners (метрики по поворотах для кола)
+
+```
+GET /api/sessions/{sessionUid}/laps/{lapNum}/corners
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: масив поворотів з entry/apex/exit швидкостями (steer-based детекція). Для маркерів і номерів поворотів на графіку speed vs distance (план 13 Phase 2).
+```json
+[
+  {
+    "cornerIndex": 1,
+    "startDistanceM": 120.5,
+    "endDistanceM": 260.0,
+    "apexDistanceM": 170.0,
+    "entrySpeedKph": 305,
+    "apexSpeedKph": 138,
+    "exitSpeedKph": 226,
+    "durationMs": null
+  }
+]
+```
+
+- Джерело: `car_telemetry_raw` (lap_distance_m, speed_kph, steer); детекція поворотів по порогу керма (steer_on/steer_off). Якщо немає точок з усіма полями — 200 і `[]`. 404 якщо сесії немає.
+- **Phase 3:** метрики зберігаються в `lap_corner_metrics`; при наявності карти поворотів треку кожен об'єкт може містити поле `name` (наприклад "T1", "T2") з `track_corners`.
+
+---
+
+#### 3.5.3 Track corner map (остання карта поворотів треку)
+
+```
+GET /api/tracks/{trackId}/corner-maps/latest?trackLengthM=
+```
+
+Query params:
+- `trackLengthM` (int, required)
+
+Response: карта поворотів для треку (версія, список кутів з name, start/end/apex distance). 404 якщо карти немає.
+```json
+{
+  "trackId": 7,
+  "trackLengthM": 5891,
+  "version": 1,
+  "corners": [
+    { "cornerIndex": 1, "name": "T1", "startDistanceM": 120.5, "endDistanceM": 260.0, "apexDistanceM": 170.0 }
+  ]
+}
+```
+
+---
+
 ### 3.6 Tyre wear (діаграма зносу шин по колах)
 
 ```
