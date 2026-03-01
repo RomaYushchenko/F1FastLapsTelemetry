@@ -4,10 +4,14 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapCornerDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PitStopDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SpeedTracePointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.StintDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TracePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TyreWearPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.LapQueryService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.PitStopQueryService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.StintQueryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +31,8 @@ import java.util.List;
 public class LapController {
 
     private final LapQueryService lapQueryService;
+    private final PitStopQueryService pitStopQueryService;
+    private final StintQueryService stintQueryService;
 
     @GetMapping("/laps")
     public ResponseEntity<List<LapResponseDto>> getLaps(
@@ -55,6 +61,26 @@ public class LapController {
     ) {
         log.debug("getTyreWear: id={}, carIndex={}", id, carIndex);
         List<TyreWearPointDto> list = lapQueryService.getTyreWear(id, carIndex);
+        return ResponseEntity.ok(list);
+    }
+
+    @GetMapping("/pit-stops")
+    public ResponseEntity<List<PitStopDto>> getPitStops(
+            @PathVariable("id") String id,
+            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
+    ) {
+        log.debug("getPitStops: id={}, carIndex={}", id, carIndex);
+        List<PitStopDto> list = pitStopQueryService.getPitStops(id, carIndex);
+        return ResponseEntity.ok(list);
+    }
+
+    @GetMapping("/stints")
+    public ResponseEntity<List<StintDto>> getStints(
+            @PathVariable("id") String id,
+            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
+    ) {
+        log.debug("getStints: id={}, carIndex={}", id, carIndex);
+        List<StintDto> list = stintQueryService.getStints(id, carIndex);
         return ResponseEntity.ok(list);
     }
 

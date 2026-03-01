@@ -244,6 +244,11 @@ export default function SessionDetails() {
           <h1 className="text-3xl font-bold mb-2">Session Details</h1>
           <p className="text-text-secondary">{subtitle || "—"}</p>
         </div>
+        <Link to={`/app/sessions/${id}/strategy`}>
+          <Button variant="outline" className="gap-2">
+            Strategy
+          </Button>
+        </Link>
         <Button variant="outline" className="gap-2">
           <Download className="w-4 h-4" />
           Export Data

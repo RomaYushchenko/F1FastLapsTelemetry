@@ -132,46 +132,45 @@ Use this to track what is done and what is left. Mark items when completed.
 
 ### Step 14 — Backend B4 Pit stops
 
-- [ ] 14.1 — REST contract: pit-stops endpoint and PitStopDto
-- [ ] 14.2 — telemetry-api-contracts: PitStopDto class
-- [ ] 14.3 — PitStopMapper (or equivalent)
-- [ ] 14.4 — PitStopQueryService (detection from laps + compound)
-- [ ] 14.5 — Controller: GET pit-stops
-- [ ] 14.6 — TestData: pit stop scenario
-- [ ] 14.7 — Unit tests + MockMvc; verify 85% coverage
-- [ ] 14.doc — Update BACKEND_FEATURES (B4 implemented), telemetry_processing_api_service if new components
+- [x] 14.1 — REST contract: pit-stops endpoint and PitStopDto
+- [x] 14.2 — telemetry-api-contracts: PitStopDto class
+- [x] 14.3 — PitStopMapper (or equivalent)
+- [x] 14.4 — PitStopQueryService (detection from laps + compound)
+- [x] 14.5 — Controller: GET pit-stops
+- [x] 14.6 — TestData: pit stop scenario
+- [x] 14.7 — Unit tests + MockMvc; verify 85% coverage
+- [x] 14.doc — Update BACKEND_FEATURES (B4 implemented), telemetry_processing_api_service if new components
 
 ### Step 15 — Backend B5 Stints
 
-- [ ] 15.1 — REST contract: stints endpoint and StintDto
-- [ ] 15.2 — telemetry-api-contracts: StintDto class
-- [ ] 15.3 — StintMapper
-- [ ] 15.4 — StintQueryService (derive from laps + compound)
-- [ ] 15.5 — Controller: GET stints
-- [ ] 15.6 — TestData: stint scenario
-- [ ] 15.7 — Unit tests + MockMvc; verify 85% coverage
-- [ ] 15.doc — BACKEND_FEATURES (B5 implemented)
+- [x] 15.1 — REST contract: stints endpoint and StintDto
+- [x] 15.2 — telemetry-api-contracts: StintDto class
+- [x] 15.3 — StintMapper
+- [x] 15.4 — StintQueryService (derive from laps + compound)
+- [x] 15.5 — Controller: GET stints
+- [x] 15.6 — TestData: stint scenario
+- [x] 15.7 — Unit tests + MockMvc; verify 85% coverage
+- [x] 15.doc — BACKEND_FEATURES (B5 implemented)
 
 ### Step 16 — New UI Strategy View
 
-- [ ] 16.1 — api/types.ts: PitStopDto, StintDto
-- [ ] 16.2 — api/client.ts: getPitStops, getStints
-- [ ] 16.3 — Route `/app/sessions/:id/strategy` + link/tab "Strategy" on Session Details
-- [ ] 16.4 — StrategyView: fetch, loading, error, empty states
-- [ ] 16.5 — Pit stop timeline and table from API
-- [ ] 16.6 — Stint comparison table from API
-- [ ] 16.7 — Overview cards: pit count and stint count from API
-- [ ] 16.8 — Compound code → display string map in UI
+- [x] 16.1 — api/types.ts: PitStopDto, StintDto
+- [x] 16.2 — api/client.ts: getPitStops, getStints
+- [x] 16.3 — Route `/app/sessions/:id/strategy` + link/tab "Strategy" on Session Details
+- [x] 16.4 — StrategyView: fetch, loading, error, empty states
+- [x] 16.5 — Pit stop timeline and table from API
+- [x] 16.6 — Stint comparison table from API
+- [x] 16.7 — Overview cards: pit count and stint count from API
+- [x] 16.8 — Compound code → display string map in UI
 
 ### Step 17 — Documentation
 
-- [ ] REST contract: pit-stops and stints sections
-- [ ] BACKEND_FEATURES_FOR_NEW_UI.md: B4, B5 marked implemented
+- [x] REST contract: pit-stops and stints sections
+- [x] BACKEND_FEATURES_FOR_NEW_UI.md: B4, B5 marked implemented
 - [ ] (Optional) NEW_UI_DOCS: Strategy View section if needed
 
 ### Step 18 — Git Commit
-- [ ] Add git commit with understanding message
-- 
+- [x] Add git commit with understanding message
 ---
 
 ## Out of scope for Block D

@@ -324,6 +324,32 @@ Response: масив точок для графіка «знос шин (% по 
 
 ---
 
+#### 3.6.1 Pit stops (піт-стопи по сесії/авто)
+
+```
+GET /api/sessions/{sessionUid}/pit-stops
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: array of PitStopDto. Each item: `lapNumber` (int, out-lap number), `inLapTimeMs` (Integer, optional), `pitDurationMs` (Integer, optional, null in MVP), `outLapTimeMs` (Integer), `compoundIn` (Integer, F1 25 code), `compoundOut` (Integer). 404 if session not found; 200 and `[]` if no pit stops. Detection: compound change between consecutive laps (from `tyre_wear_per_lap`); in/out lap times from `lap` table.
+
+---
+
+#### 3.6.2 Stints (шини по стінтах)
+
+```
+GET /api/sessions/{sessionUid}/stints
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: array of StintDto. Each item: `stintIndex` (int), `compound` (Integer, F1 25 code), `startLap` (int), `lapCount` (int), `avgLapTimeMs` (Integer, optional), `degradationIndicator` (optional, "high"|"medium"|"low" or null; UI shows "—" when null). 404 if session not found; 200 and `[]` if no laps. Consecutive laps with same compound form one stint.
+
+---
+
 ### 3.7 ERS (Energy Recovery System — запас енергії по колу)
 
 ```

@@ -62,6 +62,10 @@ export const router = createBrowserRouter([
         Component: SessionDetails,
       },
       {
+        path: "sessions/:id/strategy",
+        Component: StrategyView,
+      },
+      {
         path: "comparison",
         Component: DriverComparison,
       },

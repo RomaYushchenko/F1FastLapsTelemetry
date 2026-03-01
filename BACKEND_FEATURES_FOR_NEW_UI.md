@@ -49,9 +49,9 @@ This document lists **backend features that are not implemented today** but are 
 | B4 | **Pit stops** | List of pit stops for a session/car: lap number, in-lap time, pit duration, out-lap time, tyre change (compound in/out). | StrategyView: pit stop timeline and table (lap, inLap, pitTime, outLap, tyre change). |
 | B5 | **Stints (tyre stints)** | Per-car stints: stint index, compound, start lap, number of laps, optional avg lap time or degradation indicator. | StrategyView: stint comparison table and tyre strategy bar. |
 
-**Current backend:** Laps and tyre-wear exist; LapData has pit status. There is no aggregated “pit stops” or “stints” endpoint.
+**Obsolete (B4/B5 implemented):** Laps and tyre-wear exist; LapData has pit status. There is no aggregated “pit stops” or “stints” endpoint.
 
-**Gap:** No `GET /api/sessions/{id}/pit-stops?carIndex=` and no stint aggregation (or stint fields in pace/laps response).
+**Status: Implemented in Block D (Steps 14–16).** See [block-d-strategy-view.md](.github/draft/implementation-plans/new-ui-backend/block-d-strategy-view.md). Backend: `GET /api/sessions/{sessionUid}/pit-stops?carIndex=`, `GET /api/sessions/{sessionUid}/stints?carIndex=`; detection from laps + tyre_wear_per_lap (compound change = pit; consecutive same compound = stint). New UI: Strategy View entry from Session Details (`/app/sessions/:id/strategy`), overview cards from API, loading/error/empty states.
 
 ---
 

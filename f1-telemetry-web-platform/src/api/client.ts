@@ -12,9 +12,11 @@ import type {
   LapCorner,
   PacePoint,
   PedalTracePoint,
+  PitStopDto,
   Session,
   SessionSummary,
   SpeedTracePoint,
+  StintDto,
   TyreWearPoint,
 } from './types'
 
@@ -254,5 +256,23 @@ export async function getSessionTyreWear(
 ): Promise<TyreWearPoint[]> {
   return requestJson<TyreWearPoint[]>(
     `/api/sessions/${encodeURIComponent(sessionUid!)}/tyre-wear${carIndexQuery(carIndex)}`
+  )
+}
+
+export async function getPitStops(
+  sessionId: string | undefined,
+  carIndex = 0
+): Promise<PitStopDto[]> {
+  return requestJson<PitStopDto[]>(
+    `/api/sessions/${encodeURIComponent(sessionId!)}/pit-stops${carIndexQuery(carIndex)}`
+  )
+}
+
+export async function getStints(
+  sessionId: string | undefined,
+  carIndex = 0
+): Promise<StintDto[]> {
+  return requestJson<StintDto[]>(
+    `/api/sessions/${encodeURIComponent(sessionId!)}/stints${carIndexQuery(carIndex)}`
   )
 }

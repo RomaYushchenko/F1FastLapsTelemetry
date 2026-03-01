@@ -164,6 +164,39 @@ public final class TestData {
         return lap;
     }
 
+    /** Lap with given number and time (for pit/stint scenarios). */
+    public static Lap lapWithNumber(int lapNumber, Integer lapTimeMs) {
+        return Lap.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX)
+                .lapNumber((short) lapNumber)
+                .lapTimeMs(lapTimeMs)
+                .sector1TimeMs(SECTOR1_MS)
+                .sector2TimeMs(SECTOR2_MS)
+                .sector3TimeMs(SECTOR3_MS)
+                .isInvalid(false)
+                .positionAtLapStart(null)
+                .endedAt(LAP_ENDED_AT)
+                .build();
+    }
+
+    /** Two laps (1 and 2) for one pit stop scenario: compound change 18→16 at lap 2. */
+    public static java.util.List<Lap> lapsForPitScenario() {
+        return java.util.List.of(
+                lapWithNumber(1, 92_500),
+                lapWithNumber(2, 95_200)
+        );
+    }
+
+    /** Ten laps (1–10) for two-stint scenario. */
+    public static java.util.List<Lap> lapsForStintScenario() {
+        java.util.List<Lap> list = new java.util.ArrayList<>();
+        for (int n = 1; n <= 10; n++) {
+            list.add(lapWithNumber(n, 87_000 + n * 100));
+        }
+        return list;
+    }
+
     // --- SessionSummary ---
     public static SessionSummary sessionSummary() {
         return SessionSummary.builder()
@@ -195,6 +228,11 @@ public final class TestData {
     }
 
     // --- TyreWearPerLap ---
+    /** F1 25 compound 18 (e.g. C3 medium). */
+    public static final short COMPOUND_18 = 18;
+    /** F1 25 compound 16 (e.g. C5 soft). */
+    public static final short COMPOUND_16 = 16;
+
     public static TyreWearPerLap tyreWearPerLap() {
         return TyreWearPerLap.builder()
                 .sessionUid(SESSION_UID)
@@ -204,8 +242,64 @@ public final class TestData {
                 .wearFR(WEAR_FR)
                 .wearRL(WEAR_RL)
                 .wearRR(WEAR_RR)
-                .compound((short) 18)
+                .compound(COMPOUND_18)
                 .build();
+    }
+
+    /** Tyre wear for lap 1 (compound 18) and lap 2 (compound 16) — one pit stop between them. */
+    public static java.util.List<TyreWearPerLap> tyreWearTwoLapsOnePit() {
+        return java.util.List.of(
+                TyreWearPerLap.builder()
+                        .sessionUid(SESSION_UID)
+                        .carIndex(CAR_INDEX)
+                        .lapNumber((short) 1)
+                        .wearFL(0.02f)
+                        .wearFR(0.02f)
+                        .wearRL(0.03f)
+                        .wearRR(0.03f)
+                        .compound(COMPOUND_18)
+                        .build(),
+                TyreWearPerLap.builder()
+                        .sessionUid(SESSION_UID)
+                        .carIndex(CAR_INDEX)
+                        .lapNumber((short) 2)
+                        .wearFL(0.01f)
+                        .wearFR(0.01f)
+                        .wearRL(0.01f)
+                        .wearRR(0.01f)
+                        .compound(COMPOUND_16)
+                        .build()
+        );
+    }
+
+    /** Stint scenario: laps 1–5 compound 18, laps 6–10 compound 16 (two stints). */
+    public static java.util.List<TyreWearPerLap> tyreWearTwoStints() {
+        java.util.List<TyreWearPerLap> list = new java.util.ArrayList<>();
+        for (int lap = 1; lap <= 5; lap++) {
+            list.add(TyreWearPerLap.builder()
+                    .sessionUid(SESSION_UID)
+                    .carIndex(CAR_INDEX)
+                    .lapNumber((short) lap)
+                    .wearFL(0.02f)
+                    .wearFR(0.02f)
+                    .wearRL(0.03f)
+                    .wearRR(0.03f)
+                    .compound(COMPOUND_18)
+                    .build());
+        }
+        for (int lap = 6; lap <= 10; lap++) {
+            list.add(TyreWearPerLap.builder()
+                    .sessionUid(SESSION_UID)
+                    .carIndex(CAR_INDEX)
+                    .lapNumber((short) lap)
+                    .wearFL(0.01f)
+                    .wearFR(0.01f)
+                    .wearRL(0.01f)
+                    .wearRR(0.01f)
+                    .compound(COMPOUND_16)
+                    .build());
+        }
+        return list;
     }
 
     // --- TyreWearSnapshot ---

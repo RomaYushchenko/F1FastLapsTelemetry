@@ -111,3 +111,23 @@ export interface TyreWearPoint {
   wearRR: number | null
   compound?: string | number | null
 }
+
+/** GET /api/sessions/{id}/pit-stops */
+export interface PitStopDto {
+  lapNumber: number
+  inLapTimeMs: number | null
+  pitDurationMs: number | null
+  outLapTimeMs: number | null
+  compoundIn: number | null
+  compoundOut: number | null
+}
+
+/** GET /api/sessions/{id}/stints */
+export interface StintDto {
+  stintIndex: number
+  compound: number | null
+  startLap: number
+  lapCount: number
+  avgLapTimeMs: number | null
+  degradationIndicator: 'high' | 'medium' | 'low' | null
+}
