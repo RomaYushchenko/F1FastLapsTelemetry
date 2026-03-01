@@ -151,60 +151,60 @@ Use this checklist to track progress. Mark items as done when implemented and ve
 
 ### Step 1 — API layer and Toaster
 
-- [ ] 1.1 — `src/api/config.ts` (VITE_API_BASE_URL, VITE_WS_URL)
-- [ ] 1.2 — `src/api/types.ts` (Session, Lap, SessionSummary, HttpError, chart DTOs)
-- [ ] 1.3 — `src/api/client.ts` (requestJson, getSessions, getSession, getSessionLaps, getSessionSummary, getActiveSession, updateSessionDisplayName)
-- [ ] 1.4 — `src/api/sessionId.ts` (toSessionIdString, isValidSessionId)
-- [ ] 1.5 — Tracks constant + getTrackName (constants/tracks.ts or api/tracks.ts)
-- [ ] 1.6 — `<Toaster />` mounted in App.tsx
-- [ ] 1.7 — Notification context (list + addNotification)
-- [ ] 1.8 — notify helper and API client wired to push to notification list
-- [ ] 1.9 — Bell in AppLayout opens popover with notification list; unread badge (optional)
-- [ ] 1.10 — .env.example (optional)
+- [x] 1.1 — `src/api/config.ts` (VITE_API_BASE_URL, VITE_WS_URL)
+- [x] 1.2 — `src/api/types.ts` (Session, Lap, SessionSummary, HttpError, chart DTOs)
+- [x] 1.3 — `src/api/client.ts` (requestJson, getSessions, getSession, getSessionLaps, getSessionSummary, getActiveSession, updateSessionDisplayName)
+- [x] 1.4 — `src/api/sessionId.ts` (toSessionIdString, isValidSessionId)
+- [x] 1.5 — Tracks constant + getTrackName (constants/tracks.ts or api/tracks.ts)
+- [x] 1.6 — `<Toaster />` mounted in App.tsx
+- [x] 1.7 — Notification context (list + addNotification)
+- [x] 1.8 — notify helper and API client wired to push to notification list
+- [x] 1.9 — Bell in AppLayout opens popover with notification list; unread badge (optional)
+- [x] 1.10 — .env.example (optional)
 
 ### Step 2 — Session list
 
-- [ ] 2.1 — SessionHistory state (sessions, loading, error, offset, pageSize)
-- [ ] 2.2 — getSessions({ limit, offset }) in API client
-- [ ] 2.3 — Fetch on mount and when offset/pageSize change
-- [ ] 2.4 — Loading, error + Retry, empty state, table render
-- [ ] 2.5 — Table columns: Track, Date, Session Type, Best Lap ("—" or value), Total Time ("—" or value), Result, Actions; links use session.id (string)
-- [ ] 2.6 — Pagination: Previous/Next, "Showing X–Y"
-- [ ] 2.7 — Route param `id` for sessions/:id
+- [x] 2.1 — SessionHistory state (sessions, loading, error, offset, pageSize)
+- [x] 2.2 — getSessions({ limit, offset }) in API client
+- [x] 2.3 — Fetch on mount and when offset/pageSize change
+- [x] 2.4 — Loading, error + Retry, empty state, table render
+- [x] 2.5 — Table columns: Track, Date, Session Type, Best Lap ("—" or value), Total Time ("—" or value), Result, Actions; links use session.id (string)
+- [x] 2.6 — Pagination: Previous/Next, "Showing X–Y"
+- [x] 2.7 — Route param `id` for sessions/:id
 
 ### Step 3 — Session detail (load)
 
-- [ ] 3.1 — Guard invalid session id (isValidSessionId)
-- [ ] 3.2 — getSession, getSessionLaps, getSessionSummary (carIndex from session or 0)
-- [ ] 3.3 — 404 handling (not found message, no toast)
-- [ ] 3.4 — Summary and header from API (track name, session type, date)
-- [ ] 3.5 — Lap list from API; formatLapTime (and optional formatSector)
-- [ ] 3.6 — Retry on load error
+- [x] 3.1 — Guard invalid session id (isValidSessionId)
+- [x] 3.2 — getSession, getSessionLaps, getSessionSummary (carIndex from session or 0)
+- [x] 3.3 — 404 handling (not found message, no toast)
+- [x] 3.4 — Summary and header from API (track name, session type, date)
+- [x] 3.5 — Lap list from API; formatLapTime (and optional formatSector)
+- [x] 3.6 — Retry on load error
 
 ### Step 4 — Chart endpoints
 
-- [ ] 4.1 — getSessionPace, getLapTrace, getLapErs, getLapSpeedTrace, getLapCorners, getSessionTyreWear in client
-- [ ] 4.2 — Chart DTOs in types (PacePoint, PedalTracePoint, ErsPoint, SpeedTracePoint, LapCorner, TyreWearPoint)
+- [x] 4.1 — getSessionPace, getLapTrace, getLapErs, getLapSpeedTrace, getLapCorners, getSessionTyreWear in client
+- [x] 4.2 — Chart DTOs in types (PacePoint, PedalTracePoint, ErsPoint, SpeedTracePoint, LapCorner, TyreWearPoint)
 
 ### Step 5 — Session detail (charts)
 
-- [ ] 5.1 — Lap selector + carIndex from session
-- [ ] 5.2 — Fetch pace, trace, ers, speed-trace, corners, tyre-wear for selected lap
-- [ ] 5.3 — Pace chart from API
-- [ ] 5.4 — Pedal trace from API
-- [ ] 5.5 — ERS chart from API
-- [ ] 5.6 — Speed trace from API
-- [ ] 5.7 — Corners from API
-- [ ] 5.8 — Tyre wear chart from API
-- [ ] 5.9 — Position evolution from laps
-- [ ] 5.10 — Loading/empty states for charts
+- [x] 5.1 — Lap selector + carIndex from session
+- [x] 5.2 — Fetch pace, trace, ers, speed-trace, corners, tyre-wear for selected lap
+- [x] 5.3 — Pace chart from API
+- [x] 5.4 — Pedal trace from API
+- [x] 5.5 — ERS chart from API
+- [x] 5.6 — Speed trace from API
+- [x] 5.7 — Corners from API
+- [x] 5.8 — Tyre wear chart from API
+- [x] 5.9 — Position evolution from laps
+- [x] 5.10 — Loading/empty states for charts
 
 ### Step 6 — Edit display name
 
-- [ ] 6.1 — Edit action in Session History row
-- [ ] 6.2 — Dialog state (open, session, name)
-- [ ] 6.3 — Dialog UI + validation (trim, length ≤ 64) + updateSessionDisplayName + toast + refresh
-- [ ] 6.4 — Cancel closes dialog
+- [x] 6.1 — Edit action in Session History row
+- [x] 6.2 — Dialog state (open, session, name)
+- [x] 6.3 — Dialog UI + validation (trim, length ≤ 64) + updateSessionDisplayName + toast + refresh
+- [x] 6.4 — Cancel closes dialog
 
 ### Testing (optional)
 
@@ -215,11 +215,11 @@ Use this checklist to track progress. Mark items as done when implemented and ve
 
 ### Documentation
 
-- [ ] NEW_UI_DOCS.md — §5 Data flow (API layer, Toaster, sessionId); §8 Known limitations updated
-- [ ] react_spa_ui_architecture.md — align with new UI routes and API usage (if applicable)
+- [x] NEW_UI_DOCS.md — §5 Data flow (API layer, Toaster, sessionId); §8 Known limitations updated
+- [x] react_spa_ui_architecture.md — align with new UI routes and API usage (if applicable)
 
 ### Git Commit
-- [ ] Add git commit with understanding message
+- [x] Add git commit with understanding message
 
 **How to use the checklist:** Mark completed items by changing `- [ ]` to `- [x]`. Use "Block A — Checklist" as the single place to see what is done and what remains.
 

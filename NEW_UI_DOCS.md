@@ -10,7 +10,7 @@ The new UI is a **React SPA** built with:
 - **Components:** Radix UI primitives + Shadcn-style wrappers in `src/app/components/ui/`
 - **Charts:** Recharts (LineChart, BarChart, etc.)
 - **State:** Local component state only; no global store (Redux/Zustand)
-- **Data:** Currently **mock/static data** in every page; no API client or WebSocket
+- **Data:** Session History and Session Details use the **REST API** (see §5). Other pages (Live, Driver Comparison, Strategy, etc.) still use mock/static data or placeholders.
 
 Entry flow: `index.html` → `src/main.tsx` → `App.tsx` → `RouterProvider(router)`.
 
@@ -57,21 +57,40 @@ Used across pages: accordion, alert, alert-dialog, aspect-ratio, avatar, badge, 
 
 ## 4. State Management and Data Flow
 
-- **State:** React `useState` (and local hooks) only. No global store.
-- **Data flow:** Top-down via props. Pages own their state (e.g. SessionHistory: searchQuery, filtered list; LiveTelemetry: isPaused, selectedDriver, timeRange).
-- **Server data:** None. All lists, charts, and session data are hardcoded mock arrays/objects in the page components.
-- **Live data:** Connection status in AppLayout is hardcoded (`'live'`); no WebSocket or polling.
+- **State:** React `useState` (and local hooks) only. No global store. Notification list for the Bell is held in a small store (`src/notificationStore.ts`) with subscribe/add/markAsRead.
+- **Data flow:** Top-down via props. Pages own their state (e.g. SessionHistory: sessions, loading, error, offset; SessionDetails: session, laps, summary, chart data).
+- **Server data:** Session History and Session Details load from REST (see §5). Other pages still use mock data.
+- **Live data:** Connection status in AppLayout is hardcoded (`'live'`); WebSocket integration is planned in a later block.
 
 ---
 
-## 5. API Integrations and Contracts
+## 5. Data Flow: API Layer, Toaster, Session ID
 
-- **Current:** No API layer. No `fetch`/axios, no env for API base URL.
-- **Expected backend (from old UI / project docs):**
-  - REST: `GET /api/sessions`, `GET /api/sessions/{id}`, `GET /api/sessions/{id}/laps`, `GET /api/sessions/{id}/summary`, `GET /api/sessions/{id}/pace`, `GET /api/sessions/{id}/tyre-wear`, `GET /api/sessions/{id}/laps/{lapNum}/trace`, `GET /api/sessions/{id}/laps/{lapNum}/ers`, `GET /api/sessions/{id}/laps/{lapNum}/speed-trace`, `GET /api/sessions/{id}/laps/{lapNum}/corners`, `GET /api/sessions/active`, `PATCH /api/sessions/{id}` (sessionDisplayName).
-  - WebSocket: SockJS `/ws/live`, STOMP subscribe with `sessionId`/`carIndex`; messages: SNAPSHOT, SESSION_ENDED, ERROR.
+### 5.1 API layer (f1-telemetry-web-platform)
 
-Contracts and DTOs are documented in `.github/project/rest_web_socket_api_contracts_f_1_telemetry.md` and implemented in `telemetry-api-contracts` and `telemetry-processing-api-service`.
+- **Location:** `src/api/` (config, types, client, sessionId, format).
+- **`config.ts`:** Reads `VITE_API_BASE_URL` and `VITE_WS_URL` from env; defaults `http://localhost:8080` and `ws://localhost:8080/ws`.
+- **`types.ts`:** Session, Lap, SessionSummary, HttpError, ApiErrorBody, and chart DTOs (PacePoint, PedalTracePoint, ErsPoint, SpeedTracePoint, LapCorner, TyreWearPoint) aligned with the REST contract.
+- **`client.ts`:** Base URL from config; `requestJson<T>(path, init?)` (fetch, parse JSON; on !ok parse message, call `notify.error(message)` for status !== 404, throw `HttpError`). Methods: `getSessions({ limit?, offset? })`, `getSession(id)`, `getSessionLaps(id, carIndex)`, `getSessionSummary(id, carIndex)`, `getActiveSession()`, `updateSessionDisplayName(id, name)`, and chart endpoints: `getSessionPace`, `getLapTrace`, `getLapErs`, `getLapSpeedTrace`, `getLapCorners`, `getSessionTyreWear`.
+- **`sessionId.ts`:** `toSessionIdString(id)` (normalize API id to string), `isValidSessionId(id)` (UUID or numeric), `isSessionUuid(id)`. All URLs and API calls use string session IDs from the API.
+- **`format.ts`:** `formatLapTime(ms)`, `formatSector(ms)` for display.
+
+### 5.2 Toaster and notifications
+
+- **Toaster:** `<Toaster />` (sonner) is mounted in `App.tsx` (position bottom-right). Non-404 API errors are shown as toasts via `notify.error()` from the client.
+- **Notify helper:** `src/notify.ts` — `notify.error()`, `notify.success()`, `notify.warning()`, `notify.info()` each call the corresponding Sonner toast and push the same message into the notification store.
+- **Bell (header):** AppLayout Bell button opens a popover with the list of recent notifications from `src/notificationStore.ts` (subscribe, addNotification, markAllAsRead). Unread badge shown when there are unread items. So REST errors and success toasts are visible both as popups and in the Bell list.
+
+### 5.3 Session ID
+
+- **Session IDs from API** are strings (UUID or numeric session_uid). The UI uses them in routes (`/app/sessions/:id`) and in all API calls. Use `isValidSessionId(id)` before calling session endpoints; invalid or missing id shows an inline message and link back to Session History. 404 from getSession is handled with "Session not found" and no toast (per notification policy).
+
+### 5.4 REST endpoints in use (Block A)
+
+- **Sessions:** `GET /api/sessions?limit=&offset=`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}` (sessionDisplayName).
+- **Laps / summary / charts:** `GET /api/sessions/{id}/laps?carIndex=`, `GET .../summary?carIndex=`, `GET .../pace`, `GET .../tyre-wear`, `GET .../laps/{lapNum}/trace`, `GET .../laps/{lapNum}/ers`, `GET .../laps/{lapNum}/speed-trace`, `GET .../laps/{lapNum}/corners`, `GET /api/sessions/active` (204 → null).
+
+Contracts and DTOs: `.github/project/rest_web_socket_api_contracts_f_1_telemetry.md`. WebSocket (SockJS/STOMP) is planned in a later block.
 
 ---
 
@@ -81,7 +100,7 @@ Contracts and DTOs are documented in `.github/project/rest_web_socket_api_contra
 - **Install:** `pnpm install` (or npm/yarn if lockfile present).
 - **Dev:** `pnpm dev` (or `npm run dev`) — runs Vite dev server.
 - **Build:** `pnpm build` (or `npm run build`).
-- **Env:** No `.env` usage yet; when API is added, use `VITE_API_BASE_URL` and `VITE_WS_URL` (see old UI `src/api/config.ts`).
+- **Env:** Optional `.env` with `VITE_API_BASE_URL` and `VITE_WS_URL`; see `.env.example` in the project root. Defaults: `http://localhost:8080` and `ws://localhost:8080/ws`.
 
 ---
 
@@ -97,11 +116,10 @@ Contracts and DTOs are documented in `.github/project/rest_web_socket_api_contra
 
 ## 8. Known Limitations and TODO
 
-- **No real data:** All screens use mock data; must be replaced with REST/WebSocket integration.
+- **Session list/detail:** Use real REST API (getSessions, getSession, laps, summary, pace, trace, ERS, speed-trace, corners, tyre-wear). Session IDs from API are strings (UUID or session_uid); used in routes and all API calls. Best Lap / Total Time columns show "—" until backend adds bestLapTimeMs/totalTimeMs to list response.
 - **No auth:** Login/Register are UI-only (no submit to backend).
-- **Session IDs:** New UI uses numeric `id` (e.g. `session.id = 1`) in links; backend uses UUID or session_uid string — must align (use string `id` from API).
-- **Live:** No WebSocket; connection status is fake; live widgets need SockJS/STOMP and active-session polling.
+- **Live:** No WebSocket yet; connection status is fake; live widgets need SockJS/STOMP and active-session polling (planned in Block C).
 - **Driver comparison / Strategy:** No backend endpoints for comparison or strategy; currently mock only.
 - **Track map:** Static SVG; no real track geometry or live positions from API.
 - **Settings:** Form state not persisted; no PATCH or user prefs API.
-- **Toasts:** Sonner is in dependencies but not mounted in `App.tsx` (only in old UI); add `<Toaster />` when adding API error/success toasts.
+- **Toasts:** Sonner `<Toaster />` is mounted in App; API client uses `notify` helper so errors (non-404) and success show as toasts and in the header Bell list.
