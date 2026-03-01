@@ -1,11 +1,22 @@
 /**
- * API base URL for REST. Set via VITE_API_BASE_URL in .env
+ * API base URL for REST. Set via VITE_API_BASE_URL in .env.
+ * When unset: in browser uses '' (same-origin so /api goes through nginx proxy in Docker);
+ * in Node/test uses http://localhost:8081 (backend default port).
  */
-export const API_BASE_URL =
-  typeof import.meta.env.VITE_API_BASE_URL === 'string' &&
-  import.meta.env.VITE_API_BASE_URL.length > 0
-    ? import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')
-    : 'http://localhost:8080'
+function getApiBaseUrl(): string {
+  if (
+    typeof import.meta.env.VITE_API_BASE_URL === 'string' &&
+    import.meta.env.VITE_API_BASE_URL.length > 0
+  ) {
+    return import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '')
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return ''
+  }
+  return 'http://localhost:8081'
+}
+
+export const API_BASE_URL = getApiBaseUrl()
 
 /**
  * WebSocket URL (e.g. for live telemetry). Set via VITE_WS_URL in .env
@@ -13,16 +24,23 @@ export const API_BASE_URL =
 export const WS_URL =
   typeof import.meta.env.VITE_WS_URL === 'string' && import.meta.env.VITE_WS_URL.length > 0
     ? import.meta.env.VITE_WS_URL.replace(/\/$/, '')
-    : (API_BASE_URL.replace(/^http/, 'ws') + '/ws')
+    : (API_BASE_URL ? API_BASE_URL.replace(/^http/, 'ws') + '/ws' : '')
 
 /**
  * SockJS endpoint for live telemetry. Base URL (HTTP) + /ws/live.
- * SockJS handshake uses same origin; use API base so backend receives the connection.
+ * When API_BASE_URL is '' (same-origin), uses window.location.origin so requests go through nginx proxy.
  */
 export function getWsLiveEndpoint(): string {
-  const base =
-    typeof import.meta.env.VITE_WS_URL === 'string' && import.meta.env.VITE_WS_URL.length > 0
-      ? import.meta.env.VITE_WS_URL.replace(/\/$/, '').replace(/^ws/, 'http')
-      : API_BASE_URL
+  let base: string
+  if (
+    typeof import.meta.env.VITE_WS_URL === 'string' &&
+    import.meta.env.VITE_WS_URL.length > 0
+  ) {
+    base = import.meta.env.VITE_WS_URL.replace(/\/$/, '').replace(/^ws/, 'http')
+  } else if (API_BASE_URL === '' && typeof window !== 'undefined' && window.location?.origin) {
+    base = window.location.origin
+  } else {
+    base = API_BASE_URL || 'http://localhost:8081'
+  }
   return `${base}/ws/live`
 }
