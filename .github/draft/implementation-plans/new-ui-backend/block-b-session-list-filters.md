@@ -106,39 +106,39 @@ Track progress by marking items when done. Copy this block into your working doc
 
 ### Step 7 — Backend
 
-- [ ] **7.1** REST contract §3.1.1: query params (incl. state, bestLap sort, dateFrom/dateTo for both startedAt and endedAt) and X-Total-Count header documented
-- [ ] **7.2** Controller returns list + X-Total-Count header (no wrapper DTO)
-- [ ] **7.3** SessionQueryService method with filter (incl. state) + total
-- [ ] **7.4** Search resolution (display name + session type + track name)
-- [ ] **7.5** Repository Specification (filters incl. state, date on startedAt and endedAt; sort incl. bestLap + count)
-- [ ] **7.6** SessionController binds params and returns list + X-Total-Count header
-- [ ] **7.7** SessionQueryServiceTest: filter/sort (incl. bestLap, state)/count cases
-- [ ] **7.8** SessionControllerTest: query params and response
+- [x] **7.1** REST contract §3.1.1: query params (incl. state, bestLap sort, dateFrom/dateTo for both startedAt and endedAt) and X-Total-Count header documented
+- [x] **7.2** Controller returns list + X-Total-Count header (no wrapper DTO)
+- [x] **7.3** SessionQueryService method with filter (incl. state) + total
+- [x] **7.4** Search resolution (display name + session type + track name)
+- [x] **7.5** Repository Specification (filters incl. state, date on startedAt and endedAt; sort incl. bestLap + count)
+- [x] **7.6** SessionController binds params and returns list + X-Total-Count header
+- [x] **7.7** SessionQueryServiceTest: filter/sort (incl. bestLap, state)/count cases
+- [x] **7.8** SessionControllerTest: query params and response
 - [ ] **7.9** JaCoCo 85% coverage for changed code
 
 ### Step 8 — New UI
 
-- [ ] **8.1** getSessions(params) in API client (incl. state); read X-Total-Count header
-- [ ] **8.2** Session History filter (incl. state) + pagination state and defaults
-- [ ] **8.3** Search input wired to state and refetch
-- [ ] **8.4** Session Type select wired
-- [ ] **8.5** Sort select wired (incl. Best Lap option)
-- [ ] **8.6** Track filter wired (static list or API)
-- [ ] **8.7** Date Range picker wired (dateFrom, dateTo; filter on both startedAt and endedAt)
-- [ ] **8.8** Reset clears state and refetches
-- [ ] **8.9** State filter in More Filters (ACTIVE / FINISHED / All) wired
-- [ ] **8.10** Previous/Next pagination and "Showing X–Y of Z"
-- [ ] **8.11** Mock data removed; real API data used
-- [ ] **8.12** Loading state (skeleton/spinner)
-- [ ] **8.13** Error state + Retry + toast
-- [ ] **8.14** Table columns match SessionDto and link to session detail
+- [x] **8.1** getSessions(params) in API client (incl. state); read X-Total-Count header
+- [x] **8.2** Session History filter (incl. state) + pagination state and defaults
+- [x] **8.3** Search input wired to state and refetch
+- [x] **8.4** Session Type select wired
+- [x] **8.5** Sort select wired (incl. Best Lap option)
+- [x] **8.6** Track filter wired (static list or API)
+- [x] **8.7** Date Range picker wired (dateFrom, dateTo; filter on both startedAt and endedAt)
+- [x] **8.8** Reset clears state and refetches
+- [x] **8.9** State filter in More Filters (ACTIVE / FINISHED / All) wired
+- [x] **8.10** Previous/Next pagination and "Showing X–Y of Z"
+- [x] **8.11** Mock data removed; real API data used
+- [x] **8.12** Loading state (skeleton/spinner)
+- [x] **8.13** Error state + Retry + toast
+- [x] **8.14** Table columns match SessionDto and link to session detail
 
 ### Step 9 — Documentation
 
-- [ ] REST contract §3.1.1 updated
-- [ ] BACKEND_FEATURES_FOR_NEW_UI.md B1 marked implemented
+- [x] REST contract §3.1.1 updated
+- [x] BACKEND_FEATURES_FOR_NEW_UI.md B1 marked implemented
 
-### Step 9 — Git Commit
+### Step 10 — Git Commit
 - [ ] Add git commit with understanding message
 ---
 

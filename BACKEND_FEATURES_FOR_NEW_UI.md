@@ -14,9 +14,7 @@ This document lists **backend features that are not implemented today** but are 
 |----|---------|-------------|--------------|
 | B1 | **Query params for GET /api/sessions** | Support filtering and sorting so the Session History page can show filtered results without client-side only logic. | SessionHistory: search (track/session type text), session type filter, sort (date, result, best lap), date range. |
 
-**Current backend:** `GET /api/sessions` only supports `limit` and `offset` (see contract § 3.1.1 and `SessionController`).
-
-**Gap:** No `sessionType`, `trackId`, `search` (text), `sort`, `dateFrom`, `dateTo`.
+**Status: Implemented in Block B (Step 7).** See [block-b-session-list-filters.md](.github/draft/implementation-plans/new-ui-backend/block-b-session-list-filters.md). Backend now supports `sessionType`, `trackId`, `search`, `sort` (startedAt_asc/desc, finishingPosition_asc, bestLap_asc/desc), `state` (ACTIVE | FINISHED), `dateFrom`, `dateTo`; response includes `X-Total-Count` header.
 
 ---
 

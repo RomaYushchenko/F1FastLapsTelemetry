@@ -34,15 +34,38 @@ GET /api/sessions
 ```
 
 Query params (optional):
-- `limit` (int, default 50)
-- `offset` (int, default 0)
+- `limit` (int, default 50) — page size; max 100.
+- `offset` (int, default 0) — number of records to skip.
+- `sessionType` (string) — filter by session type **code** (e.g. `RACE`, `QUALIFYING_1`). Matches `session_type` in DB. Omit = all types.
+- `trackId` (int) — filter by F1 track id. Omit = all tracks.
+- `search` (string) — search across: (1) session display name (LIKE, case-insensitive), (2) session type **display name** (e.g. "Race" → RACE), (3) track **display name** (e.g. "Monaco" → trackId 5). Combined with OR.
+- `sort` (string) — sort order. Values: `startedAt_asc`, `startedAt_desc` (default), `finishingPosition_asc`, `bestLap_asc`, `bestLap_desc`. Default: `startedAt_desc`.
+- `state` (string) — filter by session state: `ACTIVE` (endedAt null) or `FINISHED` (endedAt non-null). Omit = all.
+- `dateFrom` (string) — ISO date (YYYY-MM-DD). Sessions included only if **both** startedAt and endedAt fall in [dateFrom, dateTo]. For active sessions (endedAt null), include if startedAt in range.
+- `dateTo` (string) — ISO date (YYYY-MM-DD). Use with dateFrom.
 
-Response: array of SessionDto. Each item includes:
+**Date filter semantics:** A session is included if: startedAt is within [dateFrom, dateTo] **and** (endedAt is within [dateFrom, dateTo] **or** endedAt is null). So active sessions are included when their start date is in range.
+
+Response:
+- **Body:** array of SessionDto (unchanged shape).
+- **Header:** `X-Total-Count` (integer) — total number of sessions matching the filters (before pagination). Use for "Showing X–Y of Z".
+
+Each SessionDto includes:
 - `id` (string) — public session identifier (UUID). Use in URLs and WebSocket subscribe.
 - `sessionDisplayName` (string) — user-facing display name; max 64 characters; not empty. Editable via PATCH. Defaults to UUID at creation.
-- `sessionType`, `trackId`, `startedAt`, `endedAt`, `endReason`, `state` (ACTIVE | FINISHED), `playerCarIndex`, `finishingPosition` (integer, optional) — race position at session end; null if session active or no LapData received. Source: last carPosition from LapData at session end; stored in `session_finishing_positions` for multi-car support.
+- `sessionType`, `trackId`, `trackDisplayName`, `startedAt`, `endedAt`, `endReason`, `state` (ACTIVE | FINISHED), `playerCarIndex`, `finishingPosition` (integer, optional) — race position at session end; null if session active or no LapData received. Source: last carPosition from LapData at session end; stored in `session_finishing_positions` for multi-car support.
 
-Example:
+Example request:
+```
+GET /api/sessions?limit=20&offset=0&sort=startedAt_desc
+GET /api/sessions?search=Monaco&state=FINISHED&dateFrom=2026-01-01&dateTo=2026-01-31
+GET /api/sessions?sessionType=RACE&sort=bestLap_asc
+```
+
+Example response (body + header):
+```
+X-Total-Count: 142
+```
 ```json
 [
   {

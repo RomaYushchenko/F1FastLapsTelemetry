@@ -59,28 +59,74 @@ async function requestJson<T>(path: string, init?: RequestOptions): Promise<T> {
   throw new HttpError(response.status, message, body ?? undefined)
 }
 
-function buildQuery(params: Record<string, number | undefined>): string {
+function buildQuery(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined) search.set(key, String(value))
+    if (value !== undefined && value !== '') search.set(key, String(value))
   })
   const s = search.toString()
   return s ? `?${s}` : ''
+}
+
+/** Response from GET /api/sessions with list and total count from X-Total-Count header. */
+export interface GetSessionsResult {
+  sessions: Session[]
+  total: number
 }
 
 function carIndexQuery(carIndex: number): string {
   return carIndex !== 0 ? `?carIndex=${carIndex}` : ''
 }
 
-export async function getSessions(params?: {
+export interface GetSessionsParams {
   limit?: number
   offset?: number
-}): Promise<Session[]> {
-  const limit = params?.limit ?? 20
+  sessionType?: string
+  trackId?: number
+  search?: string
+  sort?: string
+  state?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+export async function getSessions(params?: GetSessionsParams): Promise<GetSessionsResult> {
+  const limit = params?.limit ?? 50
   const offset = params?.offset ?? 0
-  return requestJson<Session[]>(
-    `/api/sessions${buildQuery({ limit, offset })}`
-  )
+  const query: Record<string, string | number | undefined> = {
+    limit,
+    offset,
+    sessionType: params?.sessionType,
+    trackId: params?.trackId,
+    search: params?.search,
+    sort: params?.sort ?? 'startedAt_desc',
+    state: params?.state,
+    dateFrom: params?.dateFrom,
+    dateTo: params?.dateTo,
+  }
+  const url = `${API_BASE_URL}/api/sessions${buildQuery(query)}`
+  const response = await fetch(url, { headers: { Accept: 'application/json' } })
+
+  if (!response.ok) {
+    const body = await parseJsonOrNull(response)
+    const message =
+      (body &&
+        typeof body === 'object' &&
+        'message' in body &&
+        typeof (body as ApiErrorBody).message === 'string'
+        ? (body as ApiErrorBody).message
+        : `Request to /api/sessions failed with status ${response.status}`) ?? ''
+    if (response.status !== 404) {
+      notify.error(message)
+    }
+    throw new HttpError(response.status, message, body ?? undefined)
+  }
+
+  const sessions = (await response.json()) as Session[]
+  const totalHeader = response.headers.get('X-Total-Count')
+  const total = totalHeader != null ? parseInt(totalHeader, 10) : sessions.length
+  const totalCount = Number.isNaN(total) ? sessions.length : total
+  return { sessions, total: totalCount }
 }
 
 export async function getSession(sessionUid: string | undefined): Promise<Session> {

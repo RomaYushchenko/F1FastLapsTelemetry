@@ -41,3 +41,8 @@ export function getTrackName(trackId: number | null | undefined): string {
   if (name) return name
   return `Track #${trackId}`
 }
+
+/** Track options for Session History filter dropdown (trackId → label). */
+export const TRACK_OPTIONS: { value: number; label: string }[] = Object.entries(
+  TRACK_NAMES
+).map(([id, label]) => ({ value: Number(id), label }))

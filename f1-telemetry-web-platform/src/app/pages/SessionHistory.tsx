@@ -1,121 +1,224 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router";
-import { DataCard } from "../components/DataCard";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Link } from "react-router"
+import { DataCard } from "../components/DataCard"
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../components/ui/select";
-import { Search, Eye, Filter, Calendar, Pencil, Loader2 } from "lucide-react";
-import { getSessions, updateSessionDisplayName } from "@/api/client";
-import type { Session } from "@/api/types";
-import { HttpError } from "@/api/types";
-import { getTrackName } from "@/constants/tracks";
-import { formatLapTime } from "@/api/format";
-import { isValidSessionId } from "@/api/sessionId";
+} from "../components/ui/select"
+import { Search, Eye, Calendar, Pencil, Loader2 } from "lucide-react"
+import { getSessions, updateSessionDisplayName } from "@/api/client"
+import type { Session } from "@/api/types"
+import { HttpError } from "@/api/types"
+import { getTrackName, TRACK_OPTIONS } from "@/constants/tracks"
+import { SESSION_TYPE_OPTIONS } from "@/constants/sessionTypes"
+import { formatLapTime } from "@/api/format"
+import { isValidSessionId } from "@/api/sessionId"
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "../components/ui/dialog";
-import { notify } from "@/notify";
-import { Skeleton } from "../components/ui/skeleton";
+} from "../components/ui/dialog"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover"
+import { Calendar as CalendarComponent } from "../components/ui/calendar"
+import { notify } from "@/notify"
+import { Skeleton } from "../components/ui/skeleton"
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50
+const DEFAULT_SORT = "startedAt_desc"
+
+const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: "startedAt_desc", label: "Date (Newest)" },
+  { value: "startedAt_asc", label: "Date (Oldest)" },
+  { value: "finishingPosition_asc", label: "Result" },
+  { value: "bestLap_asc", label: "Best Lap" },
+]
+
+const STATE_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "ACTIVE", label: "Active" },
+  { value: "FINISHED", label: "Finished" },
+]
+
+function formatDateForApi(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
 
 function resultDisplay(position: number | null | undefined): string {
-  if (position == null) return "—";
-  return `P${position}`;
+  if (position == null) return "—"
+  return `P${position}`
 }
 
 export default function SessionHistory() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
-  const [pageSize] = useState(PAGE_SIZE);
+  const [search, setSearch] = useState("")
+  const [sessionType, setSessionType] = useState<string>("")
+  const [trackId, setTrackId] = useState<number | "">("")
+  const [sort, setSort] = useState(DEFAULT_SORT)
+  const [state, setState] = useState("")
+  const [dateFrom, setDateFrom] = useState<string>("")
+  const [dateTo, setDateTo] = useState<string>("")
 
-  // Edit display name dialog
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editSession, setEditSession] = useState<Session | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [offset, setOffset] = useState(0)
+  const [pageSize] = useState(PAGE_SIZE)
+
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [searchDebounced, setSearchDebounced] = useState("")
+
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editSession, setEditSession] = useState<Session | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editSubmitting, setEditSubmitting] = useState(false)
 
   const fetchSessions = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
     try {
-      const data = await getSessions({ limit: pageSize, offset });
-      setSessions(data);
+      const result = await getSessions({
+        limit: pageSize,
+        offset,
+        sessionType: sessionType || undefined,
+        trackId: trackId === "" ? undefined : trackId,
+        search: searchDebounced || undefined,
+        sort,
+        state: state || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      })
+      setSessions(result.sessions)
+      setTotal(result.total)
     } catch (e) {
       const message =
-        e instanceof HttpError ? e.message : "Failed to load sessions";
-      setError(message);
-      setSessions([]);
+        e instanceof HttpError ? e.message : "Failed to load sessions"
+      setError(message)
+      setSessions([])
+      setTotal(0)
+      notify.error(message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [offset, pageSize]);
+  }, [
+    offset,
+    pageSize,
+    sessionType,
+    trackId,
+    searchDebounced,
+    sort,
+    state,
+    dateFrom,
+    dateTo,
+  ])
 
   useEffect(() => {
-    fetchSessions();
-  }, [fetchSessions]);
+    const t = setTimeout(() => {
+      setSearchDebounced(search)
+      setOffset(0)
+    }, 400)
+    searchDebounceRef.current = t
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    }
+  }, [search])
 
-  const filteredSessions = sessions.filter(
-    (session) =>
-      getTrackName(session.trackId)
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      (session.sessionType ?? "")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      (session.sessionDisplayName ?? "")
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    fetchSessions()
+  }, [fetchSessions])
+
+  const handleSessionTypeChange = (value: string) => {
+    setSessionType(value)
+    setOffset(0)
+  }
+  const handleTrackChange = (value: string) => {
+    setTrackId(value === "" ? "" : Number(value))
+    setOffset(0)
+  }
+  const handleSortChange = (value: string) => {
+    setSort(value)
+    setOffset(0)
+  }
+  const handleStateChange = (value: string) => {
+    setState(value)
+    setOffset(0)
+  }
+
+  const handleDateRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
+    if (!range) {
+      setDateFrom("")
+      setDateTo("")
+    } else {
+      setDateFrom(range.from ? formatDateForApi(range.from) : "")
+      setDateTo(range.to ? formatDateForApi(range.to) : "")
+    }
+    setOffset(0)
+  }
+
+  const dateRangeValue =
+    dateFrom && dateTo
+      ? { from: new Date(dateFrom), to: new Date(dateTo) }
+      : dateFrom
+        ? { from: new Date(dateFrom), to: undefined }
+        : undefined
+
+  const handleReset = () => {
+    setSearch("")
+    setSearchDebounced("")
+    setSessionType("")
+    setTrackId("")
+    setSort(DEFAULT_SORT)
+    setState("")
+    setDateFrom("")
+    setDateTo("")
+    setOffset(0)
+  }
 
   const handleEditClick = (session: Session) => {
-    setEditSession(session);
-    setEditName(session.sessionDisplayName ?? session.id ?? "");
-    setEditDialogOpen(true);
-  };
+    setEditSession(session)
+    setEditName(session.sessionDisplayName ?? session.id ?? "")
+    setEditDialogOpen(true)
+  }
 
   const handleEditSubmit = async () => {
-    if (!editSession) return;
-    const trimmed = editName.trim();
+    if (!editSession) return
+    const trimmed = editName.trim()
     if (!trimmed) {
-      notify.warning("Name cannot be blank");
-      return;
+      notify.warning("Name cannot be blank")
+      return
     }
     if (trimmed.length > 64) {
-      notify.warning("Name must be 64 characters or less");
-      return;
+      notify.warning("Name must be 64 characters or less")
+      return
     }
-    setEditSubmitting(true);
+    setEditSubmitting(true)
     try {
-      await updateSessionDisplayName(editSession.id, trimmed);
-      notify.success("Display name updated");
-      setEditDialogOpen(false);
-      setEditSession(null);
-      fetchSessions();
+      await updateSessionDisplayName(editSession.id, trimmed)
+      notify.success("Display name updated")
+      setEditDialogOpen(false)
+      setEditSession(null)
+      fetchSessions()
     } catch {
       // toast already shown by client
     } finally {
-      setEditSubmitting(false);
+      setEditSubmitting(false)
     }
-  };
+  }
 
-  const start = offset + 1;
-  const end = offset + sessions.length;
-  const hasNext = sessions.length >= pageSize;
-  const hasPrev = offset > 0;
+  const start = total === 0 ? 0 : offset + 1
+  const end = offset + sessions.length
+  const hasNext = offset + sessions.length < total
+  const hasPrev = offset > 0
 
   return (
     <div className="space-y-6">
@@ -126,7 +229,6 @@ export default function SessionHistory() {
         </p>
       </div>
 
-      {/* Filters */}
       <DataCard>
         <div className="grid md:grid-cols-4 gap-4">
           <div className="md:col-span-2">
@@ -136,9 +238,9 @@ export default function SessionHistory() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
               <Input
-                placeholder="Search by track or session type..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, track or session type..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="pl-10 bg-input-background border-border"
               />
             </div>
@@ -148,16 +250,17 @@ export default function SessionHistory() {
             <label className="text-xs text-text-secondary uppercase mb-2 block">
               Session Type
             </label>
-            <Select defaultValue="all">
+            <Select value={sessionType || "all"} onValueChange={(v) => handleSessionTypeChange(v === "all" ? "" : v)}>
               <SelectTrigger className="bg-input-background border-border">
-                <SelectValue />
+                <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="race">Race</SelectItem>
-                <SelectItem value="qualifying">Qualifying</SelectItem>
-                <SelectItem value="practice">Practice</SelectItem>
-                <SelectItem value="sprint">Sprint</SelectItem>
+                {SESSION_TYPE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -166,36 +269,101 @@ export default function SessionHistory() {
             <label className="text-xs text-text-secondary uppercase mb-2 block">
               Sort By
             </label>
-            <Select defaultValue="date">
+            <Select value={sort} onValueChange={handleSortChange}>
               <SelectTrigger className="bg-input-background border-border">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="date">Date (Newest)</SelectItem>
-                <SelectItem value="date-old">Date (Oldest)</SelectItem>
-                <SelectItem value="result">Result</SelectItem>
-                <SelectItem value="lap">Best Lap</SelectItem>
+                {SORT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        <div className="flex gap-2 mt-4">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Calendar className="w-4 h-4" />
-            Date Range
-          </Button>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Filter className="w-4 h-4" />
-            More Filters
-          </Button>
-          <Button variant="ghost" size="sm" className="text-text-secondary hover:text-foreground">
-            Reset
-          </Button>
+        <div className="grid md:grid-cols-4 gap-4 mt-4">
+          <div>
+            <label className="text-xs text-text-secondary uppercase mb-2 block">
+              Track
+            </label>
+            <Select
+              value={trackId === "" ? "all" : String(trackId)}
+              onValueChange={(v) => handleTrackChange(v === "all" ? "" : v)}
+            >
+              <SelectTrigger className="bg-input-background border-border">
+                <SelectValue placeholder="All Tracks" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tracks</SelectItem>
+                {TRACK_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={String(opt.value)}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <label className="text-xs text-text-secondary uppercase mb-2 block">
+              Date Range
+            </label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="w-full gap-2 justify-start">
+                  <Calendar className="w-4 h-4" />
+                  {dateFrom && dateTo
+                    ? `${dateFrom} – ${dateTo}`
+                    : dateFrom
+                      ? dateFrom
+                      : "Select dates"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="range"
+                  selected={dateRangeValue}
+                  onSelect={handleDateRangeSelect}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div>
+            <label className="text-xs text-text-secondary uppercase mb-2 block">
+              State (More Filters)
+            </label>
+            <Select value={state || "all"} onValueChange={(v) => handleStateChange(v === "all" ? "" : v)}>
+              <SelectTrigger className="bg-input-background border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value || "all"} value={opt.value || "all"}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-text-secondary hover:text-foreground"
+              onClick={handleReset}
+            >
+              Reset
+            </Button>
+          </div>
         </div>
       </DataCard>
 
-      {/* Sessions Table */}
       <DataCard noPadding>
         {loading ? (
           <div className="p-6 space-y-4">
@@ -216,7 +384,7 @@ export default function SessionHistory() {
             </div>
             <h3 className="text-lg font-semibold mb-2">No sessions found</h3>
             <p className="text-text-secondary">
-              Sessions will appear here once you have completed them
+              Try changing filters or sessions will appear here once you have completed them
             </p>
           </div>
         ) : (
@@ -249,9 +417,9 @@ export default function SessionHistory() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
-                  {filteredSessions.map((session) => {
-                    const id = session.id;
-                    const validId = isValidSessionId(id);
+                  {sessions.map((session) => {
+                    const id = session.id
+                    const validId = isValidSessionId(id)
                     return (
                       <tr
                         key={id}
@@ -326,7 +494,7 @@ export default function SessionHistory() {
                           </Button>
                         </td>
                       </tr>
-                    );
+                    )
                   })}
                 </tbody>
               </table>
@@ -335,7 +503,7 @@ export default function SessionHistory() {
             {sessions.length > 0 && (
               <div className="p-4 border-t border-border/50 flex items-center justify-between">
                 <div className="text-sm text-text-secondary">
-                  Showing {start}–{end}
+                  Showing {start}–{end} of {total}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -361,7 +529,6 @@ export default function SessionHistory() {
         )}
       </DataCard>
 
-      {/* Edit display name dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -401,5 +568,5 @@ export default function SessionHistory() {
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

@@ -1,12 +1,13 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest.UpdateSessionDisplayNameRequest;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListResult;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionUpdateService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,6 +19,7 @@ import java.util.Optional;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,19 +36,25 @@ class SessionControllerTest {
     private SessionController controller;
 
     @Test
-    @DisplayName("listSessions делегує виклик сервісу")
+    @DisplayName("listSessions делегує виклик сервісу і повертає X-Total-Count")
     void listSessions_delegatesToService() {
         // Arrange
         SessionDto dto = SessionDto.builder().id(SESSION_PUBLIC_ID_STR).build();
-        when(sessionQueryService.listSessions(0, 50)).thenReturn(List.of(dto));
+        when(sessionQueryService.listSessions(any())).thenReturn(new SessionListResult(List.of(dto), 142L));
 
         // Act
-        List<SessionDto> result = controller.listSessions(0, 50);
+        ResponseEntity<List<SessionDto>> response = controller.listSessions(0, 50, null, null, null, null, null, null, null);
 
         // Assert
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getId()).isEqualTo(SESSION_PUBLIC_ID_STR);
-        verify(sessionQueryService).listSessions(0, 50);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).hasSize(1);
+        assertThat(response.getBody().get(0).getId()).isEqualTo(SESSION_PUBLIC_ID_STR);
+        assertThat(response.getHeaders().getFirst(SessionController.HEADER_TOTAL_COUNT)).isEqualTo("142");
+        ArgumentCaptor<com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListFilter> filterCaptor =
+                ArgumentCaptor.forClass(com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListFilter.class);
+        verify(sessionQueryService).listSessions(filterCaptor.capture());
+        assertThat(filterCaptor.getValue().getOffset()).isEqualTo(0);
+        assertThat(filterCaptor.getValue().getLimit()).isEqualTo(50);
     }
 
     @Test

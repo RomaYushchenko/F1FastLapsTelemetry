@@ -8,6 +8,8 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListFilter;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListResult;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
@@ -20,6 +22,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.Collections;
 import java.util.List;
@@ -30,6 +33,7 @@ import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +51,8 @@ class SessionQueryServiceTest {
     private SessionStateManager stateManager;
     @Mock
     private SessionResolveService sessionResolveService;
+    @Mock
+    private SessionSearchResolver sessionSearchResolver;
     @Spy
     private SessionMapper sessionMapper = new SessionMapper();
 
@@ -59,33 +65,43 @@ class SessionQueryServiceTest {
         // Arrange
         Session session = session();
         SessionRuntimeState state = runtimeStateActive();
-        when(sessionRepository.findAllByOrderByCreatedAtDesc(any(Pageable.class)))
+        when(sessionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(List.of(session));
+        when(sessionRepository.count(any(Specification.class))).thenReturn(1L);
         when(stateManager.get(SESSION_UID)).thenReturn(state);
         when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
+        when(sessionSearchResolver.resolveSessionTypeCodes(any())).thenReturn(Collections.emptyList());
+        when(sessionSearchResolver.resolveTrackIds(any())).thenReturn(Collections.emptyList());
 
         // Act
-        List<SessionDto> result = service.listSessions(0, 50);
+        SessionListResult result = service.listSessions(SessionListFilter.builder().offset(0).limit(50).build());
 
         // Assert
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getId()).isEqualTo(SESSION_PUBLIC_ID_STR);
-        assertThat(result.get(0).getSessionType()).isEqualTo("RACE");
-        verify(sessionRepository).findAllByOrderByCreatedAtDesc(PageRequest.of(0, 50));
+        assertThat(result.getList()).hasSize(1);
+        assertThat(result.getList().get(0).getId()).isEqualTo(SESSION_PUBLIC_ID_STR);
+        assertThat(result.getList().get(0).getSessionType()).isEqualTo("RACE");
+        assertThat(result.getTotal()).isEqualTo(1L);
+        verify(sessionRepository).findAll(any(Specification.class), eq(PageRequest.of(0, 50)));
+        verify(sessionRepository).count(any(Specification.class));
     }
 
     @Test
     @DisplayName("listSessions обмежує limit до 100")
     void listSessions_clampsLimitTo100() {
         // Arrange
-        when(sessionRepository.findAllByOrderByCreatedAtDesc(any(Pageable.class)))
+        when(sessionRepository.findAll(any(Specification.class), any(Pageable.class)))
                 .thenReturn(List.of());
+        when(sessionRepository.count(any(Specification.class))).thenReturn(0L);
+        when(sessionSearchResolver.resolveSessionTypeCodes(any())).thenReturn(Collections.emptyList());
+        when(sessionSearchResolver.resolveTrackIds(any())).thenReturn(Collections.emptyList());
 
         // Act
-        service.listSessions(0, 200);
+        service.listSessions(SessionListFilter.builder().offset(0).limit(200).build());
 
         // Assert
-        verify(sessionRepository).findAllByOrderByCreatedAtDesc(PageRequest.of(0, 100));
+        org.mockito.ArgumentCaptor<Pageable> pageableCaptor = org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        verify(sessionRepository).findAll(any(Specification.class), pageableCaptor.capture());
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(100);
     }
 
     @Test
