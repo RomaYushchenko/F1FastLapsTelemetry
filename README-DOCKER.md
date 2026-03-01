@@ -11,7 +11,7 @@ docker-compose up -d
 docker-compose ps
 docker exec -it f1-telemetry-postgres psql -U telemetry -d telemetry -c "\dt telemetry.*"
 
-# Open UI
+# Open web app (frontend)
 open http://localhost
 ```
 
@@ -28,13 +28,13 @@ open http://localhost
 F1 25 Game → UDP:20777 → Docker Host
                            ├── udp-ingest-service (Java)
                            ├── telemetry-processing-api-service (Java)
-                           ├── ui (React + Nginx)
+                           ├── web (f1-telemetry-web-platform: React + Nginx)
                            ├── Kafka + Zookeeper
                            └── PostgreSQL + TimescaleDB
 ```
 
 **Ports:**
-- UI: `http://localhost` (80)
+- Web (frontend): `http://localhost` (80)
 - API: `http://localhost:8081`
 - UDP: `20777`
 
@@ -180,12 +180,11 @@ docker-compose down -v
 docker-compose up -d
 ```
 
-### Rollup error (ARM64)
+### Frontend build error (ARM64)
 ```bash
-# Already fixed in Dockerfile (Node 20 + fresh npm install)
 # If issue persists:
 docker builder prune -a -f
-docker-compose build --no-cache ui
+docker-compose build --no-cache web
 ```
 
 ### Out of memory
@@ -220,7 +219,7 @@ docker-compose up -d
 ```bash
 # Export
 docker save -o f1-telemetry.tar f1-telemetry/udp-ingest-service:latest \
-  f1-telemetry/telemetry-processing-api-service:latest f1-telemetry/ui:latest
+  f1-telemetry/telemetry-processing-api-service:latest f1-telemetry/web:latest
 
 # Import on another machine
 docker load -i f1-telemetry.tar
@@ -271,9 +270,9 @@ F1FastLapsTelemetry/
 │   ├── Dockerfile
 │   └── src/main/resources/
 │       └── application.yml
-├── ui/
+├── f1-telemetry-web-platform/      # Single frontend (React SPA + Nginx)
 │   ├── Dockerfile                  # Node build + Nginx
-│   └── nginx.conf                  # Reverse proxy config
+│   └── nginx.conf                  # SPA fallback + API/WS proxy
 └── infra/
     └── init-db/                    # PostgreSQL init scripts
         ├── 01-extensions.sql

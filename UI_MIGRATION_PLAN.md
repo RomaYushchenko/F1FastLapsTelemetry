@@ -104,32 +104,34 @@ This document is the result of a full analysis of both UI codebases and provides
 
 ## 5. Compatibility Matrix
 
+As of Block J, migration complete; all rows implemented in the new UI or N/A. See [MIGRATION_VERIFICATION.md](MIGRATION_VERIFICATION.md).
+
 | Feature | In old UI | In new UI | Status |
 |---------|-----------|-----------|--------|
-| Landing / marketing page | ❌ | ✅ | New UI only — keep as is |
-| Login / Register | ❌ | ✅ | New UI only — need backend auth later |
-| App layout with sidebar & header | ❌ | ✅ | New UI only — keep |
-| Dashboard (overview + recent sessions) | ❌ | ✅ | New UI only — needs API for real sessions |
-| Live overview (leaderboard, session info, events) | Partial (live widgets only) | ✅ (mock) | Needs migration: real data + optional WebSocket |
-| Live telemetry (charts, driver select) | ✅ (real-time widgets) | ✅ (mock charts) | Needs migration: connect WebSocket + reuse charts |
-| Live track map | ❌ | ✅ (static SVG) | New UI only — needs real track/positions later |
-| Session list (table, filters) | ✅ | ✅ (mock) | Needs migration: replace mock with GET /api/sessions |
-| Session detail (summary, laps, charts) | ✅ | ✅ (mock) | Needs migration: replace mock with full API set |
-| Edit session display name | ✅ | ❌ | Needs implementation in new UI |
-| Active session + WebSocket live | ✅ | ❌ | Needs implementation in new UI |
-| Pace chart | ✅ | ✅ (SessionDetails mock) | Needs migration: GET pace + real data |
-| Pedal trace / throttle-brake chart | ✅ | ✅ (SessionDetails + LiveTelemetry mock) | Needs migration: GET trace + real data |
-| ERS chart (lap) | ✅ | ✅ (mock) | Needs migration: GET ers + real data |
-| Speed trace chart | ✅ | ✅ (mock in SessionDetails) | Needs migration: GET speed-trace + real data |
-| Corners (lap) | ✅ | ✅ (sector heatmap in SessionDetails) | Needs migration: GET corners + align with API |
-| Tyre wear chart | ✅ | ✅ (Strategy + SessionDetails mock) | Needs migration: GET tyre-wear + real data |
-| Driver comparison (multi-driver) | ❌ | ✅ (mock) | New UI only — needs backend/API design |
-| Strategy view (pit stops, fuel, ERS) | ❌ | ✅ (mock) | New UI only — needs backend/API design |
-| Settings (profile, UDP, alerts) | ❌ | ✅ (UI only) | New UI only — persistence later |
-| REST API client | ✅ | ❌ | Needs implementation in new UI |
-| WebSocket + STOMP | ✅ | ❌ | Needs implementation in new UI |
-| Session ID (UUID / numeric) | ✅ | ❌ (uses numeric id in links) | Needs alignment in new UI |
-| Toaster (sonner) | ✅ | ❌ (not mounted in App) | Add Toaster in new UI when adding API |
+| Landing / marketing page | ❌ | ✅ | Done |
+| Login / Register | ❌ | ✅ | Done (UI-only until backend auth) |
+| App layout with sidebar & header | ❌ | ✅ | Done |
+| Dashboard (overview + recent sessions) | ❌ | ✅ | Done |
+| Live overview (leaderboard, session info, events) | Partial | ✅ | Done |
+| Live telemetry (charts, driver select) | ✅ | ✅ | Done |
+| Live track map | ❌ | ✅ | Done |
+| Session list (table, filters) | ✅ | ✅ | Done |
+| Session detail (summary, laps, charts) | ✅ | ✅ | Done |
+| Edit session display name | ✅ | ✅ | Done |
+| Active session + WebSocket live | ✅ | ✅ | Done |
+| Pace chart | ✅ | ✅ | Done |
+| Pedal trace / throttle-brake chart | ✅ | ✅ | Done |
+| ERS chart (lap) | ✅ | ✅ | Done |
+| Speed trace chart | ✅ | ✅ | Done |
+| Corners (lap) | ✅ | ✅ | Done |
+| Tyre wear chart | ✅ | ✅ | Done |
+| Driver comparison (multi-driver) | ❌ | ✅ | Done / N/A (optional B10) |
+| Strategy view (pit stops, fuel, ERS) | ❌ | ✅ | Done |
+| Settings (profile, UDP, alerts) | ❌ | ✅ | Done |
+| REST API client | ✅ | ✅ | Done |
+| WebSocket + STOMP | ✅ | ✅ | Done |
+| Session ID (UUID / numeric) | ✅ | ✅ | Done |
+| Toaster (sonner) | ✅ | ✅ | Done |
 
 ---
 
@@ -253,6 +255,18 @@ This document is the result of a full analysis of both UI codebases and provides
 4. **Use a single live data source for all live pages** — Implement one `useLiveTelemetry` (or equivalent) and feed it into Live Overview, Live Telemetry, and (later) Live Track Map. This avoids duplicate WebSocket logic and keeps connection status consistent (e.g. header badge).
 
 5. **Keep Driver Comparison and Strategy as “UI-first” until API exists** — The new UI already has mock screens. Implement full backend integration only when the API is defined; until then, either leave mock data or implement a minimal version using existing endpoints (e.g. two sessions or two car indices) and document limitations in NEW_UI_DOCS.md.
+
+---
+
+---
+
+## 9. Post-migration
+
+As of Block J (steps 36–40):
+
+- **Single front-end:** **f1-telemetry-web-platform** is the only UI. The old **ui/** directory has been removed.
+- **Build and run:** Docker Compose, CI (`.github/workflows/build.yml`), and any root-level scripts build and serve only **f1-telemetry-web-platform**. The Docker service is named **web** (image `f1-telemetry/web:latest`).
+- **Documentation:** Architecture, API contracts, migration plan, and runbooks describe the system based on the new UI. See [MIGRATION_VERIFICATION.md](MIGRATION_VERIFICATION.md) for the parity and feature checklists.
 
 ---
 

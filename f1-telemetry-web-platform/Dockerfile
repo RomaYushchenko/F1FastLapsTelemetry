@@ -1,21 +1,19 @@
 # Stage 1: Node Build
-# Using Node 20 LTS for better ARM64 binary support
+# Using Node 20 LTS for consistency with CI and ARM64 support
 FROM node:20 AS builder
 
 WORKDIR /build
 
 # Copy package files for dependency caching
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json* ./
 
-# Workaround for npm optional dependencies bug on ARM64
-# See: https://github.com/npm/cli/issues/4828
-# Strategy: remove lock file and do fresh install
-RUN rm -f package-lock.json && npm install
+# Install dependencies (npm; pnpm overrides in package.json are for local dev)
+RUN npm ci 2>/dev/null || npm install
 
 # Copy source code
 COPY . .
 
-# Build production bundle
+# Build production bundle (Vite output: dist/)
 RUN npm run build
 
 # Stage 2: Nginx Runtime
@@ -29,7 +27,7 @@ RUN rm -rf ./*
 # Copy built assets from builder stage
 COPY --from=builder /build/dist ./
 
-# Copy custom nginx configuration
+# Copy custom nginx configuration (SPA fallback + API/WS proxy)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Create non-privileged user and adjust permissions

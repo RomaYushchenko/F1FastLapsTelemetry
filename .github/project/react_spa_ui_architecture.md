@@ -3,6 +3,8 @@
 > **Мета документа:** опис архітектури React SPA, його місця в системі, структури екранів, потоку даних та зовнішнього вигляду (layout / wireframe) для узгодженої реалізації UI.  
 > Джерело API-контрактів: [rest_web_socket_api_contracts_f_1_telemetry.md](rest_web_socket_api_contracts_f_1_telemetry.md).
 
+**Current implementation (as of Block J):** The **single React SPA** is **f1-telemetry-web-platform**. The old `ui/` directory has been removed. Directory layout: `f1-telemetry-web-platform/src/app/` (pages, components, components/ui, api, ws), routes in `routes.tsx`. See [NEW_UI_DOCS.md](../../NEW_UI_DOCS.md) for full structure and run instructions.
+
 ---
 
 ## 1. Місце UI в архітектурі системи
@@ -63,23 +65,25 @@ React SPA є **єдиним клієнтом** backend-сервісу `telemetry
 | Стилі | **CSS Modules** / **Tailwind** / **styled-components** | На вибір команди |
 | Типи (опційно) | **TypeScript** | Рекомендовано для контрактів API |
 
-### 2.2 Базова структура каталогів
+### 2.2 Базова структура каталогів (f1-telemetry-web-platform)
 
 ```
-ui/
+f1-telemetry-web-platform/
 ├── public/
-├── src/
-│   ├── api/           # REST client, base URL, типи відповідей
-│   ├── ws/             # WebSocket client, subscribe/unsubscribe, message handlers
-│   ├── components/     # Переиспользуемые: Layout, Table, Card, Gauge, Badge
-│   ├── pages/          # Route-level: LiveDashboard, SessionList, SessionDetail
-│   ├── hooks/          # useSessions, useSessionDetail, useLiveTelemetry
-│   ├── routes/         # React Router config
-│   ├── App.tsx
-│   └── main.tsx
 ├── index.html
 ├── package.json
-└── vite.config.ts
+├── vite.config.ts
+├── nginx.conf          # For Docker: SPA fallback + API/WS proxy
+└── src/
+    ├── main.tsx
+    ├── app/
+    │   ├── App.tsx
+    │   ├── routes.tsx       # createBrowserRouter, routes: /, /login, /register, /app, /app/sessions, etc.
+    │   ├── api/             # config, types, client, sessionId, format
+    │   ├── ws/              # LiveTelemetryProvider, useLiveTelemetry, types
+    │   ├── components/      # AppLayout, DataCard, StatusBadge, TelemetryStat; ui/ = Shadcn primitives
+    │   └── pages/           # Landing, Login, Register, Dashboard, LiveOverview, LiveTelemetry, LiveTrackMap, SessionHistory, SessionDetails, DriverComparison, StrategyView, Settings, Diagnostics
+    └── styles/              # index.css, theme.css, tailwind
 ```
 
 ---

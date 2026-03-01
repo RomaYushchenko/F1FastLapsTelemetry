@@ -170,16 +170,16 @@ services:
     restart: unless-stopped
 
   # ============================================
-  # Frontend Service
+  # Frontend Service (single SPA: f1-telemetry-web-platform)
   # ============================================
 
-  ui:
+  web:
     build:
-      context: ./ui
+      context: ./f1-telemetry-web-platform
       dockerfile: Dockerfile
-    image: f1-telemetry/ui:latest
-    container_name: f1-telemetry-ui
-    hostname: ui
+    image: f1-telemetry/web:latest
+    container_name: f1-telemetry-web
+    hostname: web
     ports:
       - "80:80"
     depends_on:

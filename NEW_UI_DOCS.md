@@ -101,13 +101,14 @@ Contracts and DTOs: `.github/project/rest_web_socket_api_contracts_f_1_telemetry
 
 ---
 
-## 6. Local Run
+## 6. Local Run and Production (Docker)
 
-- **Prerequisites:** Node (version per package.json; pnpm used per pnpm overrides).
-- **Install:** `pnpm install` (or npm/yarn if lockfile present).
-- **Dev:** `pnpm dev` (or `npm run dev`) — runs Vite dev server.
-- **Build:** `pnpm build` (or `npm run build`).
-- **Env:** Optional `.env` with `VITE_API_BASE_URL` and `VITE_WS_URL`; see `.env.example` in the project root. Defaults: `http://localhost:8080` and `ws://localhost:8080/ws`.
+- **Prerequisites:** Node (version per package.json; npm or pnpm).
+- **Install:** `npm ci` or `pnpm install` (or yarn if lockfile present).
+- **Dev:** `npm run dev` (or `pnpm dev`) — runs Vite dev server.
+- **Build:** `npm run build` (or `pnpm build`).
+- **Env:** Optional `.env` with `VITE_API_BASE_URL` and `VITE_WS_URL`; see `.env.example` in the project root. Defaults: `http://localhost:8080` and `ws://localhost:8080/ws`. In Docker, the web container proxies `/api` and `/ws` to the API service, so the app uses relative URLs and works without env overrides when served from the same host.
+- **Production (Docker):** The frontend is built in `f1-telemetry-web-platform/Dockerfile` (Node build → Nginx). Service name in docker-compose: **web** (image `f1-telemetry/web:latest`). Nginx serves the SPA and proxies `/api`, `/actuator`, and `/ws` to `telemetry-processing-api-service:8081`.
 
 ---
 
