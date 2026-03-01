@@ -20,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -66,12 +67,10 @@ class SessionQueryServiceTest {
         Session session = session();
         SessionRuntimeState state = runtimeStateActive();
         when(sessionRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(List.of(session));
+                .thenReturn(new PageImpl<>(List.of(session), PageRequest.of(0, 50), 1L));
         when(sessionRepository.count(any(Specification.class))).thenReturn(1L);
         when(stateManager.get(SESSION_UID)).thenReturn(state);
         when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
-        when(sessionSearchResolver.resolveSessionTypeCodes(any())).thenReturn(Collections.emptyList());
-        when(sessionSearchResolver.resolveTrackIds(any())).thenReturn(Collections.emptyList());
 
         // Act
         SessionListResult result = service.listSessions(SessionListFilter.builder().offset(0).limit(50).build());
@@ -90,10 +89,8 @@ class SessionQueryServiceTest {
     void listSessions_clampsLimitTo100() {
         // Arrange
         when(sessionRepository.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(List.of());
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 100), 0L));
         when(sessionRepository.count(any(Specification.class))).thenReturn(0L);
-        when(sessionSearchResolver.resolveSessionTypeCodes(any())).thenReturn(Collections.emptyList());
-        when(sessionSearchResolver.resolveTrackIds(any())).thenReturn(Collections.emptyList());
 
         // Act
         service.listSessions(SessionListFilter.builder().offset(0).limit(200).build());
