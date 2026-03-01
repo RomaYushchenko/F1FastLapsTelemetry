@@ -13,6 +13,7 @@ import SessionDetails from "./pages/SessionDetails";
 import DriverComparison from "./pages/DriverComparison";
 import StrategyView from "./pages/StrategyView";
 import Settings from "./pages/Settings";
+import Diagnostics from "./pages/Diagnostics";
 
 export const router = createBrowserRouter([
   {
@@ -76,6 +77,10 @@ export const router = createBrowserRouter([
       {
         path: "settings",
         Component: Settings,
+      },
+      {
+        path: "settings/diagnostics",
+        Component: Diagnostics,
       },
     ],
   },

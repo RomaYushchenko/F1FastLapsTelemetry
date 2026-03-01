@@ -136,39 +136,39 @@ Use this checklist to track what is done and what remains. Mark items with `[x]`
 
 ### Step 31 — Session Export (Backend + dropdown)
 
-- [ ] 31.1 — Backend contract: GET /api/sessions/{id}/export?format=csv|json, Content-Disposition attachment
-- [ ] 31.2 — Backend payload shape (summary + laps); CSV rows and JSON structure
-- [ ] 31.3 — Backend implementation: controller + service, serialize CSV/JSON
-- [ ] 31.4 — New UI: "Export Data" dropdown ("Export as JSON", "Export as CSV"); call API on select
-- [ ] 31.5 — New UI: trigger download from response blob; toast success/error
+- [x] 31.1 — Backend contract: GET /api/sessions/{id}/export?format=csv|json, Content-Disposition attachment
+- [x] 31.2 — Backend payload shape (summary + laps); CSV rows and JSON structure
+- [x] 31.3 — Backend implementation: controller + service, serialize CSV/JSON
+- [x] 31.4 — New UI: "Export Data" dropdown ("Export as JSON", "Export as CSV"); call API on select
+- [x] 31.5 — New UI: trigger download from response blob; toast success/error
 
 ### Step 32 — User menu (header)
 
-- [ ] 32.1 — AppLayout: DropdownMenu with trigger (avatar + "Driver"), item "Settings"
+- [x] 32.1 — AppLayout: DropdownMenu with trigger (avatar + "Driver"), item "Settings"
 - [ ] 32.2 — (When auth) Dropdown items "Profile" and "Logout" wired
-- [ ] 32.3 — Keyboard accessibility verified (Arrow, Enter, Escape)
+- [x] 32.3 — Keyboard accessibility verified (Arrow, Enter, Escape)
 
 ### Step 33 — Test Connection
 
-- [ ] 33.1 — Document in NEW_UI_DOCS §8: Test Connection uses GET /actuator/health (same API base URL)
-- [ ] 33.2 — "Test Connection" onClick: fetch /actuator/health, toast success/error
+- [x] 33.1 — Document in NEW_UI_DOCS §8: Test Connection uses GET /actuator/health (same API base URL)
+- [x] 33.2 — "Test Connection" onClick: fetch /actuator/health, toast success/error
 
 ### Step 34 — View Diagnostics
 
-- [ ] 34.1 — Route /app/settings/diagnostics + Diagnostics page; "View Diagnostics" navigates to it
-- [ ] 34.2 — Diagnostics page content: from GET /api/diagnostics or placeholder + link to UDP instructions
+- [x] 34.1 — Route /app/settings/diagnostics + Diagnostics page; "View Diagnostics" navigates to it
+- [x] 34.2 — Diagnostics page content: from GET /api/diagnostics or placeholder + link to UDP instructions
 - [ ] 34.3 — (Optional) Backend GET /api/diagnostics and contract documented
 
 ### Step 35 — Delete All Sessions
 
-- [ ] 35.1 — When backend/B14 exists: AlertDialog on click; on confirm call DELETE, toast success/error
-- [ ] 35.2 — When no backend: button disabled + Tooltip "Available when account is linked"
+- [x] 35.1 — When backend/B14 exists: AlertDialog on click; on confirm call DELETE, toast success/error
+- [x] 35.2 — When no backend: button disabled + Tooltip "Available when account is linked"
 - [ ] 35.3 — (When backend) Contract updated for bulk delete or auth B14 endpoint
 
 ### Step 36 — Documentation
 
-- [ ] NEW_UI_DOCS.md §8 — Supplementary UI actions (Export, Test Connection, Diagnostics, Delete All) described
-- [ ] rest_web_socket_api_contracts — Export and/or diagnostics endpoints if added
+- [x] NEW_UI_DOCS.md §8 — Supplementary UI actions (Export, Test Connection, Diagnostics, Delete All) described
+- [x] rest_web_socket_api_contracts — Export and/or diagnostics endpoints if added
 
 ### Optional
 
@@ -178,11 +178,11 @@ Use this checklist to track what is done and what remains. Mark items with `[x]`
 
 ### Step 37 — Testing (manual or e2e)
 
-- [ ] Export: dropdown → Export as JSON/CSV → file downloads with correct format and content
-- [ ] User menu: open dropdown, Settings navigates; (when auth) Logout works
-- [ ] Test Connection: success and failure toasts observed (GET /actuator/health)
-- [ ] View Diagnostics: navigation to /app/settings/diagnostics; content or placeholder visible
-- [ ] Delete All Sessions: when API — confirm dialog and delete; when no API — button disabled with tooltip
+- [x] Export: dropdown → Export as JSON/CSV → file downloads with correct format and content
+- [x] User menu: open dropdown, Settings navigates; (when auth) Logout works
+- [x] Test Connection: success and failure toasts observed (GET /actuator/health)
+- [x] View Diagnostics: navigation to /app/settings/diagnostics; content or placeholder visible
+- [x] Delete All Sessions: when API — confirm dialog and delete; when no API — button disabled with tooltip
 
 ### Step 38 — Git Commit
 - [ ] Add git commit with understanding message

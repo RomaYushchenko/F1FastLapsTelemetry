@@ -1,7 +1,11 @@
+import { useState } from "react";
+import { useNavigate } from "react-router";
 import { DataCard } from "../components/DataCard";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Switch } from "../components/ui/switch";
+import { notify } from "@/notify";
+import { API_BASE_URL } from "@/api/config";
 import { 
   Select,
   SelectContent,
@@ -10,9 +14,67 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Separator } from "../components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../components/ui/alert-dialog";
 import { User, Bell, Sliders, Trash2 } from "lucide-react";
 
+/** Set to true when backend/auth supports DELETE all sessions (Block H). */
+const DELETE_ALL_SESSIONS_AVAILABLE = false;
+
 export default function Settings() {
+  const navigate = useNavigate();
+  const [testConnectionLoading, setTestConnectionLoading] = useState(false);
+  const [deleteAllLoading, setDeleteAllLoading] = useState(false);
+
+  async function handleTestConnection() {
+    setTestConnectionLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/actuator/health`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+      if (response.ok) {
+        notify.success("Connection successful");
+      } else {
+        const text = await response.text();
+        notify.error(`Connection failed: ${response.status}${text ? ` — ${text.slice(0, 80)}` : ""}`);
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Connection failed";
+      notify.error(message);
+    } finally {
+      setTestConnectionLoading(false);
+    }
+  }
+
+  async function handleDeleteAllSessions() {
+    if (!DELETE_ALL_SESSIONS_AVAILABLE) return;
+    setDeleteAllLoading(true);
+    try {
+      // When backend exists: DELETE /api/sessions?scope=all or auth DELETE /api/users/me/sessions
+      // const response = await fetch(...); if (response.ok) notify.success(...); else notify.error(...);
+      notify.success("All sessions deleted");
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setDeleteAllLoading(false);
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
@@ -268,10 +330,14 @@ export default function Settings() {
           </div>
 
           <div className="flex gap-3">
-            <Button className="bg-[#00E5FF] hover:bg-[#00E5FF]/90 text-background">
-              Test Connection
+            <Button
+              className="bg-[#00E5FF] hover:bg-[#00E5FF]/90 text-background"
+              onClick={handleTestConnection}
+              disabled={testConnectionLoading}
+            >
+              {testConnectionLoading ? "Testing…" : "Test Connection"}
             </Button>
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => navigate("/app/settings/diagnostics")}>
               View Diagnostics
             </Button>
           </div>
@@ -293,9 +359,53 @@ export default function Settings() {
             <p className="text-sm text-text-secondary mb-4">
               Permanently delete all your recorded telemetry sessions. This action cannot be undone.
             </p>
-            <Button variant="outline" className="border-[#E10600] text-[#E10600] hover:bg-[#E10600] hover:text-white">
-              Delete All Sessions
-            </Button>
+            {DELETE_ALL_SESSIONS_AVAILABLE ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-[#E10600] text-[#E10600] hover:bg-[#E10600] hover:text-white"
+                    disabled={deleteAllLoading}
+                  >
+                    {deleteAllLoading ? "Deleting…" : "Delete All Sessions"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete all sessions?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete all your recorded telemetry sessions. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-[#E10600] hover:bg-[#E10600]/90"
+                      onClick={handleDeleteAllSessions}
+                    >
+                      Delete all
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-block">
+                    <Button
+                      variant="outline"
+                      className="border-[#E10600] text-[#E10600] hover:bg-[#E10600] hover:text-white"
+                      disabled
+                    >
+                      Delete All Sessions
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Available when account is linked</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           <div className="p-4 border border-border/50 rounded-lg">

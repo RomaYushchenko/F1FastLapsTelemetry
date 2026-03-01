@@ -3,6 +3,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ComparisonResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.ComparisonQueryService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionExportService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListResult;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionUpdateService;
@@ -16,12 +17,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.*;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +39,8 @@ class SessionControllerTest {
     private SessionUpdateService sessionUpdateService;
     @Mock
     private ComparisonQueryService comparisonQueryService;
+    @Mock
+    private SessionExportService sessionExportService;
 
     @InjectMocks
     private SessionController controller;
@@ -171,5 +177,31 @@ class SessionControllerTest {
         // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         verify(comparisonQueryService).getComparison(SESSION_PUBLIC_ID_STR, 0, 1, 7, 9);
+    }
+
+    @Test
+    @DisplayName("exportSession повертає 200 з тілом та Content-Disposition attachment")
+    void exportSession_returnsOkWithBodyAndAttachmentHeader() throws IOException {
+        // Arrange
+        byte[] jsonBody = "{\"session\":{},\"summary\":{},\"laps\":[]}".getBytes();
+        when(sessionExportService.buildExport(eq(SESSION_PUBLIC_ID_STR), eq("json"))).thenReturn(jsonBody);
+
+        // Act
+        ResponseEntity<byte[]> response = controller.exportSession(SESSION_PUBLIC_ID_STR, "json");
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(jsonBody);
+        assertThat(response.getHeaders().getContentDisposition()).isNotNull();
+        assertThat(response.getHeaders().getContentDisposition().getFilename()).isEqualTo("session-" + SESSION_PUBLIC_ID_STR + "-export.json");
+        verify(sessionExportService).buildExport(SESSION_PUBLIC_ID_STR, "json");
+    }
+
+    @Test
+    @DisplayName("exportSession кидає IllegalArgumentException для невалідного format")
+    void exportSession_throwsWhenInvalidFormat() {
+        assertThatThrownBy(() -> controller.exportSession(SESSION_PUBLIC_ID_STR, "xml"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("format must be csv or json");
     }
 }

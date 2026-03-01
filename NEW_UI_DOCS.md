@@ -123,6 +123,15 @@ Contracts and DTOs: `.github/project/rest_web_socket_api_contracts_f_1_telemetry
 
 ## 8. Known Limitations and TODO
 
+### 8.1 Supplementary UI actions (Block I)
+
+- **Export Data (Session Details):** "Export Data" dropdown offers "Export as JSON" and "Export as CSV". On select, the UI calls **GET /api/sessions/{id}/export?format=csv|json**. The backend returns the session (summary + laps) as a file with `Content-Disposition: attachment` and filename `session-{id}-export.{csv|json}`. The client triggers a download from the response blob and shows a success toast. Source: session summary + laps from the same API used for the session detail page.
+- **Test Connection (Settings):** The "Test Connection" button calls **GET /actuator/health** (same API base URL as other REST calls, e.g. `VITE_API_BASE_URL` + `/actuator/health`). On 2xx the UI shows a success toast; on failure or non-2xx an error toast. This checks backend reachability only (no UDP or ingest checks).
+- **View Diagnostics (Settings):** The "View Diagnostics" button navigates to **/app/settings/diagnostics**. The Diagnostics page fetches **GET /api/diagnostics** if available; if the endpoint is missing or returns 404, the page shows a placeholder message and a link to UDP connection instructions (same as in Settings). When the backend adds a diagnostics endpoint (e.g. packet count, last received), the page will display that data.
+- **Delete All Sessions (Settings):** When auth/backend supports bulk delete (Block H): the button opens an AlertDialog; on confirm the client calls the delete endpoint and shows a success or error toast. When auth is not implemented: the button is **disabled** and a Tooltip shows "Available when account is linked".
+
+### 8.2 Other limitations
+
 - **Session list/detail:** Use real REST API (getSessions, getSession, laps, summary, pace, trace, ERS, speed-trace, corners, tyre-wear). Session IDs from API are strings (UUID or session_uid); used in routes and all API calls. Best Lap / Total Time columns show "—" until backend adds bestLapTimeMs/totalTimeMs to list response.
 - **No auth:** Login/Register are UI-only (no submit to backend).
 - **Live:** WebSocket (Block C) is implemented: LiveTelemetryProvider, useLiveTelemetry(), real connection status in header, snapshot in Live Overview and Live Telemetry (rolling buffer, Time Range 10/30/60 s). Tyre temperatures and fuel in snapshot may be mock or "—" until follow-up (see block-c-follow-up-live-snapshot-tyre-fuel.md).

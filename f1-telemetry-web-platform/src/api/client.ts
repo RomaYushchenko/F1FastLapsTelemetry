@@ -389,6 +389,38 @@ export async function getSessionEvents(
   )
 }
 
+/** GET /api/sessions/{id}/export?format=csv|json — download session data as file. Block I — Step 31. */
+export async function exportSession(
+  sessionId: string,
+  format: 'json' | 'csv'
+): Promise<void> {
+  const url = `${API_BASE_URL}/api/sessions/${encodeURIComponent(sessionId)}/export?format=${format}`
+  const response = await fetch(url, { headers: { Accept: format === 'json' ? 'application/json' : 'text/csv' } })
+  if (!response.ok) {
+    const body = await parseJsonOrNull(response)
+    const message =
+      (body &&
+        typeof body === 'object' &&
+        'message' in body &&
+        typeof (body as ApiErrorBody).message === 'string'
+        ? (body as ApiErrorBody).message
+        : `Export failed with status ${response.status}`) ?? ''
+    notify.error(message)
+    throw new HttpError(response.status, message, body ?? undefined)
+  }
+  const blob = await response.blob()
+  const disposition = response.headers.get('Content-Disposition')
+  const suggestedName =
+    disposition?.match(/filename="?([^";\n]+)"?/)?.[1] ||
+    `session-${sessionId}-export.${format}`
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = suggestedName
+  link.click()
+  URL.revokeObjectURL(link.href)
+  notify.success('Export downloaded')
+}
+
 /** GET /api/tracks/{trackId}/layout — 2D track map; 404 → null (layout not available). */
 export async function getTrackLayout(
   trackId: number,

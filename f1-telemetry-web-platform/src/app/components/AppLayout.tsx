@@ -25,6 +25,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "./ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
 import {
@@ -188,12 +194,26 @@ export default function AppLayout() {
             </Popover>
 
             {/* User Menu */}
-            <button className="flex items-center gap-2 p-2 hover:bg-sidebar-accent rounded-lg transition-colors">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#00E5FF] to-[#00FF85] rounded-full flex items-center justify-center">
-                <User className="w-4 h-4 text-background" />
-              </div>
-              <span className="text-sm font-medium hidden md:block">Driver</span>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 p-2 hover:bg-sidebar-accent rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#00E5FF]/50 focus:ring-offset-2 focus:ring-offset-secondary"
+                  aria-label="User menu"
+                  aria-haspopup="menu"
+                >
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#00E5FF] to-[#00FF85] rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 text-background" />
+                  </div>
+                  <span className="text-sm font-medium hidden md:block">Driver</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem asChild>
+                  <Link to="/app/settings">Settings</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>

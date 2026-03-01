@@ -117,6 +117,25 @@ Errors: 404 if session not found; 400 if validation fails (blank or length > 64)
 
 ---
 
+#### 3.1.4 Експорт сесії (Block I)
+
+```
+GET /api/sessions/{id}/export
+```
+
+Query params:
+- `format` (string, optional): `json` (default) or `csv`.
+
+Response: 200 OK with body = session export (summary + laps).  
+- **Content-Type:** `application/json` for JSON, `text/csv; charset=UTF-8` for CSV.  
+- **Content-Disposition:** `attachment; filename="session-{id}-export.{json|csv}"`.  
+- **JSON:** `{ "session": SessionDto, "summary": SessionSummaryDto, "laps": LapResponseDto[] }`.  
+- **CSV:** one row per lap; columns: lapNumber, lapTimeMs, sector1Ms, sector2Ms, sector3Ms, isInvalid, positionAtLapStart.
+
+Errors: 404 if session not found; 400 if format is not `csv` or `json`.
+
+---
+
 ### 3.2 Laps
 
 #### 3.2.1 Кола сесії

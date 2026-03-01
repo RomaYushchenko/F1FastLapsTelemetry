@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { ArrowLeft, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Loader2, ChevronDown } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -29,6 +29,7 @@ import {
   getLapSpeedTrace,
   getLapCorners,
   getSessionTyreWear,
+  exportSession,
 } from "@/api/client";
 import { HttpError } from "@/api/types";
 import type { Session } from "@/api/types";
@@ -46,6 +47,12 @@ import { isValidSessionId } from "@/api/sessionId";
 import { getTrackName } from "@/constants/tracks";
 import { formatLapTime, formatSector } from "@/api/format";
 import { Skeleton } from "../components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 
 const tooltipStyle = {
   backgroundColor: "#1F2937",
@@ -71,8 +78,21 @@ export default function SessionDetails() {
   const [cornersData, setCornersData] = useState<LapCorner[]>([]);
   const [tyreWearData, setTyreWearData] = useState<TyreWearPoint[]>([]);
   const [chartsLoading, setChartsLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const carIndex = session?.playerCarIndex ?? 0;
+
+  async function handleExport(format: "json" | "csv") {
+    if (!id) return;
+    setExporting(true);
+    try {
+      await exportSession(id, format);
+    } catch {
+      // Error already shown by client
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const fetchSessionData = useCallback(async () => {
     if (!id || !isValidSessionId(id)) return;
@@ -249,10 +269,23 @@ export default function SessionDetails() {
             Strategy
           </Button>
         </Link>
-        <Button variant="outline" className="gap-2">
-          <Download className="w-4 h-4" />
-          Export Data
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2" disabled={exporting}>
+              <Download className="w-4 h-4" />
+              Export Data
+              <ChevronDown className="w-4 h-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleExport("json")}>
+              Export as JSON
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport("csv")}>
+              Export as CSV
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Session Summary */}
