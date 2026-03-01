@@ -79,7 +79,7 @@ function EventTimelineRow({ event }: { event: SessionEventDto }) {
 }
 
 export default function LiveOverview() {
-  const { session, snapshot, status, leaderboard } = useLiveTelemetry();
+  const { session, snapshot, status, leaderboard, sessionEventsAppend } = useLiveTelemetry();
   const noActiveSession = status === "no-data" || session == null;
   const tyres = snapshot?.tyresSurfaceTempC;
   const fuelPercent = snapshot?.fuelRemainingPercent;
@@ -102,6 +102,9 @@ export default function LiveOverview() {
     if (session?.id) fetchEvents();
     else setEvents([]);
   }, [session?.id, fetchEvents]);
+
+  /** Initial fetch + events pushed via WebSocket (Block E optional 20.7). */
+  const displayEvents = [...events, ...sessionEventsAppend];
 
   return (
     <div className="space-y-6">
@@ -381,11 +384,11 @@ export default function LiveOverview() {
         )}
         {!eventsLoading && !eventsError && (
           <div className="space-y-3">
-            {events.length === 0 && (
+            {displayEvents.length === 0 && (
               <div className="py-6 text-center text-text-secondary">No session events yet.</div>
             )}
-            {events.map((event, idx) => (
-              <EventTimelineRow key={event.createdAt + String(idx)} event={event} />
+            {displayEvents.map((event, idx) => (
+              <EventTimelineRow key={`${event.createdAt ?? ''}-${event.eventCode}-${idx}`} event={event} />
             ))}
           </div>
         )}

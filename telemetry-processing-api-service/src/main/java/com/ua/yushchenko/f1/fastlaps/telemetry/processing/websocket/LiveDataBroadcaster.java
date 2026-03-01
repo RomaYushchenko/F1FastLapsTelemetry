@@ -1,8 +1,10 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.websocket;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LeaderboardEntryDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsLeaderboardMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSessionEndedMessage;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSessionEventMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.WsSnapshotMessageBuilder;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.LeaderboardQueryService;
@@ -118,5 +120,25 @@ public class LiveDataBroadcaster {
 
         log.info("Sent SESSION_ENDED notification for session {} to {} subscribers (reason: {})",
                 sessionUid, wsSessionManager.getSubscriberCount(sessionUid), reason);
+    }
+
+    /**
+     * Push a new session event to all subscribers of the session (Block E optional 19.10).
+     */
+    public void broadcastNewSessionEvent(Long sessionUid, SessionEventDto dto) {
+        if (!wsSessionManager.hasSubscribers(sessionUid)) {
+            return;
+        }
+        String topicId = sessionQueryService.getTopicIdForSession(sessionUid).orElse(null);
+        if (topicId == null) {
+            return;
+        }
+        WsSessionEventMessage message = WsSessionEventMessage.builder()
+                .type(WsSessionEventMessage.TYPE)
+                .event(dto)
+                .build();
+        String destination = "/topic/live/" + topicId;
+        messagingTemplate.convertAndSend(destination, message);
+        log.debug("Broadcast SESSION_EVENT for session {}: code={}", sessionUid, dto != null ? dto.getEventCode() : null);
     }
 }

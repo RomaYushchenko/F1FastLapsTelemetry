@@ -3,7 +3,7 @@
  * See: rest_web_socket_api_contracts_f_1_telemetry.md § 4.5.
  */
 
-import type { LeaderboardEntry } from '@/api/types'
+import type { LeaderboardEntry, SessionEventDto } from '@/api/types'
 
 /** Live snapshot (10 Hz). Order for tyresSurfaceTempC: RL, RR, FL, FR. */
 export interface WsSnapshotMessage {
@@ -49,10 +49,17 @@ export interface WsLeaderboardMessage {
   entries: LeaderboardEntry[];
 }
 
+/** New session event (FTLP, PENA, SCAR, etc.). Append to timeline. Block E optional 20.7. */
+export interface WsSessionEventMessage {
+  type: "SESSION_EVENT";
+  event: SessionEventDto;
+}
+
 export type WsServerMessage =
   | WsSnapshotMessage
   | WsSessionEndedMessage
   | WsLeaderboardMessage
+  | WsSessionEventMessage
   | WsErrorMessage;
 
 /** Tyre position labels; index order matches tyresSurfaceTempC: RL, RR, FL, FR. */

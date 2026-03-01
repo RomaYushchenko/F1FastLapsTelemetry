@@ -24,9 +24,10 @@ import type {
   WsLeaderboardMessage,
   WsServerMessage,
   WsSessionEndedMessage,
+  WsSessionEventMessage,
   WsSnapshotMessage,
 } from './types'
-import type { LeaderboardEntry } from '@/api/types'
+import type { LeaderboardEntry, SessionEventDto } from '@/api/types'
 
 const ACTIVE_SESSION_POLL_INTERVAL_MS = 4000
 
@@ -43,6 +44,8 @@ export interface LiveTelemetryState {
   snapshot: WsSnapshotMessage | null
   /** Live leaderboard (from WS or initial getLeaderboard). */
   leaderboard: LeaderboardEntry[]
+  /** New session events pushed via WS (append to timeline). Block E optional 20.7. */
+  sessionEventsAppend: SessionEventDto[]
   sessionEnded: WsSessionEndedMessage | null
   errorMessage: string | null
 }
@@ -80,6 +83,7 @@ const defaultState: LiveTelemetryState = {
   session: null,
   snapshot: null,
   leaderboard: [],
+  sessionEventsAppend: [],
   sessionEnded: null,
   errorMessage: null,
 }
@@ -93,6 +97,7 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [snapshot, setSnapshot] = useState<WsSnapshotMessage | null>(null)
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [sessionEventsAppend, setSessionEventsAppend] = useState<SessionEventDto[]>([])
   const [sessionEnded, setSessionEnded] = useState<WsSessionEndedMessage | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -109,6 +114,7 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
 
     setInternalStatus('connecting')
     setSession(activeSession)
+    setSessionEventsAppend([])
     setErrorMessage(null)
 
     const client = new Client({
@@ -133,6 +139,9 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
               setSnapshot(payload)
             } else if (payload.type === 'LEADERBOARD') {
               setLeaderboard((payload as WsLeaderboardMessage).entries ?? [])
+            } else if (payload.type === 'SESSION_EVENT') {
+              const ev = (payload as WsSessionEventMessage).event
+              if (ev) setSessionEventsAppend((prev) => [...prev, ev])
             } else if (payload.type === 'SESSION_ENDED') {
               notify.info('Session ended')
               setSessionEnded(payload)
@@ -231,6 +240,7 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
       setInternalStatus('no-active-session')
       setSession(null)
       setLeaderboard([])
+      setSessionEventsAppend([])
       setSessionEnded(null)
       setErrorMessage(null)
       // Schedule poll for auto-reconnect when session appears again
@@ -298,10 +308,11 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
       session,
       snapshot,
       leaderboard,
+      sessionEventsAppend,
       sessionEnded,
       errorMessage,
     }),
-    [internalStatus, session, snapshot, leaderboard, sessionEnded, errorMessage]
+    [internalStatus, session, snapshot, leaderboard, sessionEventsAppend, sessionEnded, errorMessage]
   )
 
   return (

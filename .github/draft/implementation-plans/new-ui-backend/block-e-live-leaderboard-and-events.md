@@ -181,7 +181,7 @@ Use this checklist to track progress: replace `[ ]` with `[x]` when an item is d
 - [x] 19.7 — SessionEventDto (REST) and mapper
 - [x] 19.8 — SessionEventsController + Service
 - [x] 19.9 — Unit tests (persistence, repository, controller); TestData
-- [ ] 19.10 — (Optional) WebSocket push for new events
+- [x] 19.10 — (Optional) WebSocket push for new events
 
 ### Step 20 — New UI: Event timeline
 
@@ -191,7 +191,7 @@ Use this checklist to track progress: replace `[ ]` with `[x]` when an item is d
 - [x] 20.4 — Replace mock event timeline with API data
 - [x] 20.5 — Format detail per event type (FTLP, PENA, SCAR, …)
 - [x] 20.6 — Loading and error states
-- [ ] 20.7 — (Optional) WebSocket subscription for new events
+- [x] 20.7 — (Optional) WebSocket subscription for new events
 
 ### Step 21 — Documentation and closure
 
@@ -200,4 +200,4 @@ Use this checklist to track progress: replace `[ ]` with `[x]` when an item is d
 - [ ] Update plan 08 (08-packet-event-ingest-and-processing.md) if session_events persistence is added: note “session_events table and REST events endpoint implemented in Block E”
 
 ### Step 22 — Git Commit
-- [ ] Add git commit with understanding message
+- [x] Add git commit with understanding message

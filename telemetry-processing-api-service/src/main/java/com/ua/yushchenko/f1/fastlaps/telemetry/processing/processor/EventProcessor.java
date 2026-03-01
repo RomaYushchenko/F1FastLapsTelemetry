@@ -7,8 +7,12 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.DrsDisabledReason;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.RetirementReason;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.SafetyCarEventType;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.SafetyCarType;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionEventDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionEventMapper;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.SessionEventWriter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.websocket.LiveDataBroadcaster;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +32,8 @@ public class EventProcessor {
 
     private final SessionStateManager stateManager;
     private final SessionEventWriter sessionEventWriter;
+    private final SessionEventMapper sessionEventMapper;
+    private final LiveDataBroadcaster liveDataBroadcaster;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public void process(long sessionUid, int frameId, EventDto payload) {
@@ -74,7 +80,12 @@ public class EventProcessor {
         Short lap = resolveLap(sessionUid, code, payload);
         Short carIndex = resolveCarIndex(payload);
         String detailJson = buildDetailJson(code, payload);
-        sessionEventWriter.write(sessionUid, frameId, lap, code, carIndex, detailJson);
+        SessionEvent saved = sessionEventWriter.write(sessionUid, frameId, lap, code, carIndex, detailJson);
+        // Push new event to WebSocket subscribers (Block E optional 19.10)
+        SessionEventDto dto = sessionEventMapper.toDto(saved);
+        if (dto != null) {
+            liveDataBroadcaster.broadcastNewSessionEvent(sessionUid, dto);
+        }
     }
 
     private Short resolveLap(long sessionUid, String code, EventDto payload) {

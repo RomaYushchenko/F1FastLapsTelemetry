@@ -537,7 +537,26 @@ Client sends **sessionId** (string): public_id or session UID as string, so the 
 
 ---
 
-#### 4.5.3 Live leaderboard (push)
+#### 4.5.3 New session event (push)
+
+Sent on `/topic/live/{sessionId}` when a new session event is persisted (EventProcessor). Client appends the event to the timeline. Payload: `SessionEventDto` (lap, eventCode, carIndex, detail, createdAt).
+
+```json
+{
+  "type": "SESSION_EVENT",
+  "event": {
+    "lap": 24,
+    "eventCode": "FTLP",
+    "carIndex": 0,
+    "detail": { "vehicleIdx": 0, "lapTime": 84.532 },
+    "createdAt": "2026-01-28T21:16:00.000Z"
+  }
+}
+```
+
+---
+
+#### 4.5.4 Live leaderboard (push)
 
 Sent on `/topic/live/{sessionId}` when leaderboard data changes (LapData, position, or CarStatus snapshot). Same payload shape as `GET /api/sessions/active/leaderboard` (array of LeaderboardEntryDto).
 

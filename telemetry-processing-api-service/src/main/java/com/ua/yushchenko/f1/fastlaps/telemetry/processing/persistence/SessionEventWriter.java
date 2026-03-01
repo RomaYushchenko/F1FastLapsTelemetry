@@ -17,7 +17,10 @@ public class SessionEventWriter {
 
     private final SessionEventRepository sessionEventRepository;
 
-    public void write(Long sessionUid, int frameId, Short lap, String eventCode, Short carIndex, String detailJson) {
+    /**
+     * Persist session event and return the saved entity (for WebSocket push).
+     */
+    public SessionEvent write(Long sessionUid, int frameId, Short lap, String eventCode, Short carIndex, String detailJson) {
         log.debug("write: sessionUid={}, frameId={}, lap={}, eventCode={}", sessionUid, frameId, lap, eventCode);
         SessionEvent entity = SessionEvent.builder()
                 .sessionUid(sessionUid)
@@ -27,6 +30,6 @@ public class SessionEventWriter {
                 .carIndex(carIndex)
                 .detail(detailJson)
                 .build();
-        sessionEventRepository.save(entity);
+        return sessionEventRepository.save(entity);
     }
 }
