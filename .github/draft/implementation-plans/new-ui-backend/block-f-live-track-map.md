@@ -141,12 +141,12 @@ Use this checklist to track progress. Mark `[ ]` as `[x]` when done.
 - [ ] **22.8** — Driver positions: remain mock (no B9)
 - [ ] **22.9** — Connection/lap from Block C unchanged
 
-### Documentation
+### Step 23 — Documentation
 
 - [ ] REST contract: Track layout § added
 - [ ] BACKEND_FEATURES_FOR_NEW_UI.md: B8 marked implemented
 
-### Git Commit
+### Step 24 — Git Commit
 - [ ] Add git commit with understanding message
 
 ---

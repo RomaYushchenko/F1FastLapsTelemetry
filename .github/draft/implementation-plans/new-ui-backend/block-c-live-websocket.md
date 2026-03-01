@@ -259,7 +259,7 @@ Use this list to implement Block C in a strict order. Each line is one concrete 
 - [ ] 13.3 "Previous Sessions" list from API with links to session detail
 - [ ] 13.4 Optional: "Last session" card from first item
 
-### Documentation and follow-up
+### Step 14 —Documentation and follow-up
 
 - [ ] NEW_UI_DOCS.md §4/§5/§8: document WebSocket, useLiveTelemetry; remove "connection status is fake"
 - [ ] **Follow-up (later):** Real tyre/fuel per [block-c-follow-up-live-snapshot-tyre-fuel.md](block-c-follow-up-live-snapshot-tyre-fuel.md)
@@ -268,7 +268,7 @@ Use this list to implement Block C in a strict order. Each line is one concrete 
 
 - [ ] UI unit or e2e tests for useLiveTelemetry and live pages
 
-### Git Commit
+### Step 15 — Git Commit
 - [ ] Add git commit with understanding message
 ---
 

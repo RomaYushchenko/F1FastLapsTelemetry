@@ -135,11 +135,11 @@ Use this checklist to mark what is done. Update the file as you complete each it
 - [ ] **24.11** — Mocks removed; empty and error states; toasts
 - [ ] **24.12** — Manual/e2e: session → two drivers → best vs best → change laps → verify charts
 
-### Documentation
+### Step 25 — Documentation
 
 - [ ] Contract updated (Session participants; Comparison §)
 - [ ] BACKEND_FEATURES_FOR_NEW_UI.md updated (B10 done; SessionDto.participants)
 - [ ] NEW_UI_DOCS.md updated (Driver Comparison real data)
 
-### Git Commit
+### Step 26 — Git Commit
 - [ ] Add git commit with understanding message

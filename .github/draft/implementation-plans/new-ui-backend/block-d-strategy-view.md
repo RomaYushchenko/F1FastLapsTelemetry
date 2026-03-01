@@ -163,13 +163,13 @@ Use this to track what is done and what is left. Mark items when completed.
 - [ ] 16.7 — Overview cards: pit count and stint count from API
 - [ ] 16.8 — Compound code → display string map in UI
 
-### Documentation
+### Step 17 — Documentation
 
 - [ ] REST contract: pit-stops and stints sections
 - [ ] BACKEND_FEATURES_FOR_NEW_UI.md: B4, B5 marked implemented
 - [ ] (Optional) NEW_UI_DOCS: Strategy View section if needed
 
-### Git Commit
+### Step 18 — Git Commit
 - [ ] Add git commit with understanding message
 - 
 ---

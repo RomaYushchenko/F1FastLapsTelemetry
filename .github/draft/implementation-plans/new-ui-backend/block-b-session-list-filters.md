@@ -133,12 +133,12 @@ Track progress by marking items when done. Copy this block into your working doc
 - [ ] **8.13** Error state + Retry + toast
 - [ ] **8.14** Table columns match SessionDto and link to session detail
 
-### Documentation
+### Step 9 — Documentation
 
 - [ ] REST contract §3.1.1 updated
 - [ ] BACKEND_FEATURES_FOR_NEW_UI.md B1 marked implemented
 
-### Git Commit
+### Step 9 — Git Commit
 - [ ] Add git commit with understanding message
 ---
 

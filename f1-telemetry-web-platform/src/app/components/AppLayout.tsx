@@ -1,23 +1,37 @@
 import { Outlet, Link, useLocation } from "react-router";
-import { 
-  LayoutDashboard, 
-  Radio, 
-  Activity, 
-  Map, 
-  History, 
-  GitCompare, 
-  TrendingUp, 
+import {
+  LayoutDashboard,
+  Radio,
+  Activity,
+  Map,
+  History,
+  GitCompare,
+  TrendingUp,
   Settings as SettingsIcon,
   Bell,
   User,
   Wifi,
   WifiOff,
   Menu,
-  X
+  X,
+  CheckCheck,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { cn } from "./ui/utils";
 import { StatusBadge } from "./StatusBadge";
-import { useState } from "react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "./ui/popover";
+import { Button } from "./ui/button";
+import { ScrollArea } from "./ui/scroll-area";
+import {
+  getNotifications,
+  subscribe,
+  markAllAsRead,
+  type NotificationItem,
+} from "@/notificationStore";
 
 const navigation = [
   { name: 'Overview', href: '/app', icon: LayoutDashboard, group: 'Overview' },
@@ -32,10 +46,32 @@ const navigation = [
 
 const groups = ['Overview', 'Live', 'Analysis', 'Settings'];
 
+function notificationTypeLabel(type: NotificationItem["type"]): string {
+  switch (type) {
+    case "error":
+      return "Error";
+    case "success":
+      return "Success";
+    case "warning":
+      return "Warning";
+    case "info":
+      return "Info";
+    default:
+      return type;
+  }
+}
+
 export default function AppLayout() {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [connectionStatus] = useState<'live' | 'waiting' | 'no-data' | 'error'>('live');
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  useEffect(() => {
+    return subscribe(setNotifications);
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,10 +113,68 @@ export default function AppLayout() {
             </div>
 
             {/* Notifications */}
-            <button className="p-2 hover:bg-sidebar-accent rounded-lg transition-colors relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#E10600] rounded-full" />
-            </button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="p-2 hover:bg-sidebar-accent rounded-lg transition-colors relative"
+                  aria-label="Notifications"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#E10600] rounded-full" />
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+                  <span className="text-sm font-medium">Notifications</span>
+                  {notifications.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={markAllAsRead}
+                    >
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      Mark all read
+                    </Button>
+                  )}
+                </div>
+                <ScrollArea className="h-[280px]">
+                  {notifications.length === 0 ? (
+                    <div className="py-6 text-center text-sm text-text-secondary">
+                      No notifications
+                    </div>
+                  ) : (
+                    <ul className="py-1">
+                      {notifications.map((n) => (
+                        <li
+                          key={n.id}
+                          className={cn(
+                            "px-3 py-2 text-sm border-b border-border/30 last:border-0",
+                            !n.read && "bg-secondary/30"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "text-xs font-medium uppercase",
+                              n.type === "error" && "text-red-500",
+                              n.type === "success" && "text-green-500",
+                              n.type === "warning" && "text-amber-500",
+                              n.type === "info" && "text-text-secondary"
+                            )}
+                          >
+                            {notificationTypeLabel(n.type)}
+                          </span>
+                          <p className="mt-0.5 break-words">{n.message}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
 
             {/* User Menu */}
             <button className="flex items-center gap-2 p-2 hover:bg-sidebar-accent rounded-lg transition-colors">

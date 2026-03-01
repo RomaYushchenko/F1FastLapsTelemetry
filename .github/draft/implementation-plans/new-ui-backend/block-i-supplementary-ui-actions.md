@@ -165,7 +165,7 @@ Use this checklist to track what is done and what remains. Mark items with `[x]`
 - [ ] 35.2 — When no backend: button disabled + Tooltip "Available when account is linked"
 - [ ] 35.3 — (When backend) Contract updated for bulk delete or auth B14 endpoint
 
-### Documentation
+### Step 36 — Documentation
 
 - [ ] NEW_UI_DOCS.md §8 — Supplementary UI actions (Export, Test Connection, Diagnostics, Delete All) described
 - [ ] rest_web_socket_api_contracts — Export and/or diagnostics endpoints if added
@@ -176,7 +176,7 @@ Use this checklist to track what is done and what remains. Mark items with `[x]`
 
 **Theme persistence** is in **Block H step 30** (with other Settings); not in Block I.
 
-### Testing (manual or e2e)
+### Step 37 — Testing (manual or e2e)
 
 - [ ] Export: dropdown → Export as JSON/CSV → file downloads with correct format and content
 - [ ] User menu: open dropdown, Settings navigates; (when auth) Logout works
@@ -184,7 +184,7 @@ Use this checklist to track what is done and what remains. Mark items with `[x]`
 - [ ] View Diagnostics: navigation to /app/settings/diagnostics; content or placeholder visible
 - [ ] Delete All Sessions: when API — confirm dialog and delete; when no API — button disabled with tooltip
 
-### Git Commit
+### Step 38 — Git Commit
 - [ ] Add git commit with understanding message
 
 ---

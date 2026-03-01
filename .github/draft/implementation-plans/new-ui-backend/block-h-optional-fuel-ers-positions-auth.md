@@ -238,7 +238,7 @@ Use this to track what is done and what is left. Mark with `[x]` when completed.
 - [ ] 30.8 — Theme persistence: Theme select → localStorage; apply class on html on load and on change
 - [ ] 30.9 — Optional: "Your session" marker when session.ownerUserId === current user
 
-### Documentation
+###Step 31 — Documentation
 
 - [ ] REST contract: fuel-by-lap, ers-by-lap (if 25 done)
 - [ ] REST contract: positions (if 27 done)
@@ -247,7 +247,7 @@ Use this to track what is done and what is left. Mark with `[x]` when completed.
 - [ ] NEW_UI_DOCS.md: §8 auth, settings, danger zone (if 30 done)
 - [ ] telemetry_processing_api_service.md: new controllers/services (if any)
 
-### Git Commit
+### Step 32 — Git Commit
 - [ ] Add git commit with understanding message
 
 ---

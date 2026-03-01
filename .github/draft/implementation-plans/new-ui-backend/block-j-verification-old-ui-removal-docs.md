@@ -238,9 +238,9 @@ Copy this checklist into **MIGRATION_VERIFICATION.md** or keep it here; mark eac
 - [ ] **40.4** README-DOCKER.md: ui → web/frontend; commands/paths for new UI.
 - [ ] **40.5** Other docs (IMPLEMENTATION_PROGRESS.md, frontend_refinement_plan, draft plans): references to ui/ updated or noted as historical.
 
-### Block J complete
+### Step 41 — Block J complete
 
 - [ ] All items above checked; MIGRATION_VERIFICATION.md signed off; migration marked complete in UI_MIGRATION_PLAN and IMPLEMENTATION_STEP_BY_STEP.
 
-### Git Commit
+### Step 428 — Git Commit
 - [ ] Add git commit with understanding message
