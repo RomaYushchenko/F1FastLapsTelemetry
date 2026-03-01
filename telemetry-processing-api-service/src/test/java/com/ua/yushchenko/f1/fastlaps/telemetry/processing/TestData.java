@@ -1,9 +1,14 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarStatusRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionEvent;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TyreWearPerLap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TyreWearSnapshot;
@@ -51,6 +56,13 @@ public final class TestData {
     public static final short SPEED_KPH = 285;
     public static final short GEAR = 7;
     public static final int ENGINE_RPM = 11500;
+
+    /** Fuel in tank (kg) for fuel-by-lap tests. */
+    public static final float FUEL_AT_LAP_1_END = 98.5f;
+    public static final float FUEL_AT_LAP_2_END = 95.0f;
+    /** ERS store energy (J) for ers-by-lap; ~62.5% of 4M J. */
+    public static final float ERS_STORE_AT_LAP_1_END = 2_500_000f;
+    public static final float ERS_STORE_AT_LAP_2_END = 2_200_000f;
 
     public static final float WEAR_FL = 5.2f;
     public static final float WEAR_FR = 5.0f;
@@ -129,6 +141,8 @@ public final class TestData {
         snapshot.setErsEnergyPercent(75);
         snapshot.setErsDeployActive(false);
         snapshot.setErsDeployMode(2); // 2 = Hotlap (plan 11)
+        snapshot.setTyresSurfaceTempC(new int[]{95, 99, 102, 98}); // RL, RR, FL, FR °C
+        snapshot.setFuelRemainingPercent(67);
         snapshot.setTimestamp(RAW_TS);
         return snapshot;
     }
@@ -162,6 +176,39 @@ public final class TestData {
         return lap;
     }
 
+    /** Lap with given number and time (for pit/stint scenarios). */
+    public static Lap lapWithNumber(int lapNumber, Integer lapTimeMs) {
+        return Lap.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX)
+                .lapNumber((short) lapNumber)
+                .lapTimeMs(lapTimeMs)
+                .sector1TimeMs(SECTOR1_MS)
+                .sector2TimeMs(SECTOR2_MS)
+                .sector3TimeMs(SECTOR3_MS)
+                .isInvalid(false)
+                .positionAtLapStart(null)
+                .endedAt(LAP_ENDED_AT)
+                .build();
+    }
+
+    /** Two laps (1 and 2) for one pit stop scenario: compound change 18→16 at lap 2. */
+    public static java.util.List<Lap> lapsForPitScenario() {
+        return java.util.List.of(
+                lapWithNumber(1, 92_500),
+                lapWithNumber(2, 95_200)
+        );
+    }
+
+    /** Ten laps (1–10) for two-stint scenario. */
+    public static java.util.List<Lap> lapsForStintScenario() {
+        java.util.List<Lap> list = new java.util.ArrayList<>();
+        for (int n = 1; n <= 10; n++) {
+            list.add(lapWithNumber(n, 87_000 + n * 100));
+        }
+        return list;
+    }
+
     // --- SessionSummary ---
     public static SessionSummary sessionSummary() {
         return SessionSummary.builder()
@@ -175,6 +222,104 @@ public final class TestData {
                 .bestSector3Ms(28_900)
                 .lastUpdatedAt(ENDED_AT)
                 .build();
+    }
+
+    /** Second car index for comparison tests. */
+    public static final short CAR_INDEX_1 = 1;
+
+    /** Session summary for car index 1 (Block G — comparison). */
+    public static SessionSummary sessionSummaryCar1() {
+        return SessionSummary.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX_1)
+                .totalLaps((short) 10)
+                .bestLapTimeMs(87_500)
+                .bestLapNumber((short) 5)
+                .bestSector1Ms(28_100)
+                .bestSector2Ms(30_600)
+                .bestSector3Ms(28_800)
+                .lastUpdatedAt(ENDED_AT)
+                .build();
+    }
+
+    /** Lap for car 1. */
+    public static Lap lapCar1() {
+        return Lap.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX_1)
+                .lapNumber((short) 1)
+                .lapTimeMs(87_600)
+                .sector1TimeMs(28_200)
+                .sector2TimeMs(30_700)
+                .sector3TimeMs(28_700)
+                .isInvalid(false)
+                .positionAtLapStart(2)
+                .endedAt(LAP_ENDED_AT)
+                .build();
+    }
+
+    /** Session finishing position (P1, P2) for participants displayLabel. */
+    public static SessionFinishingPosition finishingPositionP1() {
+        return SessionFinishingPosition.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX)
+                .finishingPosition(1)
+                .build();
+    }
+
+    public static SessionFinishingPosition finishingPositionP2() {
+        return SessionFinishingPosition.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX_1)
+                .finishingPosition(2)
+                .build();
+    }
+
+    // --- CarStatusRaw (fuel/ERS by lap) ---
+    /** CarStatusRaw at given timestamp with fuel and ERS (for fuel-by-lap / ers-by-lap tests). */
+    public static CarStatusRaw carStatusRaw(Instant ts, int frameId, Float fuelKg, Float ersStoreEnergy) {
+        return CarStatusRaw.builder()
+                .ts(ts)
+                .sessionUid(SESSION_UID)
+                .frameIdentifier(frameId)
+                .carIndex(CAR_INDEX)
+                .fuelInTank(fuelKg)
+                .ersStoreEnergy(ersStoreEnergy)
+                .build();
+    }
+
+    /** Two laps with endedAt for fuel/ERS-by-lap scenario. */
+    public static java.util.List<Lap> lapsWithEndedAtForFuelErs() {
+        Instant lap1End = Instant.parse("2025-01-15T10:01:27Z");
+        Instant lap2End = Instant.parse("2025-01-15T10:03:00Z");
+        return java.util.List.of(
+                Lap.builder()
+                        .sessionUid(SESSION_UID)
+                        .carIndex(CAR_INDEX)
+                        .lapNumber((short) 1)
+                        .lapTimeMs(87_000)
+                        .endedAt(lap1End)
+                        .isInvalid(false)
+                        .build(),
+                Lap.builder()
+                        .sessionUid(SESSION_UID)
+                        .carIndex(CAR_INDEX)
+                        .lapNumber((short) 2)
+                        .lapTimeMs(93_000)
+                        .endedAt(lap2End)
+                        .isInvalid(false)
+                        .build()
+        );
+    }
+
+    /** CarStatusRaw rows near lap end times for fuel/ERS-by-lap (match lapsWithEndedAtForFuelErs). */
+    public static java.util.List<CarStatusRaw> carStatusRawForFuelErsByLap() {
+        Instant lap1End = Instant.parse("2025-01-15T10:01:27Z");
+        Instant lap2End = Instant.parse("2025-01-15T10:03:00Z");
+        return java.util.List.of(
+                carStatusRaw(lap1End, 1001, FUEL_AT_LAP_1_END, ERS_STORE_AT_LAP_1_END),
+                carStatusRaw(lap2End, 1002, FUEL_AT_LAP_2_END, ERS_STORE_AT_LAP_2_END)
+        );
     }
 
     // --- CarTelemetryRaw ---
@@ -193,6 +338,11 @@ public final class TestData {
     }
 
     // --- TyreWearPerLap ---
+    /** F1 25 compound 18 (e.g. C3 medium). */
+    public static final short COMPOUND_18 = 18;
+    /** F1 25 compound 16 (e.g. C5 soft). */
+    public static final short COMPOUND_16 = 16;
+
     public static TyreWearPerLap tyreWearPerLap() {
         return TyreWearPerLap.builder()
                 .sessionUid(SESSION_UID)
@@ -202,12 +352,110 @@ public final class TestData {
                 .wearFR(WEAR_FR)
                 .wearRL(WEAR_RL)
                 .wearRR(WEAR_RR)
-                .compound((short) 18)
+                .compound(COMPOUND_18)
                 .build();
+    }
+
+    /** Tyre wear for lap 1 (compound 18) and lap 2 (compound 16) — one pit stop between them. */
+    public static java.util.List<TyreWearPerLap> tyreWearTwoLapsOnePit() {
+        return java.util.List.of(
+                TyreWearPerLap.builder()
+                        .sessionUid(SESSION_UID)
+                        .carIndex(CAR_INDEX)
+                        .lapNumber((short) 1)
+                        .wearFL(0.02f)
+                        .wearFR(0.02f)
+                        .wearRL(0.03f)
+                        .wearRR(0.03f)
+                        .compound(COMPOUND_18)
+                        .build(),
+                TyreWearPerLap.builder()
+                        .sessionUid(SESSION_UID)
+                        .carIndex(CAR_INDEX)
+                        .lapNumber((short) 2)
+                        .wearFL(0.01f)
+                        .wearFR(0.01f)
+                        .wearRL(0.01f)
+                        .wearRR(0.01f)
+                        .compound(COMPOUND_16)
+                        .build()
+        );
+    }
+
+    /** Stint scenario: laps 1–5 compound 18, laps 6–10 compound 16 (two stints). */
+    public static java.util.List<TyreWearPerLap> tyreWearTwoStints() {
+        java.util.List<TyreWearPerLap> list = new java.util.ArrayList<>();
+        for (int lap = 1; lap <= 5; lap++) {
+            list.add(TyreWearPerLap.builder()
+                    .sessionUid(SESSION_UID)
+                    .carIndex(CAR_INDEX)
+                    .lapNumber((short) lap)
+                    .wearFL(0.02f)
+                    .wearFR(0.02f)
+                    .wearRL(0.03f)
+                    .wearRR(0.03f)
+                    .compound(COMPOUND_18)
+                    .build());
+        }
+        for (int lap = 6; lap <= 10; lap++) {
+            list.add(TyreWearPerLap.builder()
+                    .sessionUid(SESSION_UID)
+                    .carIndex(CAR_INDEX)
+                    .lapNumber((short) lap)
+                    .wearFL(0.01f)
+                    .wearFR(0.01f)
+                    .wearRL(0.01f)
+                    .wearRR(0.01f)
+                    .compound(COMPOUND_16)
+                    .build());
+        }
+        return list;
     }
 
     // --- TyreWearSnapshot ---
     public static TyreWearSnapshot tyreWearSnapshot() {
         return new TyreWearSnapshot(WEAR_FL, WEAR_FR, WEAR_RL, WEAR_RR);
+    }
+
+    // --- SessionDriver ---
+    public static SessionDriver sessionDriver() {
+        return SessionDriver.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX)
+                .driverLabel("VER")
+                .createdAt(STARTED_AT)
+                .updatedAt(ENDED_AT)
+                .build();
+    }
+
+    // --- SessionEvent ---
+    public static SessionEvent sessionEvent() {
+        return SessionEvent.builder()
+                .id(1L)
+                .sessionUid(SESSION_UID)
+                .frameId(FRAME_ID)
+                .lap((short) 24)
+                .eventCode("FTLP")
+                .carIndex(CAR_INDEX)
+                .detail("{\"vehicleIdx\":0,\"lapTime\":84.532}")
+                .createdAt(RAW_TS)
+                .build();
+    }
+
+    /** Silverstone layout (track_id 8) for Block F — B8. */
+    public static final short TRACK_LAYOUT_TRACK_ID = 8;
+    public static final String TRACK_LAYOUT_POINTS_JSON =
+            "[{\"x\":100.0,\"y\":300.0},{\"x\":250.0,\"y\":100.0},{\"x\":700.0,\"y\":250.0},{\"x\":100.0,\"y\":300.0}]";
+
+    public static TrackLayout trackLayout() {
+        return TrackLayout.builder()
+                .trackId(TRACK_LAYOUT_TRACK_ID)
+                .pointsJson(TRACK_LAYOUT_POINTS_JSON)
+                .version((short) 1)
+                .minX(100.0)
+                .minY(100.0)
+                .maxX(700.0)
+                .maxY(500.0)
+                .build();
     }
 }

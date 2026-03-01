@@ -1,23 +1,31 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ComparisonResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest.UpdateSessionDisplayNameRequest;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.ComparisonQueryService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionExportService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListResult;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionUpdateService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,24 +37,34 @@ class SessionControllerTest {
     private SessionQueryService sessionQueryService;
     @Mock
     private SessionUpdateService sessionUpdateService;
+    @Mock
+    private ComparisonQueryService comparisonQueryService;
+    @Mock
+    private SessionExportService sessionExportService;
 
     @InjectMocks
     private SessionController controller;
 
     @Test
-    @DisplayName("listSessions делегує виклик сервісу")
+    @DisplayName("listSessions делегує виклик сервісу і повертає X-Total-Count")
     void listSessions_delegatesToService() {
         // Arrange
         SessionDto dto = SessionDto.builder().id(SESSION_PUBLIC_ID_STR).build();
-        when(sessionQueryService.listSessions(0, 50)).thenReturn(List.of(dto));
+        when(sessionQueryService.listSessions(any())).thenReturn(new SessionListResult(List.of(dto), 142L));
 
         // Act
-        List<SessionDto> result = controller.listSessions(0, 50);
+        ResponseEntity<List<SessionDto>> response = controller.listSessions(0, 50, null, null, null, null, null, null, null);
 
         // Assert
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getId()).isEqualTo(SESSION_PUBLIC_ID_STR);
-        verify(sessionQueryService).listSessions(0, 50);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).hasSize(1);
+        assertThat(response.getBody().get(0).getId()).isEqualTo(SESSION_PUBLIC_ID_STR);
+        assertThat(response.getHeaders().getFirst(SessionController.HEADER_TOTAL_COUNT)).isEqualTo("142");
+        ArgumentCaptor<com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListFilter> filterCaptor =
+                ArgumentCaptor.forClass(com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListFilter.class);
+        verify(sessionQueryService).listSessions(filterCaptor.capture());
+        assertThat(filterCaptor.getValue().getOffset()).isEqualTo(0);
+        assertThat(filterCaptor.getValue().getLimit()).isEqualTo(50);
     }
 
     @Test
@@ -111,5 +129,79 @@ class SessionControllerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getSessionDisplayName()).isEqualTo("Monaco Race");
         verify(sessionUpdateService).updateDisplayName(SESSION_PUBLIC_ID_STR, "Monaco Race");
+    }
+
+    @Test
+    @DisplayName("getComparison делегує сервісу та повертає 200 з ComparisonResponseDto")
+    void getComparison_delegatesAndReturnsOk() {
+        // Arrange
+        ComparisonResponseDto dto = ComparisonResponseDto.builder()
+                .sessionUid(SESSION_PUBLIC_ID_STR)
+                .carIndexA(0)
+                .carIndexB(1)
+                .referenceLapNumA(3)
+                .referenceLapNumB(5)
+                .build();
+        when(comparisonQueryService.getComparison(SESSION_PUBLIC_ID_STR, 0, 1, null, null)).thenReturn(dto);
+
+        // Act
+        ResponseEntity<ComparisonResponseDto> response = controller.getComparison(
+                SESSION_PUBLIC_ID_STR, 0, 1, null, null);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isSameAs(dto);
+        assertThat(response.getBody().getSessionUid()).isEqualTo(SESSION_PUBLIC_ID_STR);
+        assertThat(response.getBody().getCarIndexA()).isEqualTo(0);
+        assertThat(response.getBody().getCarIndexB()).isEqualTo(1);
+        verify(comparisonQueryService).getComparison(SESSION_PUBLIC_ID_STR, 0, 1, null, null);
+    }
+
+    @Test
+    @DisplayName("getComparison передає referenceLapNumA та referenceLapNumB сервісу")
+    void getComparison_passesReferenceLapParams() {
+        // Arrange
+        ComparisonResponseDto dto = ComparisonResponseDto.builder()
+                .sessionUid(SESSION_PUBLIC_ID_STR)
+                .carIndexA(0)
+                .carIndexB(1)
+                .referenceLapNumA(7)
+                .referenceLapNumB(9)
+                .build();
+        when(comparisonQueryService.getComparison(SESSION_PUBLIC_ID_STR, 0, 1, 7, 9)).thenReturn(dto);
+
+        // Act
+        ResponseEntity<ComparisonResponseDto> response = controller.getComparison(
+                SESSION_PUBLIC_ID_STR, 0, 1, 7, 9);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(comparisonQueryService).getComparison(SESSION_PUBLIC_ID_STR, 0, 1, 7, 9);
+    }
+
+    @Test
+    @DisplayName("exportSession повертає 200 з тілом та Content-Disposition attachment")
+    void exportSession_returnsOkWithBodyAndAttachmentHeader() throws IOException {
+        // Arrange
+        byte[] jsonBody = "{\"session\":{},\"summary\":{},\"laps\":[]}".getBytes();
+        when(sessionExportService.buildExport(eq(SESSION_PUBLIC_ID_STR), eq("json"))).thenReturn(jsonBody);
+
+        // Act
+        ResponseEntity<byte[]> response = controller.exportSession(SESSION_PUBLIC_ID_STR, "json");
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isEqualTo(jsonBody);
+        assertThat(response.getHeaders().getContentDisposition()).isNotNull();
+        assertThat(response.getHeaders().getContentDisposition().getFilename()).isEqualTo("session-" + SESSION_PUBLIC_ID_STR + "-export.json");
+        verify(sessionExportService).buildExport(SESSION_PUBLIC_ID_STR, "json");
+    }
+
+    @Test
+    @DisplayName("exportSession кидає IllegalArgumentException для невалідного format")
+    void exportSession_throwsWhenInvalidFormat() {
+        assertThatThrownBy(() -> controller.exportSession(SESSION_PUBLIC_ID_STR, "xml"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("format must be csv or json");
     }
 }

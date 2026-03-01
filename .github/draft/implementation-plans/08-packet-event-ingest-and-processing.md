@@ -36,7 +36,7 @@ The game sends **Packet Event (packetId = 3)** for **session-wide events** that 
 | **udp-ingest-service** | `EventPacketHandler` parses UDP packet 3 → `EventEvent` → publish to `telemetry.event`. |
 | **telemetry-processing-api-service** | **EventConsumer** reads `telemetry.event`, ensures session and idempotency, calls **EventProcessor**. **EventProcessor** logs DRSD/SCAR/RTMT with enum display names; can be extended to update session runtime state or persist to DB. |
 | **Plan 12 (DRS/ERS fix)** | On **DRSD** event: set “DRS disabled reason” in session state (or Live snapshot) and expose to UI (e.g. “DRS disabled: Wet track”). Use **DrsDisabledReason** enum for display. |
-| **Future** | Optional: **session_events** table (event_code, session_uid, frame_id, detail JSON) for event history; REST `GET /api/sessions/{uid}/events`; Live WebSocket could push DRS disabled / Safety car to the client. |
+| **Block E** | **session_events** table and REST `GET /api/sessions/{uid}/events` implemented in Block E (Live leaderboard and events). EventProcessor persists all events with lap resolution and detail JSON. |
 
 When adding new consumers or UI that need “why DRS is off” or “safety car status”, use **EventConsumer** output (EventProcessor) or read from session state that EventProcessor updates. Do not duplicate Event parsing in other services.
 

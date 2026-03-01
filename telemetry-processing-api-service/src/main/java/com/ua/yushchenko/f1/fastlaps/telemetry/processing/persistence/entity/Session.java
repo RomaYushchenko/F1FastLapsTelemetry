@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -80,6 +82,24 @@ public class Session {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * Read-only association for JPA criteria joins (e.g. sort by finishing position).
+     * Do not use for lazy loading; only for query building in SessionListSpecification.
+     */
+    @OneToMany(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_uid", referencedColumnName = "session_uid", insertable = false, updatable = false)
+    @Builder.Default
+    private List<SessionFinishingPosition> finishingPositions = new ArrayList<>();
+
+    /**
+     * Read-only association for JPA criteria joins (e.g. sort by best lap).
+     * Do not use for lazy loading; only for query building in SessionListSpecification.
+     */
+    @OneToMany(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_uid", referencedColumnName = "session_uid", insertable = false, updatable = false)
+    @Builder.Default
+    private List<SessionSummary> summaries = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {

@@ -13,6 +13,8 @@
 
 #### A.1 Summary: додати lapNumber для best секторів (S1/S2/S3)
 
+**Note (Block J):** Current UI is f1-telemetry-web-platform; old ui/ removed. Paths like ui/src/ refer to f1-telemetry-web-platform/src/app/.
+
 **Документація:**
 - `telemetry_diagrams_plan.md §4.1–4.3`: у summary мають бути **best S1/S2/S3 + номер кола**, на якому цей сектор показаний.
 

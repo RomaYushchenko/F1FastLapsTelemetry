@@ -1,21 +1,31 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionParticipantDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFoundException;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionMapper;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.spec.SessionListSpecification;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionSummaryRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -30,10 +40,12 @@ public class SessionQueryService {
 
     private final SessionRepository sessionRepository;
     private final LapRepository lapRepository;
+    private final SessionSummaryRepository sessionSummaryRepository;
     private final SessionFinishingPositionRepository finishingPositionRepository;
     private final SessionStateManager stateManager;
     private final SessionMapper sessionMapper;
     private final SessionResolveService sessionResolveService;
+    private final SessionSearchResolver sessionSearchResolver;
 
     /**
      * When session has no player_car_index set (e.g. created before we added the column),
@@ -79,14 +91,47 @@ public class SessionQueryService {
     }
 
     /**
-     * List sessions with pagination (most recent first).
+     * List sessions with pagination (most recent first). Delegates to {@link #listSessions(SessionListFilter)}.
      */
     public List<SessionDto> listSessions(int offset, int limit) {
-        log.debug("listSessions: offset={}, limit={}", offset, limit);
-        int size = Math.max(1, Math.min(limit, 100));
-        int page = offset / size;
+        return listSessions(SessionListFilter.builder().offset(offset).limit(limit).build()).getList();
+    }
+
+    /**
+     * List sessions with filters, sort, and pagination. Returns list and total count for X-Total-Count header.
+     * Plan: block-b-session-list-filters.md Step 7.
+     */
+    public SessionListResult listSessions(SessionListFilter filter) {
+        log.debug("listSessions: filter sessionType={}, trackId={}, search={}, sort={}, state={}, dateFrom={}, dateTo={}, offset={}, limit={}",
+                filter.getSessionType(), filter.getTrackId(), filter.getSearch(), filter.getSort(), filter.getState(),
+                filter.getDateFrom(), filter.getDateTo(), filter.getOffset(), filter.getLimit());
+
+        Short explicitSessionType = filter.getSessionType() != null ? filter.getSessionType().shortValue() : null;
+        Integer explicitTrackId = filter.getTrackId();
+
+        String searchTrimmed = filter.getSearch() != null && !filter.getSearch().isBlank() ? filter.getSearch().trim() : null;
+        List<Short> searchTypeCodes = searchTrimmed != null ? sessionSearchResolver.resolveSessionTypeCodes(searchTrimmed) : List.of();
+        List<Integer> searchTrackIds = searchTrimmed != null ? sessionSearchResolver.resolveTrackIds(searchTrimmed) : List.of();
+
+        SessionListSpecification.Resolved resolved = new SessionListSpecification.Resolved(
+                explicitSessionType,
+                explicitTrackId,
+                searchTrimmed,
+                searchTypeCodes,
+                searchTrackIds,
+                filter.getState(),
+                filter.getDateFrom(),
+                filter.getDateTo(),
+                filter.getSort() != null && !filter.getSort().isBlank() ? filter.getSort() : "startedAt_desc"
+        );
+
+        Specification<Session> spec = SessionListSpecification.withFilters(resolved);
+        int size = Math.max(1, Math.min(filter.getLimit(), 100));
+        int page = filter.getOffset() / size;
         Pageable pageable = PageRequest.of(page, size);
-        List<SessionDto> result = sessionRepository.findAllByOrderByCreatedAtDesc(pageable).stream()
+
+        long total = sessionRepository.count(spec);
+        List<SessionDto> list = sessionRepository.findAll(spec, pageable).stream()
                 .map(s -> {
                     SessionDto dto = sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
                     applyInferredPlayerCarIndex(s, dto);
@@ -94,8 +139,9 @@ public class SessionQueryService {
                     return dto;
                 })
                 .collect(Collectors.toList());
-        log.debug("listSessions: returning {} sessions", result.size());
-        return result;
+
+        log.debug("listSessions: returning {} sessions, total={}", list.size(), total);
+        return new SessionListResult(list, total);
     }
 
     /**
@@ -115,6 +161,7 @@ public class SessionQueryService {
         SessionDto dto = sessionMapper.toDto(session, stateManager.get(session.getSessionUid()));
         applyInferredPlayerCarIndex(session, dto);
         applyFinishingPosition(session, dto);
+        dto.setParticipants(loadParticipants(session.getSessionUid()));
         log.debug("getSession: resolved id={}", SessionMapper.toPublicIdString(session));
         return dto;
     }
@@ -139,6 +186,43 @@ public class SessionQueryService {
                     return dto;
                 });
         log.debug("getActiveSession: {}", result.isPresent() ? "present" : "empty");
+        return result;
+    }
+
+    /**
+     * Load participants (car indices with at least one lap or summary) for Driver Comparison.
+     * displayLabel from session_finishing_positions (e.g. "P1") or fallback "Car {carIndex}".
+     * Block G — Driver Comparison.
+     */
+    public List<SessionParticipantDto> loadParticipants(Long sessionUid) {
+        if (sessionUid == null) {
+            return List.of();
+        }
+        Set<Short> carIndices = new TreeSet<>();
+        lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(sessionUid).stream()
+                .map(Lap::getCarIndex)
+                .filter(c -> c != null)
+                .forEach(carIndices::add);
+        sessionSummaryRepository.findBySessionUid(sessionUid).stream()
+                .map(SessionSummary::getCarIndex)
+                .filter(c -> c != null)
+                .forEach(carIndices::add);
+
+        List<SessionFinishingPosition> positions =
+                finishingPositionRepository.findBySessionUidOrderByFinishingPositionAsc(sessionUid);
+        java.util.Map<Short, String> labelByCar = positions.stream()
+                .filter(p -> p.getCarIndex() != null && p.getFinishingPosition() != null)
+                .collect(Collectors.toMap(SessionFinishingPosition::getCarIndex,
+                        p -> "P" + p.getFinishingPosition(), (a, b) -> a));
+
+        List<SessionParticipantDto> result = new ArrayList<>();
+        for (Short carIndex : carIndices) {
+            String displayLabel = labelByCar.getOrDefault(carIndex, "Car " + carIndex);
+            result.add(SessionParticipantDto.builder()
+                    .carIndex(carIndex.intValue())
+                    .displayLabel(displayLabel)
+                    .build());
+        }
         return result;
     }
 

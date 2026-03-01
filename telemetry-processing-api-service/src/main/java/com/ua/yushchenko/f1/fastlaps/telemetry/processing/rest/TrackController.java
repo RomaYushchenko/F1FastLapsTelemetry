@@ -1,7 +1,9 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackCornerMapResponseDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackCornerMapService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -10,8 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Optional;
 
 /**
- * REST controller for track-level endpoints (corner maps).
- * Plan: 13-session-summary-speed-corner-graph.md Phase 3.
+ * REST controller for track-level endpoints (corner maps, 2D layout).
+ * Plan: 13-session-summary-speed-corner-graph.md Phase 3; Block F — B8 layout.
  */
 @Slf4j
 @RestController
@@ -20,6 +22,14 @@ import java.util.Optional;
 public class TrackController {
 
     private final TrackCornerMapService trackCornerMapService;
+    private final TrackLayoutService trackLayoutService;
+
+    @GetMapping("/{trackId}/layout")
+    public ResponseEntity<TrackLayoutResponseDto> getLayout(@PathVariable("trackId") Short trackId) {
+        log.debug("getLayout: trackId={}", trackId);
+        Optional<TrackLayoutResponseDto> dto = trackLayoutService.getLayout(trackId);
+        return dto.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
     @GetMapping("/{trackId}/corner-maps/latest")
     public ResponseEntity<TrackCornerMapResponseDto> getLatestCornerMap(

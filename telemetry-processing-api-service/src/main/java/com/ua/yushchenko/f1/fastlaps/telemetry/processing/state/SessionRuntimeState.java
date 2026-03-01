@@ -1,14 +1,17 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.state;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.CarPositionDto;
 import lombok.Data;
 
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 /**
  * Runtime state for a single session (thread-safe).
@@ -43,6 +46,9 @@ public class SessionRuntimeState {
 
     /** Last known race position per car (from LapData m_carPosition). Persisted as finishing position on session end. */
     private final Map<Integer, Integer> lastCarPositionByCarIndex = new ConcurrentHashMap<>();
+
+    /** Latest world position (x, z) per car from Motion (B9). Index 0 = worldPosX, 1 = worldPosZ. */
+    private final Map<Integer, float[]> latestWorldPositionByCarIndex = new ConcurrentHashMap<>();
 
     // Snapshot for WebSocket (per carIndex)
     private final Map<Integer, CarSnapshot> snapshots = new ConcurrentHashMap<>();
@@ -169,6 +175,28 @@ public class SessionRuntimeState {
     }
 
     /**
+     * Update latest world position for a car (from Motion packet, B9).
+     */
+    public void updatePosition(int carIndex, float worldPosX, float worldPosZ) {
+        latestWorldPositionByCarIndex.put(carIndex, new float[]{worldPosX, worldPosZ});
+        this.lastSeenAt = Instant.now();
+    }
+
+    /**
+     * Get latest positions for all cars (B9 Live Track Map). Returns list ordered by carIndex.
+     */
+    public List<CarPositionDto> getLatestPositions() {
+        return latestWorldPositionByCarIndex.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> CarPositionDto.builder()
+                        .carIndex(e.getKey())
+                        .worldPosX(e.getValue()[0])
+                        .worldPosZ(e.getValue()[1])
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Get latest snapshot for WebSocket broadcast.
      * Selects by current player car index when set; otherwise by most recent timestamp to avoid
      * undefined map iteration order (e.g. ConcurrentHashMap) when multiple snapshots exist.
@@ -243,5 +271,13 @@ public class SessionRuntimeState {
         /** ERS deploy mode code (0=none, 1=medium, 2=hotlap, 3=overtake); for display name in WS. */
         private Integer ersDeployMode;
         private Instant timestamp;
+        /** Tyre surface temperatures °C, order RL, RR, FL, FR. From CarTelemetry. */
+        private int[] tyresSurfaceTempC;
+        /** Fuel remaining 0–100%. From CarStatus fuelInTank / fuelCapacity. */
+        private Integer fuelRemainingPercent;
+        /** Visual tyre compound (F1 25 code). From CarStatus; used for leaderboard S/M/H display. */
+        private Integer visualTyreCompound;
+        /** Session time in seconds (from packet header). For live UI display. */
+        private Float sessionTimeSeconds;
     }
 }

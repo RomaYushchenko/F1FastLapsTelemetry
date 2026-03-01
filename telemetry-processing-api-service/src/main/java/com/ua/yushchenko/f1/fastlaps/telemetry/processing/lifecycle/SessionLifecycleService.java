@@ -3,6 +3,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionDataDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1SessionType;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1Track;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
@@ -18,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Session lifecycle and FSM transitions.
@@ -39,6 +42,50 @@ public class SessionLifecycleService {
     /** Serializes session persist so only one consumer inserts; others see the row after commit. */
     private final Object sessionCreationLock = new Object();
 
+    private static final DateTimeFormatter DISPLAY_NAME_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+            .withZone(ZoneOffset.UTC);
+    private static final int SESSION_DISPLAY_NAME_MAX_LENGTH = 64;
+
+    /**
+     * Build session display name from track and start time.
+     * Returns null if track is unknown so caller keeps default (UUID).
+     */
+    private static String computeSessionDisplayName(Short trackId, Instant startedAt) {
+        if (trackId == null) {
+            return null;
+        }
+        F1Track track = F1Track.fromId(trackId.intValue());
+        if (track == F1Track.UNKNOWN) {
+            return null;
+        }
+        String trackName = track.getDisplayName();
+        String timePart = startedAt == null ? "" : " – " + DISPLAY_NAME_TIME.format(startedAt);
+        String name = trackName + timePart;
+        return name.length() > SESSION_DISPLAY_NAME_MAX_LENGTH
+                ? name.substring(0, SESSION_DISPLAY_NAME_MAX_LENGTH)
+                : name;
+    }
+
+    /**
+     * If session display name is still the default (UUID), set it to "TrackName – startedAt"
+     * when track is known. Preserves user-edited names (PATCH). Returns true if display name was updated.
+     */
+    private boolean updateDisplayNameWhenStillDefault(Session session) {
+        if (session.getPublicId() == null || session.getSessionDisplayName() == null) {
+            return false;
+        }
+        if (!session.getSessionDisplayName().equals(session.getPublicId().toString())) {
+            return false;
+        }
+        String computed = computeSessionDisplayName(session.getTrackId(), session.getStartedAt());
+        if (computed == null) {
+            return false;
+        }
+        session.setSessionDisplayName(computed);
+        log.debug("Updated session display name: sessionUID={}, displayName={}", session.getSessionUid(), computed);
+        return true;
+    }
+
     /**
      * Handle session started event (SSTA).
      * Transition: INIT → ACTIVE.
@@ -53,15 +100,19 @@ public class SessionLifecycleService {
             state.setStartedAt(Instant.now());
             state.transitionTo(SessionState.ACTIVE);
 
+            Short trackIdShort = event.getTrackId() != null ? event.getTrackId().shortValue() : null;
+            String displayName = computeSessionDisplayName(trackIdShort, state.getStartedAt());
+
             Session session = Session.builder()
                     .sessionUid(sessionUID)
                     .packetFormat((short) 1) // F1 2024/2025 format
                     .gameMajorVersion((short) 1)
                     .gameMinorVersion((short) 0)
                     .sessionType(event.getSessionTypeId() != null ? event.getSessionTypeId().shortValue() : null)
-                    .trackId(event.getTrackId() != null ? event.getTrackId().shortValue() : null)
+                    .trackId(trackIdShort)
                     .totalLaps(event.getTotalLaps() != null ? event.getTotalLaps().shortValue() : null)
                     .startedAt(state.getStartedAt())
+                    .sessionDisplayName(displayName)
                     .build();
             persistSessionUnderLock(session);
         } else {
@@ -138,6 +189,7 @@ public class SessionLifecycleService {
     /**
      * Handle session metadata (SESSION_INFO).
      * Updates session type and track when session was created without SSTA (e.g. implicit start).
+     * When track becomes known, updates display name from default (UUID) to "TrackName – startedAt".
      */
     public void onSessionInfo(long sessionUID, SessionEventDto event) {
         sessionRepository.findById(sessionUID).ifPresent(session -> {
@@ -152,6 +204,9 @@ public class SessionLifecycleService {
             }
             if (session.getTotalLaps() == null && event.getTotalLaps() != null) {
                 session.setTotalLaps(event.getTotalLaps().shortValue());
+                updated = true;
+            }
+            if (updateDisplayNameWhenStillDefault(session)) {
                 updated = true;
             }
             if (updated) {
@@ -209,6 +264,9 @@ public class SessionLifecycleService {
             }
             if (session.getAiDifficulty() == null && dto.getAiDifficulty() != null) {
                 session.setAiDifficulty(dto.getAiDifficulty().shortValue());
+                updated = true;
+            }
+            if (updateDisplayNameWhenStillDefault(session)) {
                 updated = true;
             }
             if (updated) {

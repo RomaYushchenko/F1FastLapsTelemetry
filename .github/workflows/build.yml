@@ -31,24 +31,15 @@ jobs:
           path: telemetry-processing-api-service/target/site/jacoco/
           retention-days: 7
 
-      - name: Set up Node.js 20 for UI
+      - name: Set up Node.js 20 for frontend
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install UI dependencies
-        working-directory: ui
-        run: |
-          rm -rf node_modules
-          npm install
-      - name: Install Rollup Linux binary (npm optional deps workaround)
-        working-directory: ui
-        run: npm install @rollup/rollup-linux-x64-gnu --no-save
+      - name: Install frontend dependencies
+        working-directory: f1-telemetry-web-platform
+        run: npm ci
 
-      - name: Lint UI
-        working-directory: ui
-        run: npm run lint
-
-      - name: Build UI
-        working-directory: ui
+      - name: Build frontend
+        working-directory: f1-telemetry-web-platform
         run: npm run build

@@ -1,8 +1,14 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.websocket;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LeaderboardEntryDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionEventDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsLeaderboardMessage;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsPositionsMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSessionEndedMessage;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSessionEventMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.WsSnapshotMessageBuilder;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.LeaderboardQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionSummaryRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
@@ -13,6 +19,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,13 +35,14 @@ public class LiveDataBroadcaster {
     private final WebSocketSessionManager wsSessionManager;
     private final SessionQueryService sessionQueryService;
     private final SessionSummaryRepository sessionSummaryRepository;
+    private final LeaderboardQueryService leaderboardQueryService;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
-     * Broadcast snapshots every 100ms (10 Hz) for all active sessions with subscribers.
-     * Enriches snapshot with bestLapTimeMs from SessionSummary for delta-to-best display.
+     * Broadcast snapshots every 50ms (20 Hz) for all active sessions with subscribers.
+     * Higher rate reduces perceived lag for speed/throttle/brake. Enriches with bestLapTimeMs for delta.
      */
-    @Scheduled(fixedRate = 100)
+    @Scheduled(fixedRate = 50)
     public void broadcastSnapshots() {
         Map<Long, SessionRuntimeState> activeSessions = sessionStateManager.getAllActive();
 
@@ -72,6 +80,26 @@ public class LiveDataBroadcaster {
             String destination = "/topic/live/" + topicId;
             messagingTemplate.convertAndSend(destination, snapshot);
 
+            // Broadcast leaderboard when data changes (same 20 Hz cycle)
+            List<LeaderboardEntryDto> leaderboardEntries = leaderboardQueryService.buildLeaderboard(sessionUid, state);
+            if (!leaderboardEntries.isEmpty()) {
+                WsLeaderboardMessage leaderboardMsg = WsLeaderboardMessage.builder()
+                        .type(WsLeaderboardMessage.TYPE)
+                        .entries(leaderboardEntries)
+                        .build();
+                messagingTemplate.convertAndSend(destination, leaderboardMsg);
+            }
+
+            // Broadcast live positions for all cars (B9 Live Track Map)
+            var positions = state.getLatestPositions();
+            if (!positions.isEmpty()) {
+                WsPositionsMessage positionsMsg = WsPositionsMessage.builder()
+                        .type(WsPositionsMessage.TYPE)
+                        .positions(positions)
+                        .build();
+                messagingTemplate.convertAndSend(destination, positionsMsg);
+            }
+
             log.trace("Broadcast snapshot for session {}: {} subscribers",
                     sessionUid, wsSessionManager.getSubscriberCount(sessionUid));
         }
@@ -103,5 +131,25 @@ public class LiveDataBroadcaster {
 
         log.info("Sent SESSION_ENDED notification for session {} to {} subscribers (reason: {})",
                 sessionUid, wsSessionManager.getSubscriberCount(sessionUid), reason);
+    }
+
+    /**
+     * Push a new session event to all subscribers of the session (Block E optional 19.10).
+     */
+    public void broadcastNewSessionEvent(Long sessionUid, SessionEventDto dto) {
+        if (!wsSessionManager.hasSubscribers(sessionUid)) {
+            return;
+        }
+        String topicId = sessionQueryService.getTopicIdForSession(sessionUid).orElse(null);
+        if (topicId == null) {
+            return;
+        }
+        WsSessionEventMessage message = WsSessionEventMessage.builder()
+                .type(WsSessionEventMessage.TYPE)
+                .event(dto)
+                .build();
+        String destination = "/topic/live/" + topicId;
+        messagingTemplate.convertAndSend(destination, message);
+        log.debug("Broadcast SESSION_EVENT for session {}: code={}", sessionUid, dto != null ? dto.getEventCode() : null);
     }
 }

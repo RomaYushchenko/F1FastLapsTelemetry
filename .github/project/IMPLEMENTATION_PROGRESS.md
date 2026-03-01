@@ -22,7 +22,7 @@
 | Stage 7: Persistence | ✅ Complete | 100% | 8 files | JPA entities, repositories |
 | Stage 8: REST API | ✅ Complete | 100% | 4 files | Session, lap, summary endpoints |
 | Stage 9: WebSocket | ✅ Complete | 100% | 5 files | STOMP, 10Hz broadcast |
-| Stage 11: React UI | ✅ Complete | 100% | 30+ TSX/TS files | Live dashboard, sessions list/detail, pace & pedal charts |
+| Stage 11: React UI | ✅ Complete | 100% | 30+ TSX/TS files | **UI moved to f1-telemetry-web-platform.** Old `ui/` removed in Block J. Live dashboard, sessions list/detail, pace & pedal charts, Live Overview/Telemetry/Track Map, Strategy View, Driver Comparison, Settings, Export, Diagnostics. |
 | Stage 12: Final Testing | ❌ Not Started | 0% | — | MVP validation |
 | Stage 10: Observability | ❌ Not Started | 0% | — | Після MVP — metrics, health |
 
@@ -311,11 +311,11 @@
 
 **Plan reference:** [telemetry_diagrams_plan.md](telemetry_diagrams_plan.md) — перелік live-віджетів та історичних діаграм, джерела даних, критерії готовності. Детальний опис та макети: **План реалізації діаграм телеметрії EA SPORTS F1 25.pdf**.
 
-**Implemented Components (ui/ module):**
+**Implemented Components (f1-telemetry-web-platform; old ui/ removed in Block J):**
 
 | Step | Component | Data source | Status |
 |------|-----------|-------------|--------|
-| 11.1–11.2 | React project (Vite+TS), routing, API client | — | ✅ Pages `/`, `/sessions`, `/sessions/:sessionUid`; typed REST client |
+| 11.1–11.2 | React project (Vite+TS), routing, API client | — | ✅ Pages `/`, `/app`, `/app/sessions`, `/app/sessions/:id`; typed REST client |
 | 11.3 | WebSocket connection for Live | `/ws/live`, STOMP SUBSCRIBE | ✅ `useLiveTelemetry` hook, session discovery via `GET /api/sessions/active` |
 | 11.4 / 11.4a–e | **Live dashboard: telemetry widgets** | WebSocket SNAPSHOT | ✅ Speed, RPM, Gear, Throttle, Brake, DRS, Current lap/Sector per §3 |
 | 11.5 | Session list | `GET /api/sessions` | ✅ Table with ACTIVE/FINISHED badge, hover/click row behaviour, error/loading/empty states |

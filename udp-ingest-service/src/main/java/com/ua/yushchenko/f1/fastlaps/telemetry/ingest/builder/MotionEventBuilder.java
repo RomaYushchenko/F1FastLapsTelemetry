@@ -16,16 +16,23 @@ public final class MotionEventBuilder {
     }
 
     /**
-     * Build motion event with schema version 1 and producedAt set to now.
+     * Build motion event with schema version 1 and producedAt set to now (player car).
      */
     public static MotionEvent build(PacketHeader header, MotionDto payload) {
+        return build(header, payload, header.getPlayerCarIndex());
+    }
+
+    /**
+     * Build motion event for a specific car index (B9: all 22 cars).
+     */
+    public static MotionEvent build(PacketHeader header, MotionDto payload, int carIndex) {
         return MotionEvent.builder()
                 .schemaVersion(1)
                 .packetId(PacketId.MOTION)
                 .sessionUID(header.getSessionUID())
                 .frameIdentifier((int) header.getFrameIdentifier())
                 .sessionTime(header.getSessionTime())
-                .carIndex(header.getPlayerCarIndex())
+                .carIndex(carIndex)
                 .producedAt(Instant.now())
                 .payload(payload)
                 .build();

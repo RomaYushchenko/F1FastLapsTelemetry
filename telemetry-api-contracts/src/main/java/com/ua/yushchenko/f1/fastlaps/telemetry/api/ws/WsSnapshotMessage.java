@@ -46,4 +46,10 @@ public class WsSnapshotMessage {
     private Boolean ersDeployActive;
     /** ERS deploy mode display name (e.g. "Hotlap", "Overtake"). Plan 11. */
     private String ersDeployModeDisplayName;
+    /** Tyre surface temperatures °C, order RL, RR, FL, FR. From CarTelemetry. Optional. */
+    private int[] tyresSurfaceTempC;
+    /** Fuel remaining 0–100%. From CarStatus fuelInTank / fuelCapacity. Optional. */
+    private Integer fuelRemainingPercent;
+    /** Session time in seconds (from packet header). For live UI. */
+    private Float sessionTimeSeconds;
 }

@@ -5,6 +5,8 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.config.TraceIdFilter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle.SessionLifecycleService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.MotionRawWriter;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -15,7 +17,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Kafka consumer for telemetry.motion topic. Persists motion to motion_raw for corner detection (Phase 4).
+ * Kafka consumer for telemetry.motion topic. Persists motion to motion_raw and updates live positions (B9).
  */
 @Slf4j
 @Component
@@ -25,6 +27,7 @@ public class MotionConsumer {
     private final IdempotencyService idempotencyService;
     private final SessionLifecycleService lifecycleService;
     private final MotionRawWriter motionRawWriter;
+    private final SessionStateManager sessionStateManager;
 
     @KafkaListener(
             topics = "telemetry.motion",
@@ -74,6 +77,11 @@ public class MotionConsumer {
                         payload.getWorldPositionX(),
                         payload.getWorldPositionZ()
                 );
+                // Update live positions for B9 (Live Track Map)
+                SessionRuntimeState state = sessionStateManager.get(sessionUid);
+                if (state != null) {
+                    state.updatePosition(carIndex, payload.getWorldPositionX(), payload.getWorldPositionZ());
+                }
             }
 
             acknowledgment.acknowledge();

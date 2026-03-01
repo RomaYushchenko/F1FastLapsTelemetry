@@ -21,7 +21,8 @@ f1:
         initial-backoff-ms: 100
       throttle:
         enabled: true
-        permits-per-second: 100
+        # Higher rate reduces lag; F1 can send 20–60 packets/s per packet type across multiple types.
+        permits-per-second: 250
 
 logging:
   level:

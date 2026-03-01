@@ -57,7 +57,10 @@ public class CarTelemetryProcessor {
         snapshot.setThrottle(telemetry.getThrottle());
         snapshot.setBrake(telemetry.getBrake());
         snapshot.setDrs(DrsState.fromCode(telemetry.getDrs()) == DrsState.ON);
+        int[] tyreTemps = telemetry.getTyresSurfaceTemperature();
+        snapshot.setTyresSurfaceTempC(tyreTemps != null ? tyreTemps.clone() : null);
         snapshot.setTimestamp(Instant.now());
+        snapshot.setSessionTimeSeconds(sessionTime != 0 ? sessionTime : null);
         state.updateSnapshot(carIndex, snapshot);
 
         if (state.isActive()) {
