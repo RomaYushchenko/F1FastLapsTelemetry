@@ -243,5 +243,9 @@ public class SessionRuntimeState {
         /** ERS deploy mode code (0=none, 1=medium, 2=hotlap, 3=overtake); for display name in WS. */
         private Integer ersDeployMode;
         private Instant timestamp;
+        /** Tyre surface temperatures °C, order RL, RR, FL, FR. From CarTelemetry. */
+        private int[] tyresSurfaceTempC;
+        /** Fuel remaining 0–100%. From CarStatus fuelInTank / fuelCapacity. */
+        private Integer fuelRemainingPercent;
     }
 }

@@ -1,9 +1,14 @@
 import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { TelemetryStat } from "../components/TelemetryStat";
+import { useLiveTelemetry } from "../../ws/useLiveTelemetry";
+import { TYRE_LABELS } from "../../ws/types";
 import { Flag, Clock, CloudRain, AlertTriangle } from "lucide-react";
 
 export default function LiveOverview() {
+  const { snapshot, status } = useLiveTelemetry();
+  const tyres = snapshot?.tyresSurfaceTempC;
+  const fuelPercent = snapshot?.fuelRemainingPercent;
   const leaderboard = [
     { pos: 1, driver: "VER", tyre: "S", gap: "LEAD", lastLap: "1:24.532", sectors: [1, 1, 1] },
     { pos: 2, driver: "HAM", tyre: "M", gap: "+2.134", lastLap: "1:25.012", sectors: [2, 2, 1] },
@@ -26,7 +31,9 @@ export default function LiveOverview() {
           <h1 className="text-3xl font-bold mb-2">Live Overview</h1>
           <p className="text-text-secondary">Real-time session monitoring and analytics</p>
         </div>
-        <StatusBadge variant="active">Live</StatusBadge>
+        <StatusBadge variant={status === "live" ? "active" : status === "error" ? "error" : "warning"}>
+          {status === "live" ? "Live" : status === "waiting" ? "Waiting" : status === "no-data" ? "No Data" : status === "disconnected" ? "Disconnected" : "Error"}
+        </StatusBadge>
       </div>
 
       {/* Session Info */}
@@ -211,17 +218,30 @@ export default function LiveOverview() {
               <div className="pt-4 border-t border-border/50 grid grid-cols-2 gap-4">
                 <TelemetryStat
                   label="ERS"
-                  value="82%"
+                  value={snapshot?.ersEnergyPercent != null ? `${snapshot.ersEnergyPercent}%` : "—"}
                   variant="neutral"
                   size="small"
                 />
                 <TelemetryStat
                   label="Fuel"
-                  value="34%"
-                  variant="warning"
+                  value={fuelPercent != null ? `${fuelPercent}%` : "—"}
+                  variant={fuelPercent != null && fuelPercent < 25 ? "warning" : "neutral"}
                   size="small"
                 />
               </div>
+              {tyres && tyres.length >= 4 && (
+                <div className="pt-4 border-t border-border/50 grid grid-cols-4 gap-2">
+                  {TYRE_LABELS.map((label, i) => (
+                    <TelemetryStat
+                      key={label}
+                      label={label}
+                      value={`${tyres[i]}°C`}
+                      variant="neutral"
+                      size="small"
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </DataCard>
         </div>

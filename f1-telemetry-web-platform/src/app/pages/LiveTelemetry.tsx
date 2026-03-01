@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
+import { useLiveTelemetry } from "../../ws/useLiveTelemetry";
+import { TYRE_LABELS } from "../../ws/types";
 import { Button } from "../components/ui/button";
 import { 
   Select,
@@ -13,11 +15,22 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Pause, Play } from "lucide-react";
 
 export default function LiveTelemetry() {
+  const { snapshot, status } = useLiveTelemetry();
   const [isPaused, setIsPaused] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState("player");
   const [timeRange, setTimeRange] = useState("30");
 
-  // Mock telemetry data
+  const tyreTempData = useMemo(() => {
+    const t = snapshot?.tyresSurfaceTempC;
+    if (t && t.length >= 4) {
+      return TYRE_LABELS.map((tyre, i) => ({ tyre, temp: t[i] as number }));
+    }
+    return TYRE_LABELS.map((tyre) => ({ tyre, temp: null as number | null }));
+  }, [snapshot?.tyresSurfaceTempC]);
+
+  const fuelPercent = snapshot?.fuelRemainingPercent;
+
+  // Mock telemetry data (used for chart history when no rolling buffer)
   const speedData = Array.from({ length: 30 }, (_, i) => ({
     time: i,
     speed: 250 + Math.sin(i / 3) * 50 + Math.random() * 20,
@@ -35,13 +48,6 @@ export default function LiveTelemetry() {
     gear: Math.min(8, Math.max(1, Math.floor(5 + Math.sin(i / 4) * 2))),
   }));
 
-  const tyreTempData = [
-    { tyre: "FL", temp: 98 },
-    { tyre: "FR", temp: 102 },
-    { tyre: "RL", temp: 95 },
-    { tyre: "RR", temp: 99 },
-  ];
-
   const ersData = Array.from({ length: 30 }, (_, i) => ({
     time: i,
     ers: Math.max(0, Math.min(100, 60 - i * 1.5 + Math.random() * 5)),
@@ -55,7 +61,9 @@ export default function LiveTelemetry() {
           <h1 className="text-3xl font-bold mb-2">Live Telemetry</h1>
           <p className="text-text-secondary">Real-time telemetry data visualization</p>
         </div>
-        <StatusBadge variant="active">Live</StatusBadge>
+        <StatusBadge variant={status === "live" ? "active" : status === "error" ? "error" : "warning"}>
+          {status === "live" ? "Live" : status === "waiting" ? "Waiting" : status === "no-data" ? "No Data" : status === "disconnected" ? "Disconnected" : "Error"}
+        </StatusBadge>
       </div>
 
       {/* Controls */}
@@ -240,23 +248,46 @@ export default function LiveTelemetry() {
             {tyreTempData.map((data) => (
               <div key={data.tyre} className="p-4 bg-secondary/30 rounded-lg border border-border">
                 <div className="text-xs text-text-secondary uppercase mb-2">{data.tyre}</div>
-                <div className="text-3xl font-bold font-mono text-[#E10600]">{data.temp}°C</div>
+                <div className="text-3xl font-bold font-mono text-[#E10600]">
+                  {data.temp != null ? `${data.temp}°C` : "—"}
+                </div>
                 <div className="mt-2 h-2 bg-background rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full ${
-                      data.temp > 100 ? 'bg-[#E10600]' : 
-                      data.temp > 90 ? 'bg-[#FACC15]' : 
-                      'bg-[#00FF85]'
-                    }`}
-                    style={{ width: `${Math.min(100, data.temp)}%` }}
-                  />
+                  {data.temp != null && (
+                    <div 
+                      className={`h-full ${
+                        data.temp > 100 ? 'bg-[#E10600]' : 
+                        data.temp > 90 ? 'bg-[#FACC15]' : 
+                        'bg-[#00FF85]'
+                      }`}
+                      style={{ width: `${Math.min(100, data.temp)}%` }}
+                    />
+                  )}
                 </div>
               </div>
             ))}
           </div>
+          {tyreTempData.every((d) => d.temp == null) && (
+            <p className="text-xs text-text-secondary mt-2">Connect to a live session for real-time tyre temperatures.</p>
+          )}
         </DataCard>
 
         <DataCard title="ERS & Fuel">
+          {(snapshot?.ersEnergyPercent != null || fuelPercent != null) && (
+            <div className="flex gap-6 mb-4 pb-4 border-b border-border/50">
+              {snapshot?.ersEnergyPercent != null && (
+                <div>
+                  <div className="text-xs text-text-secondary uppercase">ERS</div>
+                  <div className="text-2xl font-bold font-mono text-[#A855F7]">{snapshot.ersEnergyPercent}%</div>
+                </div>
+              )}
+              {fuelPercent != null && (
+                <div>
+                  <div className="text-xs text-text-secondary uppercase">Fuel</div>
+                  <div className="text-2xl font-bold font-mono text-[#00E5FF]">{fuelPercent}%</div>
+                </div>
+              )}
+            </div>
+          )}
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={ersData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(249,250,251,0.06)" />

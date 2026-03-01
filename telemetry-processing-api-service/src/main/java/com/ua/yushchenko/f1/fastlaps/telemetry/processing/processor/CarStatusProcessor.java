@@ -56,6 +56,13 @@ public class CarStatusProcessor {
         }
         snapshot.setDrsAllowed(Boolean.TRUE.equals(status.getDrsAllowed()));
 
+        if (status.getFuelInTank() != null && status.getFuelCapacity() != null && status.getFuelCapacity() > 0) {
+            float percent = 100f * status.getFuelInTank() / status.getFuelCapacity();
+            snapshot.setFuelRemainingPercent((int) Math.max(0, Math.min(100, Math.round(percent))));
+        } else {
+            snapshot.setFuelRemainingPercent(null);
+        }
+
         if (status.getErsStoreEnergy() != null && ERS_MAX_ENERGY_J > 0) {
             float percent = 100f * status.getErsStoreEnergy() / ERS_MAX_ENERGY_J;
             snapshot.setErsEnergyPercent((int) Math.max(0, Math.min(100, Math.round(percent))));

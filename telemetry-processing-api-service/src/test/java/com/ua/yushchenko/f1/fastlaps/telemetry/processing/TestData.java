@@ -129,6 +129,8 @@ public final class TestData {
         snapshot.setErsEnergyPercent(75);
         snapshot.setErsDeployActive(false);
         snapshot.setErsDeployMode(2); // 2 = Hotlap (plan 11)
+        snapshot.setTyresSurfaceTempC(new int[]{95, 99, 102, 98}); // RL, RR, FL, FR °C
+        snapshot.setFuelRemainingPercent(67);
         snapshot.setTimestamp(RAW_TS);
         return snapshot;
     }

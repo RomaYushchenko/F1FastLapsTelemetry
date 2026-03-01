@@ -43,14 +43,14 @@ Follow [README § Frontend component reusability](README.md#frontend-component-r
 
 ## Checklist (tracking)
 
-- [ ] B1 Contract: snapshot §4.5.1 extended with tyre temps + fuel
-- [ ] B2 WsSnapshotMessage (Java) extended
-- [ ] B3 CarSnapshot / builder input has tyre + fuel
-- [ ] B4 WsSnapshotMessageBuilder maps tyre + fuel
-- [ ] B5 Verify broadcast sends new fields
-- [ ] U1 ws/types.ts extended
-- [ ] U2 Live Overview uses snapshot.tyresSurfaceTempC and fuelRemainingPercent
-- [ ] U3 Live Telemetry Tyre Temperatures and ERS & Fuel from snapshot
+- [x] B1 Contract: snapshot §4.5.1 extended with tyre temps + fuel
+- [x] B2 WsSnapshotMessage (Java) extended
+- [x] B3 CarSnapshot / builder input has tyre + fuel
+- [x] B4 WsSnapshotMessageBuilder maps tyre + fuel
+- [x] B5 Verify broadcast sends new fields (builder fills message; LiveDataBroadcaster unchanged)
+- [x] U1 ws/types.ts extended
+- [x] U2 Live Overview uses snapshot.tyresSurfaceTempC and fuelRemainingPercent
+- [x] U3 Live Telemetry Tyre Temperatures and ERS & Fuel from snapshot
 - [ ] Add git commit with understanding message
 ---
 

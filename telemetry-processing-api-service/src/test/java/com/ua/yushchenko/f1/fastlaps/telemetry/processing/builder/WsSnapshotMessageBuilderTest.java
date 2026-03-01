@@ -50,6 +50,8 @@ class WsSnapshotMessageBuilderTest {
         assertThat(msg.getErsEnergyPercent()).isEqualTo(75);
         assertThat(msg.getErsDeployActive()).isFalse();
         assertThat(msg.getErsDeployModeDisplayName()).isEqualTo("Hotlap");
+        assertThat(msg.getTyresSurfaceTempC()).containsExactly(95, 99, 102, 98);
+        assertThat(msg.getFuelRemainingPercent()).isEqualTo(67);
     }
 
     @Test
@@ -63,5 +65,19 @@ class WsSnapshotMessageBuilderTest {
 
         assertThat(msg).isNotNull();
         assertThat(msg.getDeltaMs()).isNull();
+    }
+
+    @Test
+    @DisplayName("build передає null tyresSurfaceTempC і fuelRemainingPercent коли в snapshot null")
+    void build_mapsNullTyreAndFuel_whenNotSet() {
+        SessionRuntimeState.CarSnapshot snapshot = carSnapshot();
+        snapshot.setTyresSurfaceTempC(null);
+        snapshot.setFuelRemainingPercent(null);
+
+        WsSnapshotMessage msg = WsSnapshotMessageBuilder.build(snapshot);
+
+        assertThat(msg).isNotNull();
+        assertThat(msg.getTyresSurfaceTempC()).isNull();
+        assertThat(msg.getFuelRemainingPercent()).isNull();
     }
 }

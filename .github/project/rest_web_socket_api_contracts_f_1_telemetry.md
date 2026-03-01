@@ -434,7 +434,9 @@ Client sends **sessionId** (string): public_id or session UID as string, so the 
   "bestLapTimeMs": 43100,
   "deltaMs": 2130,
   "ersEnergyPercent": 78,
-  "ersDeployActive": false
+  "ersDeployActive": false,
+  "tyresSurfaceTempC": [95, 99, 102, 98],
+  "fuelRemainingPercent": 67
 }
 ```
 
@@ -445,6 +447,8 @@ Client sends **sessionId** (string): public_id or session UID as string, so the 
 - `deltaMs` (integer, optional): delta to best lap in ms = currentLapTimeMs − bestLapTimeMs. Negative = faster than best; positive = slower. Null if either lap time missing.
 - `ersEnergyPercent` (integer, optional): ERS energy store 0–100%. From CarStatus `m_ersStoreEnergy` (Joules) ÷ ERS max capacity (4 MJ). Null until first car status packet.
 - `ersDeployActive` (boolean, optional): driver using ERS (F1 25 CarStatus `m_ersDeployMode` > 0). Null until first car status packet.
+- `tyresSurfaceTempC` (array of 4 integers, optional): tyre surface temperatures in °C, order **RL, RR, FL, FR**. From CarTelemetry `m_tyresSurfaceTemperature`. Null until first car telemetry packet.
+- `fuelRemainingPercent` (integer, optional): fuel remaining 0–100%. From CarStatus `m_fuelInTank` ÷ `m_fuelCapacity`. Null until first car status packet with valid capacity.
 
 ---
 
