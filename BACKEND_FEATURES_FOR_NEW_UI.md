@@ -75,9 +75,11 @@ This document lists **backend features that are not implemented today** but are 
 | B8 | **Track layout for map** | 2D track outline or centreline (e.g. polyline or simplified geometry) for a given track so the UI can draw the track. | LiveTrackMap: replace static SVG with backend-driven track shape. |
 | B9 | **Live positions of all cars** | Real-time positions (e.g. X,Y or distance/sector) for all cars in the active session. | LiveTrackMap: show all cars on the track. |
 
-**Current backend:** Track corner map exists (`GET /api/tracks/{trackId}/corner-maps/latest`) with corners (start/end/apex distance). No full 2D layout; no Motion (packet 0) in MVP; WebSocket is single-car only.
+**Current backend:** Track corner map exists (`GET /api/tracks/{trackId}/corner-maps/latest`) with corners (start/end/apex distance). No Motion (packet 0) in MVP; WebSocket is single-car only.
 
-**Gap:** No track “layout”/geometry endpoint for 2D map; no multi-car live positions (would require Motion data and/or broadcast).
+**Status: B8 implemented in Block F (Steps 21–22).** See [block-f-live-track-map.md](.github/draft/implementation-plans/new-ui-backend/block-f-live-track-map.md). Backend: `GET /api/tracks/{trackId}/layout` returns 2D points and optional bounds from `telemetry.track_layout` table. New UI: Live Track Map fetches layout when active session exists, draws track from API; driver positions remain mock until B9.
+
+**Gap:** No multi-car live positions (B9; would require Motion data and/or broadcast).
 
 #### B8 — Data source for track drawing (coordinates)
 

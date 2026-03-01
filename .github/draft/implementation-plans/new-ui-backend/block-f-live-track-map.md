@@ -120,31 +120,31 @@ Use this checklist to track progress. Mark `[ ]` as `[x]` when done.
 
 ### Step 21 — Backend B8 Track layout
 
-- [ ] **21.1** — REST contract: new § GET /api/tracks/{trackId}/layout, response with points + optional bounds, 404
-- [ ] **21.2** — DTO: TrackLayoutResponseDto (trackId, points, bounds optional)
-- [ ] **21.3** — DB migration: table telemetry.track_layout (track_id, points JSONB, optional version)
-- [ ] **21.4** — Data import: populate track_layout from source files for at least one track
-- [ ] **21.5** — TrackLayoutService: getLayout(trackId), query repo, map to DTO, logging
-- [ ] **21.6** — TrackController: GET /{trackId}/layout, 200/404
-- [ ] **21.7** — Unit tests: TrackLayoutService, MockMvc controller; 85% coverage
-- [ ] **21.8** — BACKEND_FEATURES_FOR_NEW_UI.md B8 implemented; optional telemetry_processing_api_service.md
+- [x] **21.1** — REST contract: new § GET /api/tracks/{trackId}/layout, response with points + optional bounds, 404
+- [x] **21.2** — DTO: TrackLayoutResponseDto (trackId, points, bounds optional)
+- [x] **21.3** — DB migration: table telemetry.track_layout (track_id, points JSONB, optional version)
+- [x] **21.4** — Data import: populate track_layout from source files for at least one track
+- [x] **21.5** — TrackLayoutService: getLayout(trackId), query repo, map to DTO, logging
+- [x] **21.6** — TrackController: GET /{trackId}/layout, 200/404
+- [x] **21.7** — Unit tests: TrackLayoutService, MockMvc controller; 85% coverage
+- [x] **21.8** — BACKEND_FEATURES_FOR_NEW_UI.md B8 implemented; optional telemetry_processing_api_service.md
 
 ### Step 22 — New UI Live Track Map
 
-- [ ] **22.1** — api/types.ts: TrackLayoutResponseDto (trackId, points, bounds?)
-- [ ] **22.2** — api/client: getTrackLayout(trackId), error/404 handling
-- [ ] **22.3** — LiveTrackMap: getActiveSession, "No active session" state when no session
-- [ ] **22.4** — LiveTrackMap: fetch layout; on 404 show "Track layout not available" (inline)
-- [ ] **22.5** — LiveTrackMap: draw track from points; use bounds from API when present for viewBox
-- [ ] **22.6** — Sector/start: keep static markers (Option B)
-- [ ] **22.7** — Card title: getTrackName(trackId) or session display name
-- [ ] **22.8** — Driver positions: remain mock (no B9)
-- [ ] **22.9** — Connection/lap from Block C unchanged
+- [x] **22.1** — api/types.ts: TrackLayoutResponseDto (trackId, points, bounds?)
+- [x] **22.2** — api/client: getTrackLayout(trackId), error/404 handling
+- [x] **22.3** — LiveTrackMap: getActiveSession, "No active session" state when no session
+- [x] **22.4** — LiveTrackMap: fetch layout; on 404 show "Track layout not available" (inline)
+- [x] **22.5** — LiveTrackMap: draw track from points; use bounds from API when present for viewBox
+- [x] **22.6** — Sector/start: keep static markers (Option B)
+- [x] **22.7** — Card title: getTrackName(trackId) or session display name
+- [x] **22.8** — Driver positions: remain mock (no B9)
+- [x] **22.9** — Connection/lap from Block C unchanged
 
 ### Step 23 — Documentation
 
-- [ ] REST contract: Track layout § added
-- [ ] BACKEND_FEATURES_FOR_NEW_UI.md: B8 marked implemented
+- [x] REST contract: Track layout § added
+- [x] BACKEND_FEATURES_FOR_NEW_UI.md: B8 marked implemented
 
 ### Step 24 — Git Commit
 - [ ] Add git commit with understanding message

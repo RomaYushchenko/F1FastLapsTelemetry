@@ -6,6 +6,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TyreWearPerLap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TyreWearSnapshot;
@@ -331,6 +332,23 @@ public final class TestData {
                 .carIndex(CAR_INDEX)
                 .detail("{\"vehicleIdx\":0,\"lapTime\":84.532}")
                 .createdAt(RAW_TS)
+                .build();
+    }
+
+    /** Silverstone layout (track_id 8) for Block F — B8. */
+    public static final short TRACK_LAYOUT_TRACK_ID = 8;
+    public static final String TRACK_LAYOUT_POINTS_JSON =
+            "[{\"x\":100.0,\"y\":300.0},{\"x\":250.0,\"y\":100.0},{\"x\":700.0,\"y\":250.0},{\"x\":100.0,\"y\":300.0}]";
+
+    public static TrackLayout trackLayout() {
+        return TrackLayout.builder()
+                .trackId(TRACK_LAYOUT_TRACK_ID)
+                .pointsJson(TRACK_LAYOUT_POINTS_JSON)
+                .version((short) 1)
+                .minX(100.0)
+                .minY(100.0)
+                .maxX(700.0)
+                .maxY(500.0)
                 .build();
     }
 }

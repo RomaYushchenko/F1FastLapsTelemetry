@@ -19,6 +19,7 @@ import type {
   SessionSummary,
   SpeedTracePoint,
   StintDto,
+  TrackLayoutResponseDto,
   TyreWearPoint,
 } from './types'
 
@@ -318,4 +319,33 @@ export async function getSessionEvents(
   return requestJson<SessionEventDto[]>(
     `/api/sessions/${encodeURIComponent(sessionId)}/events${q}`
   )
+}
+
+/** GET /api/tracks/{trackId}/layout — 2D track map; 404 → null (layout not available). */
+export async function getTrackLayout(
+  trackId: number,
+  options?: RequestOptions
+): Promise<TrackLayoutResponseDto | null> {
+  const url = `${API_BASE_URL}/api/tracks/${trackId}/layout`
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options?.headers ?? {}),
+    },
+  })
+  if (response.status === 404) return null
+  if (response.ok) {
+    return (await response.json()) as TrackLayoutResponseDto
+  }
+  const body = await parseJsonOrNull(response)
+  const message =
+    (body &&
+    typeof body === 'object' &&
+    'message' in body &&
+    typeof (body as ApiErrorBody).message === 'string'
+      ? (body as ApiErrorBody).message
+      : `Request to /api/tracks/${trackId}/layout failed with status ${response.status}`) ?? ''
+  notify.error(message)
+  throw new HttpError(response.status, message, body ?? undefined)
 }

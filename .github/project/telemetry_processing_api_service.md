@@ -92,6 +92,8 @@ telemetry-processing-api-service
     │   ├── SessionQueryService.java
     │   ├── LapQueryService.java
     │   ├── SessionSummaryQueryService.java
+    │   ├── TrackCornerMapService.java
+    │   ├── TrackLayoutService.java
     │   └── WebSocketSubscriptionService.java
     ├── mapper
     │   ├── SessionMapper.java
@@ -103,6 +105,7 @@ telemetry-processing-api-service
     │   ├── SessionController.java
     │   ├── LapController.java
     │   ├── SessionSummaryController.java
+    │   ├── TrackController.java
     │   └── RestExceptionHandler.java
     └── websocket
         ├── WebSocketConfig.java
@@ -122,6 +125,9 @@ telemetry-processing-api-service
 - **SessionQueryService** — список сесій (пагінація), сесія по id, активна сесія. Використовує SessionRepository, SessionStateManager, SessionMapper, SessionResolveService.
 - **LapQueryService** — getLaps, getPace, getTyreWear, getLapTrace (resolve сесії → репозиторії → маппери).
 - **SessionSummaryQueryService** — summary по session id + carIndex.
+- **TrackCornerMapService** — corner map по trackId + trackLengthM (GET corner-maps/latest).
+- **TrackLayoutService** — 2D track layout по trackId (GET /api/tracks/{trackId}/layout); Block F B8.
+- **TrackController** — GET /{trackId}/layout, GET /{trackId}/corner-maps/latest.
 - **RestExceptionHandler** — обробка SessionNotFoundException → 404 + RestErrorResponse.
 
 ### 4.2 WebSocket

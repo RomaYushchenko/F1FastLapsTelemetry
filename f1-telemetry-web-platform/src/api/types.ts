@@ -153,3 +153,22 @@ export interface SessionEventDto {
   detail: Record<string, unknown> | null
   createdAt: string
 }
+
+/** GET /api/tracks/{trackId}/layout — 2D track map points and optional bounds */
+export interface TrackLayoutPoint {
+  x: number
+  y: number
+}
+
+export interface TrackLayoutBounds {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+export interface TrackLayoutResponseDto {
+  trackId: number
+  points: TrackLayoutPoint[]
+  bounds?: TrackLayoutBounds
+}
