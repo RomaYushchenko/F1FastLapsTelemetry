@@ -10,7 +10,7 @@ The new UI is a **React SPA** built with:
 - **Components:** Radix UI primitives + Shadcn-style wrappers in `src/app/components/ui/`
 - **Charts:** Recharts (LineChart, BarChart, etc.)
 - **State:** Local component state only; no global store (Redux/Zustand)
-- **Data:** Session History and Session Details use the **REST API** (see §5). Live Overview and Live Telemetry use **WebSocket** (SockJS/STOMP) for real-time snapshot data (see §5.5). Dashboard uses REST for recent sessions. Driver Comparison, Strategy, etc. still use mock/static data or placeholders.
+- **Data:** Session History and Session Details use the **REST API** (see §5). Live Overview and Live Telemetry use **WebSocket** (SockJS/STOMP) for real-time snapshot data (see §5.5). Dashboard uses REST for recent sessions. **Driver Comparison** uses real API: `getSessions()`, `getSession(sessionUid)` for participants (Driver A/B dropdowns), `getComparison(sessionUid, carIndexA, carIndexB, referenceLapNumA?, referenceLapNumB?)`; default is best lap vs best lap; two lap selectors allow comparing any lap of A vs any lap of B. Strategy View uses REST for pit stops and stints.
 
 Entry flow: `index.html` → `src/main.tsx` → `App.tsx` → `RouterProvider(router)`.
 

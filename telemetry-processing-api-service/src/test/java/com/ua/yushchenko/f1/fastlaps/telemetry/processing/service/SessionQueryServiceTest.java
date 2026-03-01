@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionParticipantDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFoundException;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
@@ -8,6 +9,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionSummaryRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListFilter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListResult;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
@@ -46,6 +48,8 @@ class SessionQueryServiceTest {
     private SessionRepository sessionRepository;
     @Mock
     private LapRepository lapRepository;
+    @Mock
+    private SessionSummaryRepository sessionSummaryRepository;
     @Mock
     private SessionFinishingPositionRepository finishingPositionRepository;
     @Mock
@@ -110,6 +114,8 @@ class SessionQueryServiceTest {
         when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
         when(stateManager.get(SESSION_UID)).thenReturn(state);
         when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
+        when(sessionSummaryRepository.findBySessionUid(SESSION_UID)).thenReturn(Collections.emptyList());
+        when(finishingPositionRepository.findBySessionUidOrderByFinishingPositionAsc(SESSION_UID)).thenReturn(Collections.emptyList());
 
         // Act
         SessionDto dto = service.getSession(SESSION_PUBLIC_ID_STR);
@@ -232,11 +238,57 @@ class SessionQueryServiceTest {
         when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
         when(stateManager.get(SESSION_UID)).thenReturn(runtimeStateActive());
         when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(SESSION_UID)).thenReturn(List.of(lap));
+        when(sessionSummaryRepository.findBySessionUid(SESSION_UID)).thenReturn(Collections.emptyList());
+        when(finishingPositionRepository.findBySessionUidOrderByFinishingPositionAsc(SESSION_UID)).thenReturn(Collections.emptyList());
 
         // Act
         SessionDto dto = service.getSession(SESSION_PUBLIC_ID_STR);
 
         // Assert: UI will use this to request laps/summary for car 5
         assertThat(dto.getPlayerCarIndex()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("loadParticipants повертає учасників з displayLabel з finishing positions")
+    void loadParticipants_returnsParticipantsWithDisplayLabel_whenLapsAndPositionsExist() {
+        // Arrange
+        when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(SESSION_UID))
+                .thenReturn(List.of(lap(), lapCar1()));
+        when(sessionSummaryRepository.findBySessionUid(SESSION_UID))
+                .thenReturn(List.of(sessionSummary(), sessionSummaryCar1()));
+        when(finishingPositionRepository.findBySessionUidOrderByFinishingPositionAsc(SESSION_UID))
+                .thenReturn(List.of(finishingPositionP1(), finishingPositionP2()));
+
+        // Act
+        List<SessionParticipantDto> result = service.loadParticipants(SESSION_UID);
+
+        // Assert
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getCarIndex()).isEqualTo(0);
+        assertThat(result.get(0).getDisplayLabel()).isEqualTo("P1");
+        assertThat(result.get(1).getCarIndex()).isEqualTo(1);
+        assertThat(result.get(1).getDisplayLabel()).isEqualTo("P2");
+    }
+
+    @Test
+    @DisplayName("getSession повертає DTO з participants")
+    void getSession_returnsDtoWithParticipants() {
+        // Arrange
+        Session session = session();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(stateManager.get(SESSION_UID)).thenReturn(runtimeStateActive());
+        when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(SESSION_UID)).thenReturn(List.of(lap()));
+        when(sessionSummaryRepository.findBySessionUid(SESSION_UID)).thenReturn(List.of(sessionSummary()));
+        when(finishingPositionRepository.findBySessionUidOrderByFinishingPositionAsc(SESSION_UID))
+                .thenReturn(List.of(finishingPositionP1()));
+
+        // Act
+        SessionDto dto = service.getSession(SESSION_PUBLIC_ID_STR);
+
+        // Assert
+        assertThat(dto.getParticipants()).isNotNull();
+        assertThat(dto.getParticipants()).hasSize(1);
+        assertThat(dto.getParticipants().get(0).getCarIndex()).isEqualTo(0);
+        assertThat(dto.getParticipants().get(0).getDisplayLabel()).isEqualTo("P1");
     }
 }

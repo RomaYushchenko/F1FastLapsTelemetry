@@ -22,6 +22,33 @@ export interface Session {
   bestLapTimeMs?: number | null
   /** Optional from list when backend adds it. */
   totalTimeMs?: number | null
+  /** Participants (car indices with data) for Driver Comparison. From GET /api/sessions/{id}. */
+  participants?: SessionParticipantDto[] | null
+}
+
+/** Session participant for Driver A/B dropdowns (GET /api/sessions/{id}.participants). */
+export interface SessionParticipantDto {
+  carIndex: number
+  displayLabel?: string | null
+}
+
+/** GET /api/sessions/{sessionUid}/comparison — Driver Comparison response. */
+export interface ComparisonResponseDto {
+  sessionUid: string
+  carIndexA: number
+  carIndexB: number
+  lapsA: Lap[]
+  lapsB: Lap[]
+  summaryA: SessionSummary
+  summaryB: SessionSummary
+  paceA: PacePoint[]
+  paceB: PacePoint[]
+  referenceLapNumA: number
+  referenceLapNumB: number
+  traceA: PedalTracePoint[]
+  traceB: PedalTracePoint[]
+  speedTraceA: SpeedTracePoint[]
+  speedTraceB: SpeedTracePoint[]
 }
 
 export type SessionState = 'ACTIVE' | 'FINISHED'

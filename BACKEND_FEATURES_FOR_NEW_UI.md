@@ -98,9 +98,7 @@ Coordinates for drawing the track will be provided separately (e.g. a file or se
 |----|---------|-------------|--------------|
 | B10 | **Comparison endpoint (optional)** | Single endpoint that returns comparison data for two cars in one session (e.g. lap times, sector deltas, speed/trace overlay) to avoid multiple round-trips. | DriverComparison: one request instead of two carIndex calls for session/laps/summary/pace/trace/speed-trace. |
 
-**Current backend:** UI can call existing endpoints twice (carIndex=A and carIndex=B). No dedicated comparison API.
-
-**Gap:** Optional; improves performance and simplicity but not strictly required.
+**Status: Implemented in Block G (Steps 23–24).** See [block-g-driver-comparison.md](.github/draft/implementation-plans/new-ui-backend/block-g-driver-comparison.md). Backend: `GET /api/sessions/{sessionUid}/comparison?carIndexA=&carIndexB=&referenceLapNumA=&referenceLapNumB=` (reference params optional; when omitted, server uses best lap from summary for each car). Response: laps, summary, pace, referenceLapNumA/B, traceA/B, speedTraceA/B. **SessionDto.participants:** GET /api/sessions/{id} includes optional `participants` (array of `{ carIndex, displayLabel? }`) — car indices with at least one lap or summary; displayLabel from session_finishing_positions (e.g. "P1") or "Car N". Forward-compatible with future drivers table. New UI: Driver Comparison uses getSessions, getSession(sessionUid) for participants, getComparison for data; best-vs-best by default; optional lap selectors per driver.
 
 ---
 

@@ -5,6 +5,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionEvent;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TyreWearPerLap;
@@ -212,6 +213,57 @@ public final class TestData {
                 .bestSector2Ms(30_400)
                 .bestSector3Ms(28_900)
                 .lastUpdatedAt(ENDED_AT)
+                .build();
+    }
+
+    /** Second car index for comparison tests. */
+    public static final short CAR_INDEX_1 = 1;
+
+    /** Session summary for car index 1 (Block G — comparison). */
+    public static SessionSummary sessionSummaryCar1() {
+        return SessionSummary.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX_1)
+                .totalLaps((short) 10)
+                .bestLapTimeMs(87_500)
+                .bestLapNumber((short) 5)
+                .bestSector1Ms(28_100)
+                .bestSector2Ms(30_600)
+                .bestSector3Ms(28_800)
+                .lastUpdatedAt(ENDED_AT)
+                .build();
+    }
+
+    /** Lap for car 1. */
+    public static Lap lapCar1() {
+        return Lap.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX_1)
+                .lapNumber((short) 1)
+                .lapTimeMs(87_600)
+                .sector1TimeMs(28_200)
+                .sector2TimeMs(30_700)
+                .sector3TimeMs(28_700)
+                .isInvalid(false)
+                .positionAtLapStart(2)
+                .endedAt(LAP_ENDED_AT)
+                .build();
+    }
+
+    /** Session finishing position (P1, P2) for participants displayLabel. */
+    public static SessionFinishingPosition finishingPositionP1() {
+        return SessionFinishingPosition.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX)
+                .finishingPosition(1)
+                .build();
+    }
+
+    public static SessionFinishingPosition finishingPositionP2() {
+        return SessionFinishingPosition.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX_1)
+                .finishingPosition(2)
                 .build();
     }
 

@@ -1,6 +1,8 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ComparisonResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.ComparisonQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListResult;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionUpdateService;
@@ -31,6 +33,8 @@ class SessionControllerTest {
     private SessionQueryService sessionQueryService;
     @Mock
     private SessionUpdateService sessionUpdateService;
+    @Mock
+    private ComparisonQueryService comparisonQueryService;
 
     @InjectMocks
     private SessionController controller;
@@ -119,5 +123,53 @@ class SessionControllerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getSessionDisplayName()).isEqualTo("Monaco Race");
         verify(sessionUpdateService).updateDisplayName(SESSION_PUBLIC_ID_STR, "Monaco Race");
+    }
+
+    @Test
+    @DisplayName("getComparison делегує сервісу та повертає 200 з ComparisonResponseDto")
+    void getComparison_delegatesAndReturnsOk() {
+        // Arrange
+        ComparisonResponseDto dto = ComparisonResponseDto.builder()
+                .sessionUid(SESSION_PUBLIC_ID_STR)
+                .carIndexA(0)
+                .carIndexB(1)
+                .referenceLapNumA(3)
+                .referenceLapNumB(5)
+                .build();
+        when(comparisonQueryService.getComparison(SESSION_PUBLIC_ID_STR, 0, 1, null, null)).thenReturn(dto);
+
+        // Act
+        ResponseEntity<ComparisonResponseDto> response = controller.getComparison(
+                SESSION_PUBLIC_ID_STR, 0, 1, null, null);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isSameAs(dto);
+        assertThat(response.getBody().getSessionUid()).isEqualTo(SESSION_PUBLIC_ID_STR);
+        assertThat(response.getBody().getCarIndexA()).isEqualTo(0);
+        assertThat(response.getBody().getCarIndexB()).isEqualTo(1);
+        verify(comparisonQueryService).getComparison(SESSION_PUBLIC_ID_STR, 0, 1, null, null);
+    }
+
+    @Test
+    @DisplayName("getComparison передає referenceLapNumA та referenceLapNumB сервісу")
+    void getComparison_passesReferenceLapParams() {
+        // Arrange
+        ComparisonResponseDto dto = ComparisonResponseDto.builder()
+                .sessionUid(SESSION_PUBLIC_ID_STR)
+                .carIndexA(0)
+                .carIndexB(1)
+                .referenceLapNumA(7)
+                .referenceLapNumB(9)
+                .build();
+        when(comparisonQueryService.getComparison(SESSION_PUBLIC_ID_STR, 0, 1, 7, 9)).thenReturn(dto);
+
+        // Act
+        ResponseEntity<ComparisonResponseDto> response = controller.getComparison(
+                SESSION_PUBLIC_ID_STR, 0, 1, 7, 9);
+
+        // Assert
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        verify(comparisonQueryService).getComparison(SESSION_PUBLIC_ID_STR, 0, 1, 7, 9);
     }
 }

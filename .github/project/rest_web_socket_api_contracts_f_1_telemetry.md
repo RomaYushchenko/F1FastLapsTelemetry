@@ -89,7 +89,9 @@ X-Total-Count: 142
 GET /api/sessions/{sessionUid}
 ```
 
-Response: SessionDto with `id`, `sessionDisplayName`, `sessionType`, `trackId`, `trackLengthM`, `totalLaps`, `aiDifficulty`, `startedAt`, `endedAt`, `endReason`, `state`, `playerCarIndex`, `finishingPosition` (integer or null).
+Response: SessionDto with `id`, `sessionDisplayName`, `sessionType`, `trackId`, `trackLengthM`, `totalLaps`, `aiDifficulty`, `startedAt`, `endedAt`, `endReason`, `state`, `playerCarIndex`, `finishingPosition` (integer or null), **`participants`** (optional).
+
+**participants** (optional): array of `SessionParticipantDto`. Each item: `carIndex` (number), `displayLabel` (string, optional). Represents car indices that have at least one lap or session summary for this session; used by Driver Comparison to populate Driver A / Driver B dropdowns. `displayLabel` is derived from `session_finishing_positions` (e.g. "P1", "P2") or fallback "Car {carIndex}". Forward-compatible: when a drivers table exists, the same DTO may include `driverId` and `displayLabel` from driver names. Included in **GET /api/sessions/{id}** (session detail); may be omitted in **GET /api/sessions** (list) for performance.
 
 ---
 
@@ -382,6 +384,35 @@ Query params:
 - `carIndex` (int, default 0)
 
 Response: array of StintDto. Each item: `stintIndex` (int), `compound` (Integer, F1 25 code), `startLap` (int), `lapCount` (int), `avgLapTimeMs` (Integer, optional), `degradationIndicator` (optional, "high"|"medium"|"low" or null; UI shows "—" when null). 404 if session not found; 200 and `[]` if no laps. Consecutive laps with same compound form one stint.
+
+---
+
+#### 3.6.3 Comparison (Driver Comparison — два пілоти, кола, trace, speed)
+
+```
+GET /api/sessions/{sessionUid}/comparison?carIndexA=&carIndexB=&referenceLapNumA=&referenceLapNumB=
+```
+
+Query params:
+- `carIndexA` (int, required) — first car index.
+- `carIndexB` (int, required) — second car index.
+- `referenceLapNumA` (int, optional) — lap number used for trace/speed for car A. When omitted, server uses **best lap** from summary A (`summaryA.bestLapNumber`).
+- `referenceLapNumB` (int, optional) — lap number used for trace/speed for car B. When omitted, server uses **best lap** from summary B.
+
+Response: **ComparisonResponseDto** with:
+- `sessionUid` (string, public id), `carIndexA`, `carIndexB`
+- `lapsA`, `lapsB` — arrays of LapResponseDto
+- `summaryA`, `summaryB` — SessionSummaryDto
+- `paceA`, `paceB` — arrays of PacePointDto
+- `referenceLapNumA`, `referenceLapNumB` — lap numbers actually used for trace/speed
+- `traceA`, `traceB` — arrays of TracePointDto (throttle/brake) for the reference laps
+- `speedTraceA`, `speedTraceB` — arrays of SpeedTracePointDto for the reference laps
+
+Errors:
+- **400** if `carIndexA == carIndexB` or car params missing.
+- **404** if session not found or no data for one of the cars (no laps/summary).
+
+Plan: block-g-driver-comparison.md Step 23.
 
 ---
 

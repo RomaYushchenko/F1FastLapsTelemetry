@@ -7,6 +7,7 @@ import { API_BASE_URL } from './config'
 import { HttpError } from './types'
 import type {
   ApiErrorBody,
+  ComparisonResponseDto,
   ErsPoint,
   Lap,
   LapCorner,
@@ -136,6 +137,25 @@ export async function getSessions(params?: GetSessionsParams): Promise<GetSessio
 
 export async function getSession(sessionUid: string | undefined): Promise<Session> {
   return requestJson<Session>(`/api/sessions/${encodeURIComponent(sessionUid!)}`)
+}
+
+/** GET /api/sessions/{sessionUid}/comparison — Driver Comparison (optional referenceLapNumA/B). */
+export async function getComparison(
+  sessionUid: string | undefined,
+  carIndexA: number,
+  carIndexB: number,
+  referenceLapNumA?: number | null,
+  referenceLapNumB?: number | null
+): Promise<ComparisonResponseDto> {
+  const params: Record<string, string | number> = {
+    carIndexA,
+    carIndexB,
+  }
+  if (referenceLapNumA != null) params.referenceLapNumA = referenceLapNumA
+  if (referenceLapNumB != null) params.referenceLapNumB = referenceLapNumB
+  return requestJson<ComparisonResponseDto>(
+    `/api/sessions/${encodeURIComponent(sessionUid!)}/comparison${buildQuery(params)}`
+  )
 }
 
 export async function getSessionLaps(

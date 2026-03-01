@@ -111,35 +111,35 @@ Use this checklist to mark what is done. Update the file as you complete each it
 
 ### Backend (Step 23) — B10 + SessionDto.participants
 
-- [ ] **23.1** — Contract: SessionDto extended with `participants` (§ Session); comparison endpoint and response shape (§ Comparison); referenceLapNumA/B optional, default best lap each
-- [ ] **23.2** — DTO: `SessionParticipantDto`; `SessionDto.participants`; `ComparisonResponseDto` (with referenceLapNumA/B, traceA/B, speedTraceA/B)
-- [ ] **23.3** — Service: participants loaded in session detail (cars with laps/summary; displayLabel from finishing position or fallback); `ComparisonQueryService` (best lap default, optional ref laps)
-- [ ] **23.4** — Mapper: entity/list → comparison DTO; session → participants list
-- [ ] **23.5** — Controller: GET /api/sessions/{id} returns session with participants; GET comparison endpoint, validation, 400/404
-- [ ] **23.6** — Logging: DEBUG entry (including ref lap params); WARN on validation/404
-- [ ] **23.7** — TestData: two-car data; participants list for session
-- [ ] **23.8** — Unit tests: participants in session detail; ComparisonQueryService and controller (default best lap, custom ref laps, 400, 404); 85% coverage
+- [x] **23.1** — Contract: SessionDto extended with `participants` (§ Session); comparison endpoint and response shape (§ Comparison); referenceLapNumA/B optional, default best lap each
+- [x] **23.2** — DTO: `SessionParticipantDto`; `SessionDto.participants`; `ComparisonResponseDto` (with referenceLapNumA/B, traceA/B, speedTraceA/B)
+- [x] **23.3** — Service: participants loaded in session detail (cars with laps/summary; displayLabel from finishing position or fallback); `ComparisonQueryService` (best lap default, optional ref laps)
+- [x] **23.4** — Mapper: entity/list → comparison DTO; session → participants list (participants built in SessionQueryService; comparison DTO built in ComparisonQueryService)
+- [x] **23.5** — Controller: GET /api/sessions/{id} returns session with participants; GET comparison endpoint, validation, 400/404
+- [x] **23.6** — Logging: DEBUG entry (including ref lap params); WARN on validation/404
+- [x] **23.7** — TestData: two-car data; participants list for session
+- [x] **23.8** — Unit tests: participants in session detail; ComparisonQueryService and controller (default best lap, custom ref laps, 400, 404); 85% coverage
 
 ### New UI (Step 24)
 
-- [ ] **24.1** — API: `getComparison(sessionUid, carIndexA, carIndexB, referenceLapNumA?, referenceLapNumB?)` and types; getSession returns participants
-- [ ] **24.2** — Session selector: load list; on select load getSession(sessionUid) for participants
-- [ ] **24.3** — Driver A/B selectors: from `session.participants`, displayLabel or "Car N"
-- [ ] **24.4** — Fetch comparison (initial: no ref-lap params → best vs best); TanStack Query keyed by ref laps
-- [ ] **24.5** — Two lap selectors (Driver A, Driver B); on change refetch with referenceLapNumA/B
-- [ ] **24.6** — Summary cards: real summary A/B
-- [ ] **24.7** — Lap time comparison chart: real laps/pace
-- [ ] **24.8** — Sector delta comparison: real best sectors, deltas
-- [ ] **24.9** — Speed and throttle overlay: from comparison response (traceA/B, speedTraceA/B)
-- [ ] **24.10** — Time delta chart: computed from speedTraceA/B on client
-- [ ] **24.11** — Mocks removed; empty and error states; toasts
+- [x] **24.1** — API: `getComparison(sessionUid, carIndexA, carIndexB, referenceLapNumA?, referenceLapNumB?)` and types; getSession returns participants
+- [x] **24.2** — Session selector: load list; on select load getSession(sessionUid) for participants
+- [x] **24.3** — Driver A/B selectors: from `session.participants`, displayLabel or "Car N"
+- [x] **24.4** — Fetch comparison (initial: no ref-lap params → best vs best); state keyed by ref laps for refetch
+- [x] **24.5** — Two lap selectors (Driver A, Driver B); on change refetch with referenceLapNumA/B
+- [x] **24.6** — Summary cards: real summary A/B
+- [x] **24.7** — Lap time comparison chart: real laps/pace
+- [x] **24.8** — Sector delta comparison: real best sectors, deltas
+- [x] **24.9** — Speed and throttle overlay: from comparison response (traceA/B, speedTraceA/B)
+- [x] **24.10** — Time delta chart: computed from speedTraceA/B on client
+- [x] **24.11** — Mocks removed; empty and error states; toasts
 - [ ] **24.12** — Manual/e2e: session → two drivers → best vs best → change laps → verify charts
 
 ### Step 25 — Documentation
 
-- [ ] Contract updated (Session participants; Comparison §)
-- [ ] BACKEND_FEATURES_FOR_NEW_UI.md updated (B10 done; SessionDto.participants)
-- [ ] NEW_UI_DOCS.md updated (Driver Comparison real data)
+- [x] Contract updated (Session participants; Comparison §)
+- [x] BACKEND_FEATURES_FOR_NEW_UI.md updated (B10 done; SessionDto.participants)
+- [x] NEW_UI_DOCS.md updated (Driver Comparison real data)
 
 ### Step 26 — Git Commit
 - [ ] Add git commit with understanding message

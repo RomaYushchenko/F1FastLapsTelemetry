@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * REST DTO for session (GET /api/sessions, GET /api/sessions/{id}).
@@ -39,4 +40,6 @@ public class SessionDto {
     private Integer playerCarIndex;
     /** Finishing position (race position at session end). Null if session active or no LapData received. */
     private Integer finishingPosition;
+    /** Participants (car indices with data) for Driver Comparison. Included in GET /api/sessions/{id}; may be omitted in list. */
+    private List<SessionParticipantDto> participants;
 }

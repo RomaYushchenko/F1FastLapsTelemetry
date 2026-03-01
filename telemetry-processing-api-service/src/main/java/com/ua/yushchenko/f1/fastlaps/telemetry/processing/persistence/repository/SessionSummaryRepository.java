@@ -5,6 +5,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -18,4 +19,10 @@ public interface SessionSummaryRepository extends JpaRepository<SessionSummary, 
      * Find summary for a specific session and car.
      */
     Optional<SessionSummary> findBySessionUidAndCarIndex(Long sessionUid, Short carIndex);
+
+    /**
+     * Find all summaries for a session (all cars). Used for participants list (cars with data).
+     * Block G — Driver Comparison.
+     */
+    List<SessionSummary> findBySessionUid(Long sessionUid);
 }
