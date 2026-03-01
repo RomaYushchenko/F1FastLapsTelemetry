@@ -374,6 +374,50 @@ Response: array of ErsPointDto — stored energy along the lap (same lap as peda
 
 ---
 
+### 3.8 Live leaderboard (active session)
+
+```
+GET /api/sessions/active/leaderboard
+```
+
+Returns the current leaderboard for the **active** session only (same session as `GET /api/sessions/active`). Source: runtime state (positions from LapData), last completed lap per car from `laps`, compound from CarStatus snapshot, driver label from `session_drivers` (fallback "Car N" if null).
+
+Response: **204 No Content** if there is no active session. Otherwise **200 OK** with body: array of `LeaderboardEntryDto`:
+
+- `position` (integer) — race position (1-based).
+- `carIndex` (integer) — car index (0–19).
+- `driverLabel` (string, optional) — display label (e.g. "VER"); null = UI shows "Car N".
+- `compound` (string) — tyre compound for display: "S", "M", "H", or "—".
+- `gap` (string) — "LEAD" for P1, "+1.234" for others, or "—" if no lap time yet.
+- `lastLapTimeMs` (integer, optional) — last completed lap time in ms.
+- `sector1Ms`, `sector2Ms`, `sector3Ms` (integer, optional) — sector times of last lap.
+
+WebSocket: same payload is sent as message type **LEADERBOARD** on `/topic/live/{sessionId}` when LapData/position/snapshot changes (see § 4.5.3).
+
+---
+
+### 3.9 Session events (timeline)
+
+```
+GET /api/sessions/{sessionUid}/events
+```
+
+Query params:
+- `fromLap` (int, optional) — minimum lap (inclusive).
+- `toLap` (int, optional) — maximum lap (inclusive).
+- `limit` (int, optional) — max number of events to return (default 100, max 500).
+
+Response: array of `SessionEventDto`. Each item:
+- `lap` (integer, optional) — lap number when event occurred; null if unknown.
+- `eventCode` (string) — event code (e.g. "FTLP", "PENA", "SCAR").
+- `carIndex` (integer, optional) — car index when applicable.
+- `detail` (object, optional) — event-specific fields (e.g. FTLP: `lapTime`, `vehicleIdx`; PENA: `penaltyTime`, `penaltyLapNum`).
+- `createdAt` (string) — ISO-8601 timestamp.
+
+Order: by `lap` ascending, then by frame. 404 if session not found; 200 and `[]` if no events.
+
+---
+
 ## 4. WebSocket API
 
 ### 4.1 Endpoint
@@ -490,6 +534,31 @@ Client sends **sessionId** (string): public_id or session UID as string, so the 
 
 - `sessionId` (string): same identifier as in topic (`/topic/live/{sessionId}`) and REST (session public id or UID as string).
 - `endReason` (string): reason code (e.g. EVENT_SEND, NO_DATA_TIMEOUT).
+
+---
+
+#### 4.5.3 Live leaderboard (push)
+
+Sent on `/topic/live/{sessionId}` when leaderboard data changes (LapData, position, or CarStatus snapshot). Same payload shape as `GET /api/sessions/active/leaderboard` (array of LeaderboardEntryDto).
+
+```json
+{
+  "type": "LEADERBOARD",
+  "entries": [
+    {
+      "position": 1,
+      "carIndex": 0,
+      "driverLabel": "VER",
+      "compound": "S",
+      "gap": "LEAD",
+      "lastLapTimeMs": 84432,
+      "sector1Ms": 28100,
+      "sector2Ms": 27900,
+      "sector3Ms": 28432
+    }
+  ]
+}
+```
 
 ---
 

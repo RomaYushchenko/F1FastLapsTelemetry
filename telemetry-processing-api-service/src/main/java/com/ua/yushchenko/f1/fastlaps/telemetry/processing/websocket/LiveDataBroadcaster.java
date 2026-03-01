@@ -1,8 +1,11 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.websocket;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LeaderboardEntryDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsLeaderboardMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSessionEndedMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.WsSnapshotMessageBuilder;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.LeaderboardQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionSummaryRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
@@ -13,6 +16,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,6 +32,7 @@ public class LiveDataBroadcaster {
     private final WebSocketSessionManager wsSessionManager;
     private final SessionQueryService sessionQueryService;
     private final SessionSummaryRepository sessionSummaryRepository;
+    private final LeaderboardQueryService leaderboardQueryService;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
@@ -71,6 +76,16 @@ public class LiveDataBroadcaster {
             }
             String destination = "/topic/live/" + topicId;
             messagingTemplate.convertAndSend(destination, snapshot);
+
+            // Broadcast leaderboard when data changes (same 10 Hz cycle)
+            List<LeaderboardEntryDto> leaderboardEntries = leaderboardQueryService.buildLeaderboard(sessionUid, state);
+            if (!leaderboardEntries.isEmpty()) {
+                WsLeaderboardMessage leaderboardMsg = WsLeaderboardMessage.builder()
+                        .type(WsLeaderboardMessage.TYPE)
+                        .entries(leaderboardEntries)
+                        .build();
+                messagingTemplate.convertAndSend(destination, leaderboardMsg);
+            }
 
             log.trace("Broadcast snapshot for session {}: {} subscribers",
                     sessionUid, wsSessionManager.getSubscriberCount(sessionUid));

@@ -152,51 +152,51 @@ Use this checklist to track progress: replace `[ ]` with `[x]` when an item is d
 
 ### Step 17 — Backend: Live leaderboard
 
-- [ ] 17.1 — Driver (participant) table + repository; resolve driverLabel for leaderboard/events
-- [ ] 17.2 — REST contract GET /api/sessions/active/leaderboard + WebSocket LEADERBOARD message type
-- [ ] 17.3 — LeaderboardEntryDto (position, carIndex, driverLabel, compound, gap, sector times)
-- [ ] 17.4 — LeaderboardQueryService (state + LapRepository + CarStatus snapshots; gap; driver lookup)
-- [ ] 17.5 — LeaderboardController
-- [ ] 17.6 — WebSocket leaderboard push on LapData/position/snapshot change
-- [ ] 17.7 — Unit tests (driver table, service, controller); TestData
-- [ ] 17.8 — Logging (DEBUG/WARN)
+- [x] 17.1 — Driver (participant) table + repository; resolve driverLabel for leaderboard/events
+- [x] 17.2 — REST contract GET /api/sessions/active/leaderboard + WebSocket LEADERBOARD message type
+- [x] 17.3 — LeaderboardEntryDto (position, carIndex, driverLabel, compound, gap, sector times)
+- [x] 17.4 — LeaderboardQueryService (state + LapRepository + CarStatus snapshots; gap; driver lookup)
+- [x] 17.5 — LeaderboardController
+- [x] 17.6 — WebSocket leaderboard push on LapData/position/snapshot change
+- [x] 17.7 — Unit tests (driver table, service, controller); TestData
+- [x] 17.8 — Logging (DEBUG/WARN)
 
 ### Step 18 — New UI: Leaderboard
 
-- [ ] 18.1 — getLeaderboard() in API client
-- [ ] 18.2 — Leaderboard types (driverLabel, compound, etc.)
-- [ ] 18.3 — WebSocket: subscribe to leaderboard updates; update state on LEADERBOARD message
-- [ ] 18.4 — LiveOverview: initial load getLeaderboard() + WS for updates
-- [ ] 18.5 — Replace mock table; show driverLabel (fallback if null), compound, times, sectors, gap
-- [ ] 18.6 — Loading and error states
+- [x] 18.1 — getLeaderboard() in API client
+- [x] 18.2 — Leaderboard types (driverLabel, compound, etc.)
+- [x] 18.3 — WebSocket: subscribe to leaderboard updates; update state on LEADERBOARD message
+- [x] 18.4 — LiveOverview: initial load getLeaderboard() + WS for updates
+- [x] 18.5 — Replace mock table; show driverLabel (fallback if null), compound, times, sectors, gap
+- [x] 18.6 — Loading and error states
 
 ### Step 19 — Backend: Session events
 
-- [ ] 19.1 — DB migration: session_events table
-- [ ] 19.2 — SessionEvent entity
-- [ ] 19.3 — SessionEventRepository (find by session, optional lap range)
-- [ ] 19.4 — Lap resolution for events (from payload or session state)
-- [ ] 19.5 — Persist in EventProcessor (SessionEventWriter or repository call)
-- [ ] 19.6 — REST contract GET /api/sessions/{sessionUid}/events
-- [ ] 19.7 — SessionEventDto (REST) and mapper
-- [ ] 19.8 — SessionEventsController + Service
-- [ ] 19.9 — Unit tests (persistence, repository, controller); TestData
+- [x] 19.1 — DB migration: session_events table
+- [x] 19.2 — SessionEvent entity
+- [x] 19.3 — SessionEventRepository (find by session, optional lap range)
+- [x] 19.4 — Lap resolution for events (from payload or session state)
+- [x] 19.5 — Persist in EventProcessor (SessionEventWriter or repository call)
+- [x] 19.6 — REST contract GET /api/sessions/{sessionUid}/events
+- [x] 19.7 — SessionEventDto (REST) and mapper
+- [x] 19.8 — SessionEventsController + Service
+- [x] 19.9 — Unit tests (persistence, repository, controller); TestData
 - [ ] 19.10 — (Optional) WebSocket push for new events
 
 ### Step 20 — New UI: Event timeline
 
-- [ ] 20.1 — getSessionEvents() in API client
-- [ ] 20.2 — Session event types in frontend
-- [ ] 20.3 — LiveOverview: fetch events for active session
-- [ ] 20.4 — Replace mock event timeline with API data
-- [ ] 20.5 — Format detail per event type (FTLP, PENA, SCAR, …)
-- [ ] 20.6 — Loading and error states
+- [x] 20.1 — getSessionEvents() in API client
+- [x] 20.2 — Session event types in frontend
+- [x] 20.3 — LiveOverview: fetch events for active session
+- [x] 20.4 — Replace mock event timeline with API data
+- [x] 20.5 — Format detail per event type (FTLP, PENA, SCAR, …)
+- [x] 20.6 — Loading and error states
 - [ ] 20.7 — (Optional) WebSocket subscription for new events
 
 ### Step 21 — Documentation and closure
 
-- [ ] Update [rest_web_socket_api_contracts_f_1_telemetry.md](../../../project/rest_web_socket_api_contracts_f_1_telemetry.md) with leaderboard and events endpoints and DTOs
-- [ ] Update [BACKEND_FEATURES_FOR_NEW_UI.md](../../../BACKEND_FEATURES_FOR_NEW_UI.md): mark B2 and B3 as implemented
+- [x] Update [rest_web_socket_api_contracts_f_1_telemetry.md](../../../project/rest_web_socket_api_contracts_f_1_telemetry.md) with leaderboard and events endpoints and DTOs
+- [x] Update [BACKEND_FEATURES_FOR_NEW_UI.md](../../../BACKEND_FEATURES_FOR_NEW_UI.md): mark B2 and B3 as implemented
 - [ ] Update plan 08 (08-packet-event-ingest-and-processing.md) if session_events persistence is added: note “session_events table and REST events endpoint implemented in Block E”
 
 ### Step 22 — Git Commit

@@ -247,5 +247,7 @@ public class SessionRuntimeState {
         private int[] tyresSurfaceTempC;
         /** Fuel remaining 0–100%. From CarStatus fuelInTank / fuelCapacity. */
         private Integer fuelRemainingPercent;
+        /** Visual tyre compound (F1 25 code). From CarStatus; used for leaderboard S/M/H display. */
+        private Integer visualTyreCompound;
     }
 }

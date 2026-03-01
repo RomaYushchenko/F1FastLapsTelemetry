@@ -1,31 +1,107 @@
 import { Link } from "react-router";
+import { useCallback, useEffect, useState } from "react";
 import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { TelemetryStat } from "../components/TelemetryStat";
 import { useLiveTelemetry, TYRE_LABELS } from "@/ws";
 import { getTrackName } from "@/constants/tracks";
 import { formatLapTime } from "@/api/format";
+import { getSessionEvents } from "@/api/client";
+import type { SessionEventDto } from "@/api/types";
 import { Flag, Clock, CloudRain, AlertTriangle } from "lucide-react";
 
+function eventCodeToLabel(code: string): string {
+  const map: Record<string, string> = {
+    FTLP: "Fastest Lap",
+    PENA: "Penalty",
+    SPTP: "Speed Trap",
+    SSTA: "Session Started",
+    SEND: "Session Ended",
+    RTMT: "Retirement",
+    DRSD: "DRS Disabled",
+    SCAR: "Safety Car",
+    DTS: "Drive Through Served",
+    SGS: "Stop Go Served",
+  };
+  return map[code] ?? code;
+}
+
+function formatEventDetail(event: SessionEventDto): string {
+  const d = event.detail;
+  if (!d || typeof d !== "object") return "";
+  if (event.eventCode === "FTLP" && typeof d.lapTime === "number") {
+    const sec = Math.floor(d.lapTime);
+    const ms = Math.round((d.lapTime - sec) * 1000);
+    return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
+  }
+  if (event.eventCode === "PENA" && d.penaltyTime != null) return `${d.penaltyTime}s Time Penalty`;
+  if (event.eventCode === "SCAR") return "Safety car";
+  return Object.entries(d).map(([k, v]) => `${k}: ${v}`).join(", ") || "";
+}
+
+function EventTimelineRow({ event }: { event: SessionEventDto }) {
+  const isPenalty = event.eventCode === "PENA";
+  const isSc = event.eventCode === "SCAR";
+  const timeStr = event.lap != null ? `Lap ${event.lap}` : "—";
+  const detailStr = formatEventDetail(event);
+  const driverStr = event.carIndex != null ? `Car ${event.carIndex}` : "";
+
+  return (
+    <div
+      className={`flex items-start gap-4 p-3 rounded-lg border transition-all ${
+        isPenalty ? "border-[#E10600]/50 bg-[#E10600]/10" : isSc ? "border-[#FACC15]/50 bg-[#FACC15]/10" : "border-border/30 bg-secondary/20"
+      }`}
+    >
+      <div className="flex-shrink-0 w-16 text-xs text-text-secondary font-mono">{timeStr}</div>
+      <div className="flex-shrink-0">
+        {isPenalty ? (
+          <div className="w-8 h-8 bg-[#E10600]/20 rounded-lg flex items-center justify-center">
+            <AlertTriangle className="w-4 h-4 text-[#E10600]" />
+          </div>
+        ) : isSc ? (
+          <div className="w-8 h-8 bg-[#FACC15]/20 rounded-lg flex items-center justify-center">
+            <Flag className="w-4 h-4 text-[#FACC15]" />
+          </div>
+        ) : (
+          <div className="w-8 h-8 bg-[#00E5FF]/20 rounded-lg flex items-center justify-center text-xs font-bold text-[#00E5FF]">🏁</div>
+        )}
+      </div>
+      <div className="flex-1">
+        <div className="font-semibold">{eventCodeToLabel(event.eventCode)}</div>
+        <div className="text-sm text-text-secondary">
+          {driverStr && <span className="font-bold">{driverStr}</span>}
+          {driverStr && detailStr && " • "}
+          {detailStr}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LiveOverview() {
-  const { session, snapshot, status } = useLiveTelemetry();
+  const { session, snapshot, status, leaderboard } = useLiveTelemetry();
   const noActiveSession = status === "no-data" || session == null;
   const tyres = snapshot?.tyresSurfaceTempC;
   const fuelPercent = snapshot?.fuelRemainingPercent;
-  const leaderboard = [
-    { pos: 1, driver: "VER", tyre: "S", gap: "LEAD", lastLap: "1:24.532", sectors: [1, 1, 1] },
-    { pos: 2, driver: "HAM", tyre: "M", gap: "+2.134", lastLap: "1:25.012", sectors: [2, 2, 1] },
-    { pos: 3, driver: "LEC", tyre: "S", gap: "+5.421", lastLap: "1:24.998", sectors: [1, 3, 2] },
-    { pos: 4, driver: "NOR", tyre: "M", gap: "+8.765", lastLap: "1:25.234", sectors: [3, 2, 2] },
-    { pos: 5, driver: "PIA", tyre: "M", gap: "+12.123", lastLap: "1:25.456", sectors: [2, 3, 3] },
-  ];
 
-  const events = [
-    { time: "Lap 24", event: "Fastest Lap", driver: "VER", detail: "1:24.532", type: "fastest" },
-    { time: "Lap 23", event: "Pit Stop", driver: "HAM", detail: "2.8s", type: "pit" },
-    { time: "Lap 22", event: "Penalty", driver: "SAI", detail: "5s Time Penalty", type: "penalty" },
-    { time: "Lap 19", event: "Safety Car", driver: "", detail: "Debris on track", type: "sc" },
-  ];
+  const [events, setEvents] = useState<SessionEventDto[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+
+  const fetchEvents = useCallback(() => {
+    if (!session?.id) return;
+    setEventsLoading(true);
+    setEventsError(null);
+    getSessionEvents(session.id)
+      .then(setEvents)
+      .catch((err) => setEventsError(err instanceof Error ? err.message : "Failed to load events"))
+      .finally(() => setEventsLoading(false));
+  }, [session?.id]);
+
+  useEffect(() => {
+    if (session?.id) fetchEvents();
+    else setEvents([]);
+  }, [session?.id, fetchEvents]);
 
   return (
     <div className="space-y-6">
@@ -132,46 +208,41 @@ export default function LiveOverview() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/30">
+                  {leaderboard.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-text-secondary">
+                        No leaderboard data yet. Positions appear when LapData is received.
+                      </td>
+                    </tr>
+                  )}
                   {leaderboard.map((item) => (
-                    <tr key={item.pos} className="hover:bg-secondary/30 transition-colors">
-                      <td className="px-4 py-4 font-bold text-[#00E5FF]">{item.pos}</td>
-                      <td className="px-4 py-4 font-bold">{item.driver}</td>
+                    <tr key={`${item.position}-${item.carIndex}`} className="hover:bg-secondary/30 transition-colors">
+                      <td className="px-4 py-4 font-bold text-[#00E5FF]">{item.position}</td>
+                      <td className="px-4 py-4 font-bold">{item.driverLabel ?? `Car ${item.carIndex}`}</td>
                       <td className="px-4 py-4">
                         <span className={`inline-flex px-2 py-1 rounded text-xs font-bold ${
-                          item.tyre === 'S' ? 'bg-[#E10600]/20 text-[#E10600]' :
-                          item.tyre === 'M' ? 'bg-[#FACC15]/20 text-[#FACC15]' :
+                          item.compound === 'S' ? 'bg-[#E10600]/20 text-[#E10600]' :
+                          item.compound === 'M' ? 'bg-[#FACC15]/20 text-[#FACC15]' :
                           'bg-[#F9FAFB]/20 text-[#F9FAFB]'
                         }`}>
-                          {item.tyre}
+                          {item.compound ?? "—"}
                         </span>
                       </td>
-                      <td className="px-4 py-4 font-mono text-text-secondary">{item.gap}</td>
-                      <td className="px-4 py-4 font-mono">{item.lastLap}</td>
+                      <td className="px-4 py-4 font-mono text-text-secondary">{item.gap ?? "—"}</td>
+                      <td className="px-4 py-4 font-mono">{item.lastLapTimeMs != null ? formatLapTime(item.lastLapTimeMs) : "—"}</td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex w-6 h-6 items-center justify-center rounded text-xs font-bold ${
-                          item.sectors[0] === 1 ? 'bg-[#A855F7]/20 text-[#A855F7]' :
-                          item.sectors[0] === 2 ? 'bg-[#00FF85]/20 text-[#00FF85]' :
-                          'bg-[#FACC15]/20 text-[#FACC15]'
-                        }`}>
-                          {item.sectors[0]}
+                        <span className="inline-flex w-6 h-6 items-center justify-center rounded text-xs font-bold bg-secondary/50 text-text-secondary">
+                          {item.sector1Ms != null ? formatLapTime(item.sector1Ms) : "—"}
                         </span>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex w-6 h-6 items-center justify-center rounded text-xs font-bold ${
-                          item.sectors[1] === 1 ? 'bg-[#A855F7]/20 text-[#A855F7]' :
-                          item.sectors[1] === 2 ? 'bg-[#00FF85]/20 text-[#00FF85]' :
-                          'bg-[#FACC15]/20 text-[#FACC15]'
-                        }`}>
-                          {item.sectors[1]}
+                        <span className="inline-flex w-6 h-6 items-center justify-center rounded text-xs font-bold bg-secondary/50 text-text-secondary">
+                          {item.sector2Ms != null ? formatLapTime(item.sector2Ms) : "—"}
                         </span>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex w-6 h-6 items-center justify-center rounded text-xs font-bold ${
-                          item.sectors[2] === 1 ? 'bg-[#A855F7]/20 text-[#A855F7]' :
-                          item.sectors[2] === 2 ? 'bg-[#00FF85]/20 text-[#00FF85]' :
-                          'bg-[#FACC15]/20 text-[#FACC15]'
-                        }`}>
-                          {item.sectors[2]}
+                        <span className="inline-flex w-6 h-6 items-center justify-center rounded text-xs font-bold bg-secondary/50 text-text-secondary">
+                          {item.sector3Ms != null ? formatLapTime(item.sector3Ms) : "—"}
                         </span>
                       </td>
                     </tr>
@@ -297,49 +368,27 @@ export default function LiveOverview() {
         </div>
       </div>
 
-      {/* Event Timeline (mock; Block E for real data) */}
+      {/* Event Timeline (API) */}
       <DataCard title="Event Timeline">
-        <div className="space-y-3">
-          {events.map((event, idx) => (
-            <div 
-              key={idx}
-              className={`flex items-start gap-4 p-3 rounded-lg border transition-all ${
-                event.type === 'penalty' 
-                  ? 'border-[#E10600]/50 bg-[#E10600]/10 animate-pulse' 
-                  : event.type === 'sc'
-                  ? 'border-[#FACC15]/50 bg-[#FACC15]/10'
-                  : 'border-border/30 bg-secondary/20'
-              }`}
-            >
-              <div className="flex-shrink-0 w-16 text-xs text-text-secondary font-mono">
-                {event.time}
-              </div>
-              <div className="flex-shrink-0">
-                {event.type === 'penalty' ? (
-                  <div className="w-8 h-8 bg-[#E10600]/20 rounded-lg flex items-center justify-center">
-                    <AlertTriangle className="w-4 h-4 text-[#E10600]" />
-                  </div>
-                ) : event.type === 'sc' ? (
-                  <div className="w-8 h-8 bg-[#FACC15]/20 rounded-lg flex items-center justify-center">
-                    <Flag className="w-4 h-4 text-[#FACC15]" />
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 bg-[#00E5FF]/20 rounded-lg flex items-center justify-center text-xs font-bold text-[#00E5FF]">
-                    {event.type === 'fastest' ? '🏁' : '🔧'}
-                  </div>
-                )}
-              </div>
-              <div className="flex-1">
-                <div className="font-semibold">{event.event}</div>
-                <div className="text-sm text-text-secondary">
-                  {event.driver && <span className="font-bold">{event.driver}</span>}
-                  {event.driver && event.detail && ' • '}
-                  {event.detail}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {eventsLoading && (
+          <div className="py-6 text-center text-text-secondary">Loading events…</div>
+        )}
+        {eventsError && (
+          <div className="py-4 text-center text-destructive">
+            {eventsError}
+            <button type="button" onClick={fetchEvents} className="ml-2 text-[#00E5FF] hover:underline">Retry</button>
+          </div>
+        )}
+        {!eventsLoading && !eventsError && (
+          <div className="space-y-3">
+            {events.length === 0 && (
+              <div className="py-6 text-center text-text-secondary">No session events yet.</div>
+            )}
+            {events.map((event, idx) => (
+              <EventTimelineRow key={event.createdAt + String(idx)} event={event} />
+            ))}
+          </div>
+        )}
       </DataCard>
         </>
       )}

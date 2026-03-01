@@ -3,6 +3,8 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TyreWearPerLap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
@@ -305,5 +307,30 @@ public final class TestData {
     // --- TyreWearSnapshot ---
     public static TyreWearSnapshot tyreWearSnapshot() {
         return new TyreWearSnapshot(WEAR_FL, WEAR_FR, WEAR_RL, WEAR_RR);
+    }
+
+    // --- SessionDriver ---
+    public static SessionDriver sessionDriver() {
+        return SessionDriver.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX)
+                .driverLabel("VER")
+                .createdAt(STARTED_AT)
+                .updatedAt(ENDED_AT)
+                .build();
+    }
+
+    // --- SessionEvent ---
+    public static SessionEvent sessionEvent() {
+        return SessionEvent.builder()
+                .id(1L)
+                .sessionUid(SESSION_UID)
+                .frameId(FRAME_ID)
+                .lap((short) 24)
+                .eventCode("FTLP")
+                .carIndex(CAR_INDEX)
+                .detail("{\"vehicleIdx\":0,\"lapTime\":84.532}")
+                .createdAt(RAW_TS)
+                .build();
     }
 }

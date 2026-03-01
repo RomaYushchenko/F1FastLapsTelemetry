@@ -131,3 +131,25 @@ export interface StintDto {
   avgLapTimeMs: number | null
   degradationIndicator: 'high' | 'medium' | 'low' | null
 }
+
+/** GET /api/sessions/active/leaderboard — live leaderboard entry */
+export interface LeaderboardEntry {
+  position: number
+  carIndex: number
+  driverLabel: string | null
+  compound: string | null
+  gap: string | null
+  lastLapTimeMs: number | null
+  sector1Ms: number | null
+  sector2Ms: number | null
+  sector3Ms: number | null
+}
+
+/** GET /api/sessions/{id}/events — session event for timeline */
+export interface SessionEventDto {
+  lap: number | null
+  eventCode: string
+  carIndex: number | null
+  detail: Record<string, unknown> | null
+  createdAt: string
+}

@@ -16,15 +16,17 @@ import {
 import SockJS from 'sockjs-client'
 import { Client, type IMessage, type StompSubscription } from '@stomp/stompjs'
 import { getWsLiveEndpoint } from '@/api/config'
-import { getActiveSession } from '@/api/client'
+import { getActiveSession, getLeaderboard } from '@/api/client'
 import { notify } from '@/notify'
 import type { Session } from '@/api/types'
 import type {
   WsErrorMessage,
+  WsLeaderboardMessage,
   WsServerMessage,
   WsSessionEndedMessage,
   WsSnapshotMessage,
 } from './types'
+import type { LeaderboardEntry } from '@/api/types'
 
 const ACTIVE_SESSION_POLL_INTERVAL_MS = 4000
 
@@ -39,6 +41,8 @@ export interface LiveTelemetryState {
   status: LiveStatus
   session: Session | null
   snapshot: WsSnapshotMessage | null
+  /** Live leaderboard (from WS or initial getLeaderboard). */
+  leaderboard: LeaderboardEntry[]
   sessionEnded: WsSessionEndedMessage | null
   errorMessage: string | null
 }
@@ -75,6 +79,7 @@ const defaultState: LiveTelemetryState = {
   status: 'no-data',
   session: null,
   snapshot: null,
+  leaderboard: [],
   sessionEnded: null,
   errorMessage: null,
 }
@@ -87,6 +92,7 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
   >('idle')
   const [session, setSession] = useState<Session | null>(null)
   const [snapshot, setSnapshot] = useState<WsSnapshotMessage | null>(null)
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [sessionEnded, setSessionEnded] = useState<WsSessionEndedMessage | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -125,6 +131,8 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
             const payload = JSON.parse(message.body) as WsServerMessage
             if (payload.type === 'SNAPSHOT') {
               setSnapshot(payload)
+            } else if (payload.type === 'LEADERBOARD') {
+              setLeaderboard((payload as WsLeaderboardMessage).entries ?? [])
             } else if (payload.type === 'SESSION_ENDED') {
               notify.info('Session ended')
               setSessionEnded(payload)
@@ -166,6 +174,13 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
 
       setInternalStatus('connected')
       notify.info('Live telemetry connected')
+
+      // Initial leaderboard load; WS will push updates
+      getLeaderboard()
+        .then((entries) => {
+          if (!isCancelledRef.current) setLeaderboard(entries)
+        })
+        .catch(() => { /* toast already from getLeaderboard */ })
     }
 
     client.onStompError = (frame) => {
@@ -215,6 +230,7 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
     if (!activeSession) {
       setInternalStatus('no-active-session')
       setSession(null)
+      setLeaderboard([])
       setSessionEnded(null)
       setErrorMessage(null)
       // Schedule poll for auto-reconnect when session appears again
@@ -281,10 +297,11 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
       status: toDisplayStatus(internalStatus),
       session,
       snapshot,
+      leaderboard,
       sessionEnded,
       errorMessage,
     }),
-    [internalStatus, session, snapshot, sessionEnded, errorMessage]
+    [internalStatus, session, snapshot, leaderboard, sessionEnded, errorMessage]
   )
 
   return (

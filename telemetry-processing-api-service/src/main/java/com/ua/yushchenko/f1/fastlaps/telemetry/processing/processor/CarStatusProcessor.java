@@ -76,6 +76,9 @@ public class CarStatusProcessor {
         if (status.getTyresCompound() != null) {
             lastTyreCompoundState.update(sessionUid, carIndex, status.getTyresCompound());
         }
+        if (status.getVisualTyreCompound() != null) {
+            snapshot.setVisualTyreCompound(status.getVisualTyreCompound());
+        }
 
         if (state.isActive()) {
             carStatusRawWriter.write(

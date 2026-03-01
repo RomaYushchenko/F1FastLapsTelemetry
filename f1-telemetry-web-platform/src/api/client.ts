@@ -10,10 +10,12 @@ import type {
   ErsPoint,
   Lap,
   LapCorner,
+  LeaderboardEntry,
   PacePoint,
   PedalTracePoint,
   PitStopDto,
   Session,
+  SessionEventDto,
   SessionSummary,
   SpeedTracePoint,
   StintDto,
@@ -274,5 +276,46 @@ export async function getStints(
 ): Promise<StintDto[]> {
   return requestJson<StintDto[]>(
     `/api/sessions/${encodeURIComponent(sessionId!)}/stints${carIndexQuery(carIndex)}`
+  )
+}
+
+/** GET /api/sessions/active/leaderboard — live leaderboard; 204 → empty list */
+export async function getLeaderboard(options?: RequestOptions): Promise<LeaderboardEntry[]> {
+  const url = `${API_BASE_URL}/api/sessions/active/leaderboard`
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options?.headers ?? {}),
+    },
+  })
+  if (response.status === 204) return []
+  if (!response.ok) {
+    const body = await parseJsonOrNull(response)
+    const message =
+      (body &&
+      typeof body === 'object' &&
+      'message' in body &&
+      typeof (body as ApiErrorBody).message === 'string'
+        ? (body as ApiErrorBody).message
+        : `Request to /api/sessions/active/leaderboard failed with status ${response.status}`) ?? ''
+    notify.error(message)
+    throw new HttpError(response.status, message, body ?? undefined)
+  }
+  return response.json() as Promise<LeaderboardEntry[]>
+}
+
+/** GET /api/sessions/{id}/events — session events for timeline */
+export async function getSessionEvents(
+  sessionId: string,
+  params?: { fromLap?: number; toLap?: number; limit?: number }
+): Promise<SessionEventDto[]> {
+  const query: Record<string, string | number | undefined> = {}
+  if (params?.fromLap != null) query.fromLap = params.fromLap
+  if (params?.toLap != null) query.toLap = params.toLap
+  if (params?.limit != null) query.limit = params.limit
+  const q = Object.keys(query).length ? buildQuery(query) : ''
+  return requestJson<SessionEventDto[]>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/events${q}`
   )
 }

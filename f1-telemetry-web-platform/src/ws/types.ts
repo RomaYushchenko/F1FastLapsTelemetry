@@ -3,6 +3,8 @@
  * See: rest_web_socket_api_contracts_f_1_telemetry.md § 4.5.
  */
 
+import type { LeaderboardEntry } from '@/api/types'
+
 /** Live snapshot (10 Hz). Order for tyresSurfaceTempC: RL, RR, FL, FR. */
 export interface WsSnapshotMessage {
   type: "SNAPSHOT";
@@ -41,9 +43,16 @@ export interface WsErrorMessage {
   message?: string;
 }
 
+/** Live leaderboard (all cars). Sent when LapData/position/snapshot changes. */
+export interface WsLeaderboardMessage {
+  type: "LEADERBOARD";
+  entries: LeaderboardEntry[];
+}
+
 export type WsServerMessage =
   | WsSnapshotMessage
   | WsSessionEndedMessage
+  | WsLeaderboardMessage
   | WsErrorMessage;
 
 /** Tyre position labels; index order matches tyresSurfaceTempC: RL, RR, FL, FR. */

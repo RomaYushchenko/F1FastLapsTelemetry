@@ -26,7 +26,7 @@ This document lists **backend features that are not implemented today** but are 
 
 **Current backend:** WebSocket sends a **single-car** snapshot (player car). There is no REST or WebSocket payload with all cars’ current state.
 
-**Gap:** No endpoint or message type that returns/broadcasts a multi-car leaderboard (e.g. from LapData for all car indices).
+**Status: Implemented in Block E (Steps 17–18).** See [block-e-live-leaderboard-and-events.md](.github/draft/implementation-plans/new-ui-backend/block-e-live-leaderboard-and-events.md). Backend: `GET /api/sessions/active/leaderboard` (204 if no active session); WebSocket message type `LEADERBOARD` pushed when LapData/position/snapshot changes. Driver labels from `session_drivers` table (fallback "Car N"). New UI: Live Overview leaderboard from API + WS.
 
 ---
 
@@ -38,7 +38,7 @@ This document lists **backend features that are not implemented today** but are 
 
 **Current backend:** F1 25 Packet Event (packet 3) carries these events; they are not persisted or exposed via REST/WebSocket in the current design.
 
-**Gap:** No `GET /api/sessions/{id}/events` (or equivalent) and no WebSocket push of session events.
+**Status: Implemented in Block E (Steps 19–20).** See [block-e-live-leaderboard-and-events.md](.github/draft/implementation-plans/new-ui-backend/block-e-live-leaderboard-and-events.md). Backend: `session_events` table; EventProcessor persists events with lap resolution; `GET /api/sessions/{sessionUid}/events?fromLap=&toLap=&limit=`. New UI: Live Overview event timeline from API.
 
 ---
 
