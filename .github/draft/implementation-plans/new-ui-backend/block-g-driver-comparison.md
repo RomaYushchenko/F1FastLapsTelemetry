@@ -140,3 +140,6 @@ Use this checklist to mark what is done. Update the file as you complete each it
 - [ ] Contract updated (Session participants; Comparison §)
 - [ ] BACKEND_FEATURES_FOR_NEW_UI.md updated (B10 done; SessionDto.participants)
 - [ ] NEW_UI_DOCS.md updated (Driver Comparison real data)
+
+### Git Commit
+- [ ] Add git commit with understanding message

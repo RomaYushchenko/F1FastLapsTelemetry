@@ -247,6 +247,9 @@ Use this to track what is done and what is left. Mark with `[x]` when completed.
 - [ ] NEW_UI_DOCS.md: §8 auth, settings, danger zone (if 30 done)
 - [ ] telemetry_processing_api_service.md: new controllers/services (if any)
 
+### Git Commit
+- [ ] Add git commit with understanding message
+
 ---
 
 ## Cross-references

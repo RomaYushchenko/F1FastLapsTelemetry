@@ -218,6 +218,9 @@ Use this checklist to track progress. Mark items as done when implemented and ve
 - [ ] NEW_UI_DOCS.md — §5 Data flow (API layer, Toaster, sessionId); §8 Known limitations updated
 - [ ] react_spa_ui_architecture.md — align with new UI routes and API usage (if applicable)
 
+### Git Commit
+- [ ] Add git commit with understanding message
+
 **How to use the checklist:** Mark completed items by changing `- [ ]` to `- [x]`. Use "Block A — Checklist" as the single place to see what is done and what remains.
 
 ---

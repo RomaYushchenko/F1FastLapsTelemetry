@@ -51,7 +51,7 @@ Follow [README § Frontend component reusability](README.md#frontend-component-r
 - [ ] U1 ws/types.ts extended
 - [ ] U2 Live Overview uses snapshot.tyresSurfaceTempC and fuelRemainingPercent
 - [ ] U3 Live Telemetry Tyre Temperatures and ERS & Fuel from snapshot
-
+- [ ] Add git commit with understanding message
 ---
 
 ## When to do this

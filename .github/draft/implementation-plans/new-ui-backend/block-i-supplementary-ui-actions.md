@@ -184,6 +184,9 @@ Use this checklist to track what is done and what remains. Mark items with `[x]`
 - [ ] View Diagnostics: navigation to /app/settings/diagnostics; content or placeholder visible
 - [ ] Delete All Sessions: when API — confirm dialog and delete; when no API — button disabled with tooltip
 
+### Git Commit
+- [ ] Add git commit with understanding message
+
 ---
 
 ## Decisions recorded

@@ -268,6 +268,8 @@ Use this list to implement Block C in a strict order. Each line is one concrete 
 
 - [ ] UI unit or e2e tests for useLiveTelemetry and live pages
 
+### Git Commit
+- [ ] Add git commit with understanding message
 ---
 
 ## Follow-up (do not forget)

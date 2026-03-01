@@ -169,6 +169,9 @@ Use this to track what is done and what is left. Mark items when completed.
 - [ ] BACKEND_FEATURES_FOR_NEW_UI.md: B4, B5 marked implemented
 - [ ] (Optional) NEW_UI_DOCS: Strategy View section if needed
 
+### Git Commit
+- [ ] Add git commit with understanding message
+- 
 ---
 
 ## Out of scope for Block D

@@ -146,6 +146,9 @@ Use this checklist to track progress. Mark `[ ]` as `[x]` when done.
 - [ ] REST contract: Track layout § added
 - [ ] BACKEND_FEATURES_FOR_NEW_UI.md: B8 marked implemented
 
+### Git Commit
+- [ ] Add git commit with understanding message
+
 ---
 
 ## Out of scope for Block F

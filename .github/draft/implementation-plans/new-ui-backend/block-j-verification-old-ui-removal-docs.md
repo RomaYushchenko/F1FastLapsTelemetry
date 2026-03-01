@@ -241,3 +241,6 @@ Copy this checklist into **MIGRATION_VERIFICATION.md** or keep it here; mark eac
 ### Block J complete
 
 - [ ] All items above checked; MIGRATION_VERIFICATION.md signed off; migration marked complete in UI_MIGRATION_PLAN and IMPLEMENTATION_STEP_BY_STEP.
+
+### Git Commit
+- [ ] Add git commit with understanding message

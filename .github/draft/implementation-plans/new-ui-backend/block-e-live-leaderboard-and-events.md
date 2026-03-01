@@ -198,3 +198,6 @@ Use this checklist to track progress: replace `[ ]` with `[x]` when an item is d
 - [ ] Update [rest_web_socket_api_contracts_f_1_telemetry.md](../../../project/rest_web_socket_api_contracts_f_1_telemetry.md) with leaderboard and events endpoints and DTOs
 - [ ] Update [BACKEND_FEATURES_FOR_NEW_UI.md](../../../BACKEND_FEATURES_FOR_NEW_UI.md): mark B2 and B3 as implemented
 - [ ] Update plan 08 (08-packet-event-ingest-and-processing.md) if session_events persistence is added: note “session_events table and REST events endpoint implemented in Block E”
+
+### Git Commit
+- [ ] Add git commit with understanding message
