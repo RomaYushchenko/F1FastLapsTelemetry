@@ -47,6 +47,10 @@ public class SessionEventsQueryService {
         List<SessionEvent> entities;
         if (fromLap != null && toLap != null) {
             entities = sessionEventRepository.findBySessionUidAndLapBetweenOrderByLapAscFrameIdAsc(sessionUid, fromLap, toLap);
+        } else if (fromLap != null) {
+            entities = sessionEventRepository.findBySessionUidAndLapGreaterThanEqualOrderByLapAscFrameIdAsc(sessionUid, fromLap);
+        } else if (toLap != null) {
+            entities = sessionEventRepository.findBySessionUidAndLapLessThanEqualOrderByLapAscFrameIdAsc(sessionUid, toLap);
         } else {
             entities = sessionEventRepository.findBySessionUidOrderByLapAscFrameIdAsc(sessionUid);
         }

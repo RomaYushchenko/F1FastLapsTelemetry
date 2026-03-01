@@ -50,8 +50,12 @@ const STATE_OPTIONS: { value: string; label: string }[] = [
   { value: "FINISHED", label: "Finished" },
 ]
 
+/** Format date as YYYY-MM-DD in local calendar time (not UTC) for API filters. */
 function formatDateForApi(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
 }
 
 function resultDisplay(position: number | null | undefined): string {

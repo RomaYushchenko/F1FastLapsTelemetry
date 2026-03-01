@@ -143,6 +143,30 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
               const ev = (payload as WsSessionEventMessage).event
               if (ev) setSessionEventsAppend((prev) => [...prev, ev])
             } else if (payload.type === 'SESSION_ENDED') {
+              // Deactivate STOMP client so reconnect does not create a second connection
+              const client = stompClientRef.current
+              if (liveSubRef.current) {
+                liveSubRef.current.unsubscribe()
+                liveSubRef.current = null
+              }
+              if (errorSubRef.current) {
+                errorSubRef.current.unsubscribe()
+                errorSubRef.current = null
+              }
+              if (client?.connected) {
+                try {
+                  client.publish({
+                    destination: '/app/unsubscribe',
+                    body: JSON.stringify({ type: 'UNSUBSCRIBE' }),
+                  })
+                } catch {
+                  // ignore
+                }
+              }
+              if (client) {
+                client.deactivate()
+                stompClientRef.current = null
+              }
               notify.info('Session ended')
               setSessionEnded(payload)
               setInternalStatus('disconnected')

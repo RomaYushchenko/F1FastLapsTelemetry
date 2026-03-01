@@ -61,4 +61,55 @@ class SessionEventsQueryServiceTest {
         assertThat(result.get(0).getEventCode()).isEqualTo("FTLP");
         verify(sessionEventRepository).findBySessionUidOrderByLapAscFrameIdAsc(SESSION_UID);
     }
+
+    @Test
+    @DisplayName("getEvents з fromLap викликає фільтр lap >= fromLap")
+    void getEvents_withFromLapOnly_usesGreaterThanEqual() {
+        Session session = session();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        SessionEvent entity = sessionEvent();
+        when(sessionEventRepository.findBySessionUidAndLapGreaterThanEqualOrderByLapAscFrameIdAsc(SESSION_UID, (short) 5))
+                .thenReturn(List.of(entity));
+        SessionEventDto dto = SessionEventDto.builder().lap(24).eventCode("FTLP").build();
+        when(sessionEventMapper.toDto(entity)).thenReturn(dto);
+
+        List<SessionEventDto> result = service.getEvents(SESSION_PUBLIC_ID_STR, (short) 5, null, null);
+
+        assertThat(result).hasSize(1);
+        verify(sessionEventRepository).findBySessionUidAndLapGreaterThanEqualOrderByLapAscFrameIdAsc(SESSION_UID, (short) 5);
+    }
+
+    @Test
+    @DisplayName("getEvents з toLap викликає фільтр lap <= toLap")
+    void getEvents_withToLapOnly_usesLessThanEqual() {
+        Session session = session();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        SessionEvent entity = sessionEvent();
+        when(sessionEventRepository.findBySessionUidAndLapLessThanEqualOrderByLapAscFrameIdAsc(SESSION_UID, (short) 10))
+                .thenReturn(List.of(entity));
+        SessionEventDto dto = SessionEventDto.builder().lap(10).eventCode("PENA").build();
+        when(sessionEventMapper.toDto(entity)).thenReturn(dto);
+
+        List<SessionEventDto> result = service.getEvents(SESSION_PUBLIC_ID_STR, null, (short) 10, null);
+
+        assertThat(result).hasSize(1);
+        verify(sessionEventRepository).findBySessionUidAndLapLessThanEqualOrderByLapAscFrameIdAsc(SESSION_UID, (short) 10);
+    }
+
+    @Test
+    @DisplayName("getEvents з fromLap і toLap викликає фільтр between")
+    void getEvents_withFromLapAndToLap_usesBetween() {
+        Session session = session();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        SessionEvent entity = sessionEvent();
+        when(sessionEventRepository.findBySessionUidAndLapBetweenOrderByLapAscFrameIdAsc(SESSION_UID, (short) 5, (short) 10))
+                .thenReturn(List.of(entity));
+        SessionEventDto dto = SessionEventDto.builder().lap(7).eventCode("SCAR").build();
+        when(sessionEventMapper.toDto(entity)).thenReturn(dto);
+
+        List<SessionEventDto> result = service.getEvents(SESSION_PUBLIC_ID_STR, (short) 5, (short) 10, null);
+
+        assertThat(result).hasSize(1);
+        verify(sessionEventRepository).findBySessionUidAndLapBetweenOrderByLapAscFrameIdAsc(SESSION_UID, (short) 5, (short) 10);
+    }
 }
