@@ -103,12 +103,13 @@ export default function SessionDetails() {
       const sessionRes = await getSession(id);
       setSession(sessionRes);
       const carIdx = sessionRes.playerCarIndex ?? 0;
-      const [lapsRes, summaryRes] = await Promise.all([
-        getSessionLaps(id, carIdx),
-        getSessionSummary(id, carIdx),
-      ]);
+      const lapsRes = await getSessionLaps(id, carIdx);
       setLaps(lapsRes);
-      setSummary(summaryRes);
+      try {
+        setSummary(await getSessionSummary(id, carIdx));
+      } catch {
+        setSummary(null);
+      }
       const firstWithTime = lapsRes.find(
         (l) => l.lapTimeMs != null && l.lapTimeMs > 0 && !l.isInvalid
       );
@@ -288,49 +289,75 @@ export default function SessionDetails() {
         </DropdownMenu>
       </div>
 
-      {/* Session Summary */}
-      <DataCard title="Session Summary">
-        <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
-          <div>
-            <div className="text-xs text-text-secondary uppercase mb-1">
-              Result
+      {/* Session Summary: prefer summary API; fallback to derived from laps when summary missing or empty */}
+      {(() => {
+        const bestLapFromLaps =
+          laps.length > 0
+            ? laps
+                .filter(
+                  (l) =>
+                    l.lapTimeMs != null && l.lapTimeMs > 0 && !l.isInvalid
+                )
+                .map((l) => l.lapTimeMs as number)
+                .reduce<number | null>(
+                  (best, ms) =>
+                    best == null ? ms : Math.min(best, ms),
+                  null
+                )
+            : null;
+        const bestLapMs =
+          summary?.bestLapTimeMs != null && summary.bestLapTimeMs > 0
+            ? summary.bestLapTimeMs
+            : bestLapFromLaps;
+        const totalLaps =
+          summary?.totalLaps != null && summary.totalLaps > 0
+            ? summary.totalLaps
+            : laps.length;
+        return (
+          <DataCard title="Session Summary">
+            <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
+              <div>
+                <div className="text-xs text-text-secondary uppercase mb-1">
+                  Result
+                </div>
+                <div className="text-2xl font-bold text-[#00E5FF]">
+                  {session?.finishingPosition != null
+                    ? `P${session.finishingPosition}`
+                    : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary uppercase mb-1">
+                  Best Lap
+                </div>
+                <div className="text-2xl font-bold font-mono text-[#00FF85]">
+                  {formatLapTime(bestLapMs ?? null)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary uppercase mb-1">
+                  Total Time
+                </div>
+                <div className="text-2xl font-bold font-mono">—</div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary uppercase mb-1">
+                  Total Laps
+                </div>
+                <div className="text-2xl font-bold">
+                  {totalLaps > 0 ? totalLaps : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-text-secondary uppercase mb-1">
+                  Pit Stops
+                </div>
+                <div className="text-2xl font-bold">—</div>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-[#00E5FF]">
-              {session?.finishingPosition != null
-                ? `P${session.finishingPosition}`
-                : "—"}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-text-secondary uppercase mb-1">
-              Best Lap
-            </div>
-            <div className="text-2xl font-bold font-mono text-[#00FF85]">
-              {formatLapTime(summary?.bestLapTimeMs ?? null)}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-text-secondary uppercase mb-1">
-              Total Time
-            </div>
-            <div className="text-2xl font-bold font-mono">—</div>
-          </div>
-          <div>
-            <div className="text-xs text-text-secondary uppercase mb-1">
-              Total Laps
-            </div>
-            <div className="text-2xl font-bold">
-              {summary?.totalLaps ?? laps.length ?? "—"}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-text-secondary uppercase mb-1">
-              Pit Stops
-            </div>
-            <div className="text-2xl font-bold">—</div>
-          </div>
-        </div>
-      </DataCard>
+          </DataCard>
+        );
+      })()}
 
       {/* Lap selector */}
       {laps.length > 0 && (
@@ -455,32 +482,24 @@ export default function SessionDetails() {
         </DataCard>
       </div>
 
-      {/* Pedal trace */}
-      <DataCard title="Pedal trace (throttle / brake)">
+      {/* Speed trace */}
+      <DataCard title="Speed trace">
         {chartsLoading ? (
           <div className="h-[300px] flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-text-secondary" />
           </div>
-        ) : traceData.length === 0 ? (
+        ) : speedData.length === 0 ? (
           <div className="h-[300px] flex items-center justify-center text-text-secondary">
-            {selectedLap == null ? "Select a lap" : "No trace data for this lap"}
+            {selectedLap == null ? "Select a lap" : "No speed data for this lap"}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart
-              data={traceData.map((p) => ({
-                ...p,
-                distance: p.distance,
-                throttle: p.throttle * 100,
-                brake: p.brake * 100,
-              }))}
-            >
+            <LineChart data={speedData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(249,250,251,0.06)" />
-              <XAxis dataKey="distance" stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" domain={[0, 100]} />
+              <XAxis dataKey="distanceM" stroke="#9CA3AF" />
+              <YAxis stroke="#9CA3AF" />
               <Tooltip contentStyle={tooltipStyle} />
-              <Line type="monotone" dataKey="throttle" stroke="#00FF85" strokeWidth={1.5} dot={false} />
-              <Line type="monotone" dataKey="brake" stroke="#E10600" strokeWidth={1.5} dot={false} />
+              <Line type="monotone" dataKey="speedKph" stroke="#00E5FF" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -509,24 +528,32 @@ export default function SessionDetails() {
         )}
       </DataCard>
 
-      {/* Speed trace */}
-      <DataCard title="Speed trace">
+      {/* Pedal trace */}
+      <DataCard title="Pedal trace (throttle / brake)">
         {chartsLoading ? (
           <div className="h-[300px] flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-text-secondary" />
           </div>
-        ) : speedData.length === 0 ? (
+        ) : traceData.length === 0 ? (
           <div className="h-[300px] flex items-center justify-center text-text-secondary">
-            {selectedLap == null ? "Select a lap" : "No speed data for this lap"}
+            {selectedLap == null ? "Select a lap" : "No trace data for this lap"}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={speedData}>
+            <LineChart
+              data={traceData.map((p) => ({
+                ...p,
+                distance: p.distance,
+                throttle: p.throttle * 100,
+                brake: p.brake * 100,
+              }))}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(249,250,251,0.06)" />
-              <XAxis dataKey="distanceM" stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" />
+              <XAxis dataKey="distance" stroke="#9CA3AF" />
+              <YAxis stroke="#9CA3AF" domain={[0, 100]} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Line type="monotone" dataKey="speedKph" stroke="#00E5FF" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="throttle" stroke="#00FF85" strokeWidth={1.5} dot={false} />
+              <Line type="monotone" dataKey="brake" stroke="#E10600" strokeWidth={1.5} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         )}
@@ -586,46 +613,119 @@ export default function SessionDetails() {
         )}
       </DataCard>
 
-      {/* Lap list (sectors) */}
-      <DataCard title="Lap times">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-secondary/50 border-b border-border/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Lap</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Time</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">S1</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">S2</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">S3</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Position</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/30">
-              {laps.map((lap) => (
-                <tr key={lap.lapNumber} className="hover:bg-secondary/30">
-                  <td className="px-4 py-2 font-bold">{lap.lapNumber}</td>
-                  <td className="px-4 py-2 font-mono text-[#00E5FF]">
-                    {formatLapTime(lap.lapTimeMs)}
-                    {lap.isInvalid && " *"}
-                  </td>
-                  <td className="px-4 py-2 font-mono text-text-secondary">
-                    {formatSector(lap.sector1Ms)}
-                  </td>
-                  <td className="px-4 py-2 font-mono text-text-secondary">
-                    {formatSector(lap.sector2Ms)}
-                  </td>
-                  <td className="px-4 py-2 font-mono text-text-secondary">
-                    {formatSector(lap.sector3Ms)}
-                  </td>
-                  <td className="px-4 py-2">
-                    {lap.positionAtLapStart != null ? `P${lap.positionAtLapStart}` : "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </DataCard>
+      {/* Lap list (sectors): highlight best lap time and best sectors */}
+      {(() => {
+        const validLaps = laps.filter(
+          (l) =>
+            l.lapTimeMs != null &&
+            l.lapTimeMs > 0 &&
+            !l.isInvalid
+        );
+        const bestLapTimeMs =
+          summary?.bestLapTimeMs != null && summary.bestLapTimeMs > 0
+            ? summary.bestLapTimeMs
+            : validLaps.length > 0
+              ? Math.min(...validLaps.map((l) => l.lapTimeMs!))
+              : null;
+        const bestS1 =
+          summary?.bestSector1Ms != null && summary.bestSector1Ms > 0
+            ? summary.bestSector1Ms
+            : (() => {
+                const vals = laps
+                  .filter((l) => l.sector1Ms != null && l.sector1Ms > 0)
+                  .map((l) => l.sector1Ms!);
+                return vals.length > 0 ? Math.min(...vals) : null;
+              })();
+        const bestS2 =
+          summary?.bestSector2Ms != null && summary.bestSector2Ms > 0
+            ? summary.bestSector2Ms
+            : (() => {
+                const vals = laps
+                  .filter((l) => l.sector2Ms != null && l.sector2Ms > 0)
+                  .map((l) => l.sector2Ms!);
+                return vals.length > 0 ? Math.min(...vals) : null;
+              })();
+        const bestS3 =
+          summary?.bestSector3Ms != null && summary.bestSector3Ms > 0
+            ? summary.bestSector3Ms
+            : (() => {
+                const vals = laps
+                  .filter((l) => l.sector3Ms != null && l.sector3Ms > 0)
+                  .map((l) => l.sector3Ms!);
+                return vals.length > 0 ? Math.min(...vals) : null;
+              })();
+        const isBestLap = (lap: Lap) =>
+          bestLapTimeMs != null &&
+          lap.lapTimeMs != null &&
+          lap.lapTimeMs > 0 &&
+          !lap.isInvalid &&
+          lap.lapTimeMs === bestLapTimeMs;
+        const isBestS1 = (lap: Lap) =>
+          bestS1 != null &&
+          lap.sector1Ms != null &&
+          lap.sector1Ms > 0 &&
+          lap.sector1Ms === bestS1;
+        const isBestS2 = (lap: Lap) =>
+          bestS2 != null &&
+          lap.sector2Ms != null &&
+          lap.sector2Ms > 0 &&
+          lap.sector2Ms === bestS2;
+        const isBestS3 = (lap: Lap) =>
+          bestS3 != null &&
+          lap.sector3Ms != null &&
+          lap.sector3Ms > 0 &&
+          lap.sector3Ms === bestS3;
+        const bestCellClass = "font-mono font-semibold text-[#A855F7]";
+        return (
+          <DataCard title="Lap times">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-secondary/50 border-b border-border/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Lap</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Time</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">S1</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">S2</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">S3</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Position</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {laps.map((lap) => (
+                    <tr key={lap.lapNumber} className="hover:bg-secondary/30">
+                      <td className="px-4 py-2 font-bold">{lap.lapNumber}</td>
+                      <td
+                        className={`px-4 py-2 font-mono ${isBestLap(lap) ? bestCellClass : "text-[#00E5FF]"}`}
+                      >
+                        {formatLapTime(lap.lapTimeMs)}
+                        {lap.isInvalid && " *"}
+                      </td>
+                      <td
+                        className={`px-4 py-2 font-mono ${isBestS1(lap) ? bestCellClass : "text-text-secondary"}`}
+                      >
+                        {formatSector(lap.sector1Ms)}
+                      </td>
+                      <td
+                        className={`px-4 py-2 font-mono ${isBestS2(lap) ? bestCellClass : "text-text-secondary"}`}
+                      >
+                        {formatSector(lap.sector2Ms)}
+                      </td>
+                      <td
+                        className={`px-4 py-2 font-mono ${isBestS3(lap) ? bestCellClass : "text-text-secondary"}`}
+                      >
+                        {formatSector(lap.sector3Ms)}
+                      </td>
+                      <td className="px-4 py-2">
+                        {lap.positionAtLapStart != null ? `P${lap.positionAtLapStart}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </DataCard>
+        );
+      })()}
     </div>
   );
 }

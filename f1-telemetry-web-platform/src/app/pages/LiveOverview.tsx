@@ -5,7 +5,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { TelemetryStat } from "../components/TelemetryStat";
 import { useLiveTelemetry, TYRE_LABELS } from "@/ws";
 import { getTrackName } from "@/constants/tracks";
-import { formatLapTime } from "@/api/format";
+import { formatLapTime, formatSessionTime } from "@/api/format";
 import { getSessionEvents } from "@/api/client";
 import type { SessionEventDto } from "@/api/types";
 import { Flag, Clock, CloudRain, AlertTriangle } from "lucide-react";
@@ -160,7 +160,9 @@ export default function LiveOverview() {
               <Clock className="w-4 h-4" />
               Session Time
             </div>
-            <div className="text-3xl font-bold font-mono">—</div>
+            <div className="text-3xl font-bold font-mono">
+              {formatSessionTime(snapshot?.sessionTimeSeconds ?? null)}
+            </div>
           </div>
         </DataCard>
 

@@ -19,8 +19,10 @@ import {
 } from "../components/ui/select";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Pause, Play } from "lucide-react";
+import { formatLapTime, formatSessionTime } from "@/api/format";
 
-const SNAPSHOT_HZ = 10;
+/** Expected snapshot rate from backend (20 Hz). Used for chart buffer length. */
+const SNAPSHOT_HZ = 20;
 
 interface ChartPoint {
   time: number;
@@ -162,6 +164,44 @@ export default function LiveTelemetry() {
             >
               {isPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
             </Button>
+          </div>
+        </div>
+      </DataCard>
+
+      {/* Session time, current lap, delta */}
+      <DataCard title="Time & Delta" variant="live">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <div className="text-xs text-text-secondary uppercase mb-1">Session time</div>
+            <div className="text-xl font-bold font-mono text-[#00E5FF]">
+              {formatSessionTime(snapshot?.sessionTimeSeconds ?? null)}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-text-secondary uppercase mb-1">Current lap</div>
+            <div className="text-xl font-bold font-mono">
+              {formatLapTime(snapshot?.currentLapTimeMs ?? null)}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-text-secondary uppercase mb-1">Delta to best</div>
+            <div className={`text-xl font-bold font-mono ${
+              snapshot?.deltaMs != null
+                ? snapshot.deltaMs <= 0
+                  ? "text-[#00FF85]"
+                  : "text-[#E10600]"
+                : ""
+            }`}>
+              {snapshot?.deltaMs != null
+                ? (snapshot.deltaMs <= 0 ? "-" : "+") + formatLapTime(Math.abs(snapshot.deltaMs))
+                : "—"}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-text-secondary uppercase mb-1">Best lap</div>
+            <div className="text-xl font-bold font-mono text-[#A855F7]">
+              {formatLapTime(snapshot?.bestLapTimeMs ?? null)}
+            </div>
           </div>
         </div>
       </DataCard>

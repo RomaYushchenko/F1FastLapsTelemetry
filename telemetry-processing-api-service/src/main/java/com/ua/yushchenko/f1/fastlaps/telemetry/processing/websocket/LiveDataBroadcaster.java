@@ -39,10 +39,10 @@ public class LiveDataBroadcaster {
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
-     * Broadcast snapshots every 100ms (10 Hz) for all active sessions with subscribers.
-     * Enriches snapshot with bestLapTimeMs from SessionSummary for delta-to-best display.
+     * Broadcast snapshots every 50ms (20 Hz) for all active sessions with subscribers.
+     * Higher rate reduces perceived lag for speed/throttle/brake. Enriches with bestLapTimeMs for delta.
      */
-    @Scheduled(fixedRate = 100)
+    @Scheduled(fixedRate = 50)
     public void broadcastSnapshots() {
         Map<Long, SessionRuntimeState> activeSessions = sessionStateManager.getAllActive();
 
@@ -80,7 +80,7 @@ public class LiveDataBroadcaster {
             String destination = "/topic/live/" + topicId;
             messagingTemplate.convertAndSend(destination, snapshot);
 
-            // Broadcast leaderboard when data changes (same 10 Hz cycle)
+            // Broadcast leaderboard when data changes (same 20 Hz cycle)
             List<LeaderboardEntryDto> leaderboardEntries = leaderboardQueryService.buildLeaderboard(sessionUid, state);
             if (!leaderboardEntries.isEmpty()) {
                 WsLeaderboardMessage leaderboardMsg = WsLeaderboardMessage.builder()

@@ -50,4 +50,6 @@ public class WsSnapshotMessage {
     private int[] tyresSurfaceTempC;
     /** Fuel remaining 0–100%. From CarStatus fuelInTank / fuelCapacity. Optional. */
     private Integer fuelRemainingPercent;
+    /** Session time in seconds (from packet header). For live UI. */
+    private Float sessionTimeSeconds;
 }

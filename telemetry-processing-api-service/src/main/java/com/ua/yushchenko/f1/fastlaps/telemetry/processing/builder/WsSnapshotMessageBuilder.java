@@ -52,6 +52,7 @@ public final class WsSnapshotMessageBuilder {
                 .ersDeployModeDisplayName(CarStatusMapper.ersDeployModeDisplayName(snapshot.getErsDeployMode()))
                 .tyresSurfaceTempC(snapshot.getTyresSurfaceTempC() != null ? snapshot.getTyresSurfaceTempC().clone() : null)
                 .fuelRemainingPercent(snapshot.getFuelRemainingPercent())
+                .sessionTimeSeconds(snapshot.getSessionTimeSeconds())
                 .build();
     }
 }

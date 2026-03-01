@@ -21,3 +21,13 @@ export function formatSector(ms: number | null | undefined): string {
   const sec = ms / 1000
   return sec.toFixed(3)
 }
+
+/**
+ * Format session time in seconds (from game) as M:SS.mmm (e.g. 2:05.500).
+ */
+export function formatSessionTime(seconds: number | null | undefined): string {
+  if (seconds == null || seconds < 0) return '—'
+  const minutes = Math.floor(seconds / 60)
+  const sec = seconds - minutes * 60
+  return `${minutes}:${sec.toFixed(3).padStart(6, '0')}`
+}

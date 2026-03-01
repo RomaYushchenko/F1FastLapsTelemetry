@@ -277,5 +277,7 @@ public class SessionRuntimeState {
         private Integer fuelRemainingPercent;
         /** Visual tyre compound (F1 25 code). From CarStatus; used for leaderboard S/M/H display. */
         private Integer visualTyreCompound;
+        /** Session time in seconds (from packet header). For live UI display. */
+        private Float sessionTimeSeconds;
     }
 }

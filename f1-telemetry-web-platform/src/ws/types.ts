@@ -29,6 +29,8 @@ export interface WsSnapshotMessage {
   tyresSurfaceTempC?: number[] | null;
   /** Fuel remaining 0–100%. */
   fuelRemainingPercent?: number | null;
+  /** Session time in seconds (from game). */
+  sessionTimeSeconds?: number | null;
 }
 
 export interface WsSessionEndedMessage {
