@@ -3,6 +3,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.websocket;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LeaderboardEntryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsLeaderboardMessage;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsPositionsMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSessionEndedMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSessionEventMessage;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage;
@@ -87,6 +88,16 @@ public class LiveDataBroadcaster {
                         .entries(leaderboardEntries)
                         .build();
                 messagingTemplate.convertAndSend(destination, leaderboardMsg);
+            }
+
+            // Broadcast live positions for all cars (B9 Live Track Map)
+            var positions = state.getLatestPositions();
+            if (!positions.isEmpty()) {
+                WsPositionsMessage positionsMsg = WsPositionsMessage.builder()
+                        .type(WsPositionsMessage.TYPE)
+                        .positions(positions)
+                        .build();
+                messagingTemplate.convertAndSend(destination, positionsMsg);
             }
 
             log.trace("Broadcast snapshot for session {}: {} subscribers",

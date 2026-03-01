@@ -3,11 +3,11 @@ import { useParams, Link } from "react-router";
 import { DataCard } from "../components/DataCard";
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
-import { getSession, getPitStops, getStints } from "@/api/client";
+import { getSession, getPitStops, getStints, getFuelByLap, getErsByLap } from "@/api/client";
 import { formatLapTime } from "@/api/format";
 import { HttpError } from "@/api/types";
 import type { Session } from "@/api/types";
-import type { PitStopDto, StintDto } from "@/api/types";
+import type { PitStopDto, StintDto, FuelByLapDto, ErsByLapDto } from "@/api/types";
 import { getCompoundLabel } from "@/constants/compounds";
 import { isValidSessionId } from "@/api/sessionId";
 import {
@@ -28,6 +28,8 @@ export default function StrategyView() {
   const [session, setSession] = useState<Session | null>(null);
   const [pitStops, setPitStops] = useState<PitStopDto[]>([]);
   const [stints, setStints] = useState<StintDto[]>([]);
+  const [fuelByLap, setFuelByLap] = useState<FuelByLapDto[]>([]);
+  const [ersByLap, setErsByLap] = useState<ErsByLapDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -44,18 +46,24 @@ export default function StrategyView() {
       const sessionRes = await getSession(id);
       setSession(sessionRes);
       const carIdx = sessionRes.playerCarIndex ?? 0;
-      const [pitStopsRes, stintsRes] = await Promise.all([
+      const [pitStopsRes, stintsRes, fuelByLapRes, ersByLapRes] = await Promise.all([
         getPitStops(id, carIdx),
         getStints(id, carIdx),
+        getFuelByLap(id, carIdx).catch(() => []),
+        getErsByLap(id, carIdx).catch(() => []),
       ]);
       setPitStops(pitStopsRes);
       setStints(stintsRes);
+      setFuelByLap(Array.isArray(fuelByLapRes) ? fuelByLapRes : []);
+      setErsByLap(Array.isArray(ersByLapRes) ? ersByLapRes : []);
     } catch (e) {
       if (e instanceof HttpError && e.status === 404) {
         setNotFound(true);
         setSession(null);
         setPitStops([]);
         setStints([]);
+        setFuelByLap([]);
+        setErsByLap([]);
       } else {
         setError(e instanceof Error ? e.message : "Failed to load strategy");
       }
@@ -69,16 +77,30 @@ export default function StrategyView() {
     fetchData();
   }, [id, fetchData]);
 
-  // Mock data for charts that stay mock (Block D scope)
-  const fuelConsumption = Array.from({ length: 30 }, (_, i) => ({
-    lap: i + 1,
-    fuel: 100 - i * 3.2,
-  }));
-  const ersDeployment = Array.from({ length: 30 }, (_, i) => ({
-    lap: i + 1,
-    deployed: 20 + Math.random() * 40,
-    harvested: 15 + Math.random() * 30,
-  }));
+  // Fuel chart: use API data (B6) when available, else mock
+  const fuelChartData =
+    fuelByLap.length > 0
+      ? fuelByLap
+          .filter((p) => p.fuelKg != null)
+          .map((p) => ({ lap: p.lapNumber, fuelKg: p.fuelKg! }))
+      : Array.from({ length: 30 }, (_, i) => ({
+          lap: i + 1,
+          fuelKg: 100 - i * 3.2,
+        }));
+  const fuelFromApi = fuelByLap.length > 0;
+
+  // ERS chart: use API data (B7) when available (one value per lap — ersStorePercentEnd), else mock
+  const ersChartData =
+    ersByLap.length > 0
+      ? ersByLap
+          .filter((p) => p.ersStorePercentEnd != null)
+          .map((p) => ({ lap: p.lapNumber, ersStorePercentEnd: p.ersStorePercentEnd! }))
+      : Array.from({ length: 30 }, (_, i) => ({
+          lap: i + 1,
+          deployed: 20 + Math.random() * 40,
+          harvested: 15 + Math.random() * 30,
+        }));
+  const ersFromApi = ersByLap.length > 0;
   const tyreDegradation = Array.from({ length: 15 }, (_, i) => ({
     lap: i + 1,
     performance: 100 - i * 3.5 - Math.random() * 5,
@@ -320,46 +342,72 @@ export default function StrategyView() {
         )}
       </DataCard>
 
-      {/* Fuel Consumption — mock */}
+      {/* Fuel Consumption — from API (B6) when available, else mock */}
       <DataCard title="Fuel Consumption">
         <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={fuelConsumption}>
+          <LineChart data={fuelChartData}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(249,250,251,0.06)" />
             <XAxis dataKey="lap" stroke="#9CA3AF" label={{ value: "Lap", position: "insideBottom", offset: -5, fill: "#9CA3AF" }} />
-            <YAxis stroke="#9CA3AF" domain={[0, 100]} label={{ value: "Fuel Remaining (%)", angle: -90, position: "insideLeft", fill: "#9CA3AF" }} />
-            <Tooltip contentStyle={{ backgroundColor: "#1F2937", border: "1px solid rgba(249,250,251,0.08)", borderRadius: "8px" }} formatter={(value: number) => `${value.toFixed(1)}%`} />
-            <Line type="monotone" dataKey="fuel" stroke="#00E5FF" strokeWidth={2} dot={false} />
+            <YAxis
+              stroke="#9CA3AF"
+              dataKey={fuelFromApi ? "fuelKg" : undefined}
+              domain={fuelFromApi ? ["auto", "auto"] : [0, 100]}
+              label={{ value: fuelFromApi ? "Fuel (kg)" : "Fuel Remaining (%)", angle: -90, position: "insideLeft", fill: "#9CA3AF" }}
+            />
+            <Tooltip
+              contentStyle={{ backgroundColor: "#1F2937", border: "1px solid rgba(249,250,251,0.08)", borderRadius: "8px" }}
+              formatter={(value: number) => (fuelFromApi ? `${Number(value).toFixed(1)} kg` : `${value.toFixed(1)}%`)}
+            />
+            <Line
+              type="monotone"
+              dataKey="fuelKg"
+              stroke="#00E5FF"
+              strokeWidth={2}
+              dot={false}
+              name={fuelFromApi ? "Fuel (kg)" : "Fuel (%)"}
+            />
           </LineChart>
         </ResponsiveContainer>
         <div className="mt-4 grid grid-cols-3 gap-4">
           <div className="p-3 bg-secondary/30 rounded-lg">
-            <div className="text-xs text-text-secondary uppercase mb-1">Avg Consumption</div>
-            <div className="text-lg font-bold font-mono">3.2%<span className="text-sm text-text-secondary">/lap</span></div>
+            <div className="text-xs text-text-secondary uppercase mb-1">Source</div>
+            <div className="text-lg font-bold text-[#00FF85]">{fuelFromApi ? "Session data" : "Mock"}</div>
           </div>
           <div className="p-3 bg-secondary/30 rounded-lg">
-            <div className="text-xs text-text-secondary uppercase mb-1">Predicted Finish</div>
-            <div className="text-lg font-bold font-mono text-[#00FF85]">2.1%</div>
+            <div className="text-xs text-text-secondary uppercase mb-1">Laps</div>
+            <div className="text-lg font-bold font-mono">{fuelChartData.length}</div>
           </div>
           <div className="p-3 bg-secondary/30 rounded-lg">
-            <div className="text-xs text-text-secondary uppercase mb-1">Fuel Margin</div>
-            <div className="text-lg font-bold text-[#00FF85]">Safe (mock)</div>
+            <div className="text-xs text-text-secondary uppercase mb-1">Fuel at lap end</div>
+            <div className="text-lg font-bold font-mono">{fuelFromApi ? "kg" : "—"}</div>
           </div>
         </div>
       </DataCard>
 
-      {/* ERS — mock */}
+      {/* ERS — from API (B7) when available (store % at lap end), else mock */}
       <DataCard title="ERS Deployment & Harvesting">
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={ersDeployment}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(249,250,251,0.06)" />
-            <XAxis dataKey="lap" stroke="#9CA3AF" />
-            <YAxis stroke="#9CA3AF" label={{ value: "Energy (%)", angle: -90, position: "insideLeft", fill: "#9CA3AF" }} />
-            <Tooltip contentStyle={{ backgroundColor: "#1F2937", border: "1px solid rgba(249,250,251,0.08)", borderRadius: "8px" }} formatter={(value: number) => `${value.toFixed(1)}%`} />
-            <Legend />
-            <Bar dataKey="deployed" fill="#A855F7" name="Deployed" />
-            <Bar dataKey="harvested" fill="#00FF85" name="Harvested" />
-          </BarChart>
+          {ersFromApi ? (
+            <LineChart data={ersChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(249,250,251,0.06)" />
+              <XAxis dataKey="lap" stroke="#9CA3AF" label={{ value: "Lap", position: "insideBottom", offset: -5, fill: "#9CA3AF" }} />
+              <YAxis stroke="#9CA3AF" domain={[0, 100]} label={{ value: "ERS store % at lap end", angle: -90, position: "insideLeft", fill: "#9CA3AF" }} />
+              <Tooltip contentStyle={{ backgroundColor: "#1F2937", border: "1px solid rgba(249,250,251,0.08)", borderRadius: "8px" }} formatter={(value: number) => `${value.toFixed(0)}%`} />
+              <Line type="monotone" dataKey="ersStorePercentEnd" stroke="#A855F7" strokeWidth={2} dot={{ fill: "#A855F7", r: 3 }} name="ERS store %" />
+            </LineChart>
+          ) : (
+            <BarChart data={ersChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(249,250,251,0.06)" />
+              <XAxis dataKey="lap" stroke="#9CA3AF" />
+              <YAxis stroke="#9CA3AF" label={{ value: "Energy (%)", angle: -90, position: "insideLeft", fill: "#9CA3AF" }} />
+              <Tooltip contentStyle={{ backgroundColor: "#1F2937", border: "1px solid rgba(249,250,251,0.08)", borderRadius: "8px" }} formatter={(value: number) => `${value.toFixed(1)}%`} />
+              <Legend />
+              <Bar dataKey="deployed" fill="#A855F7" name="Deployed" />
+              <Bar dataKey="harvested" fill="#00FF85" name="Harvested" />
+            </BarChart>
+          )}
         </ResponsiveContainer>
+        {ersFromApi && <p className="mt-2 text-sm text-text-secondary">ERS store % at lap end (from session data).</p>}
       </DataCard>
     </div>
   );

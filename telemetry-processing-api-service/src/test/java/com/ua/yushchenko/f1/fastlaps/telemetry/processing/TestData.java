@@ -1,5 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarStatusRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
@@ -55,6 +56,13 @@ public final class TestData {
     public static final short SPEED_KPH = 285;
     public static final short GEAR = 7;
     public static final int ENGINE_RPM = 11500;
+
+    /** Fuel in tank (kg) for fuel-by-lap tests. */
+    public static final float FUEL_AT_LAP_1_END = 98.5f;
+    public static final float FUEL_AT_LAP_2_END = 95.0f;
+    /** ERS store energy (J) for ers-by-lap; ~62.5% of 4M J. */
+    public static final float ERS_STORE_AT_LAP_1_END = 2_500_000f;
+    public static final float ERS_STORE_AT_LAP_2_END = 2_200_000f;
 
     public static final float WEAR_FL = 5.2f;
     public static final float WEAR_FR = 5.0f;
@@ -265,6 +273,53 @@ public final class TestData {
                 .carIndex(CAR_INDEX_1)
                 .finishingPosition(2)
                 .build();
+    }
+
+    // --- CarStatusRaw (fuel/ERS by lap) ---
+    /** CarStatusRaw at given timestamp with fuel and ERS (for fuel-by-lap / ers-by-lap tests). */
+    public static CarStatusRaw carStatusRaw(Instant ts, int frameId, Float fuelKg, Float ersStoreEnergy) {
+        return CarStatusRaw.builder()
+                .ts(ts)
+                .sessionUid(SESSION_UID)
+                .frameIdentifier(frameId)
+                .carIndex(CAR_INDEX)
+                .fuelInTank(fuelKg)
+                .ersStoreEnergy(ersStoreEnergy)
+                .build();
+    }
+
+    /** Two laps with endedAt for fuel/ERS-by-lap scenario. */
+    public static java.util.List<Lap> lapsWithEndedAtForFuelErs() {
+        Instant lap1End = Instant.parse("2025-01-15T10:01:27Z");
+        Instant lap2End = Instant.parse("2025-01-15T10:03:00Z");
+        return java.util.List.of(
+                Lap.builder()
+                        .sessionUid(SESSION_UID)
+                        .carIndex(CAR_INDEX)
+                        .lapNumber((short) 1)
+                        .lapTimeMs(87_000)
+                        .endedAt(lap1End)
+                        .isInvalid(false)
+                        .build(),
+                Lap.builder()
+                        .sessionUid(SESSION_UID)
+                        .carIndex(CAR_INDEX)
+                        .lapNumber((short) 2)
+                        .lapTimeMs(93_000)
+                        .endedAt(lap2End)
+                        .isInvalid(false)
+                        .build()
+        );
+    }
+
+    /** CarStatusRaw rows near lap end times for fuel/ERS-by-lap (match lapsWithEndedAtForFuelErs). */
+    public static java.util.List<CarStatusRaw> carStatusRawForFuelErsByLap() {
+        Instant lap1End = Instant.parse("2025-01-15T10:01:27Z");
+        Instant lap2End = Instant.parse("2025-01-15T10:03:00Z");
+        return java.util.List.of(
+                carStatusRaw(lap1End, 1001, FUEL_AT_LAP_1_END, ERS_STORE_AT_LAP_1_END),
+                carStatusRaw(lap2End, 1002, FUEL_AT_LAP_2_END, ERS_STORE_AT_LAP_2_END)
+        );
     }
 
     // --- CarTelemetryRaw ---

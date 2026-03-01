@@ -1,5 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.CarPositionDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LeaderboardEntryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
@@ -50,6 +51,25 @@ public class LeaderboardQueryService {
         List<LeaderboardEntryDto> list = buildLeaderboard(sessionUid, state);
         log.debug("getLeaderboardForActiveSession: sessionUid={}, entries={}", sessionUid, list.size());
         return list;
+    }
+
+    /**
+     * Get live positions for the current active session (B9), or empty list if none.
+     */
+    public List<CarPositionDto> getPositionsForActiveSession() {
+        log.debug("getPositionsForActiveSession");
+        Map<Long, SessionRuntimeState> active = stateManager.getAllActive();
+        Optional<Map.Entry<Long, SessionRuntimeState>> first = active.entrySet().stream()
+                .filter(e -> e.getValue().isActive())
+                .findFirst();
+        if (first.isEmpty()) {
+            log.debug("getPositionsForActiveSession: no active session");
+            return List.of();
+        }
+        SessionRuntimeState state = first.get().getValue();
+        List<CarPositionDto> positions = state.getLatestPositions();
+        log.debug("getPositionsForActiveSession: positions={}", positions.size());
+        return positions;
     }
 
     /**

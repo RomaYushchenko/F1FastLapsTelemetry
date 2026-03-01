@@ -8,7 +8,9 @@ import { HttpError } from './types'
 import type {
   ApiErrorBody,
   ComparisonResponseDto,
+  ErsByLapDto,
   ErsPoint,
+  FuelByLapDto,
   Lap,
   LapCorner,
   LeaderboardEntry,
@@ -298,6 +300,52 @@ export async function getStints(
   return requestJson<StintDto[]>(
     `/api/sessions/${encodeURIComponent(sessionId!)}/stints${carIndexQuery(carIndex)}`
   )
+}
+
+/** GET /api/sessions/{id}/fuel-by-lap — fuel (kg) at lap end (B6). */
+export async function getFuelByLap(
+  sessionId: string | undefined,
+  carIndex = 0
+): Promise<FuelByLapDto[]> {
+  return requestJson<FuelByLapDto[]>(
+    `/api/sessions/${encodeURIComponent(sessionId!)}/fuel-by-lap${carIndexQuery(carIndex)}`
+  )
+}
+
+/** GET /api/sessions/{id}/ers-by-lap — ERS store % at lap end (B7). */
+export async function getErsByLap(
+  sessionId: string | undefined,
+  carIndex = 0
+): Promise<ErsByLapDto[]> {
+  return requestJson<ErsByLapDto[]>(
+    `/api/sessions/${encodeURIComponent(sessionId!)}/ers-by-lap${carIndexQuery(carIndex)}`
+  )
+}
+
+/** GET /api/sessions/active/positions — live positions for all cars (B9); 204 → empty list */
+export async function getActivePositions(options?: RequestOptions): Promise<import('./types').CarPositionDto[]> {
+  const url = `${API_BASE_URL}/api/sessions/active/positions`
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options?.headers ?? {}),
+    },
+  })
+  if (response.status === 204) return []
+  if (!response.ok) {
+    const body = await parseJsonOrNull(response)
+    const message =
+      (body &&
+      typeof body === 'object' &&
+      'message' in body &&
+      typeof (body as ApiErrorBody).message === 'string'
+        ? (body as ApiErrorBody).message
+        : `Request to /api/sessions/active/positions failed with status ${response.status}`) ?? ''
+    notify.error(message)
+    throw new HttpError(response.status, message, body ?? undefined)
+  }
+  return response.json() as Promise<import('./types').CarPositionDto[]>
 }
 
 /** GET /api/sessions/active/leaderboard — live leaderboard; 204 → empty list */

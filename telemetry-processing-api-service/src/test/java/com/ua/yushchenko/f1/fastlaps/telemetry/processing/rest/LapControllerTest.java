@@ -1,5 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsByLapDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.FuelByLapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapCornerDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
@@ -206,5 +208,43 @@ class LapControllerTest {
         assertThat(response.getBody()).hasSize(1);
         assertThat(response.getBody().get(0).getStintIndex()).isEqualTo(1);
         verify(stintQueryService).getStints(SESSION_PUBLIC_ID_STR, CAR_INDEX);
+    }
+
+    @Test
+    @DisplayName("getFuelByLap делегує сервісу та повертає 200")
+    void getFuelByLap_delegatesAndReturnsOk() {
+        // Arrange
+        List<FuelByLapDto> list = List.of(
+                FuelByLapDto.builder().lapNumber(1).fuelKg(98.5f).build());
+        when(lapQueryService.getFuelByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX)).thenReturn(list);
+
+        // Act
+        ResponseEntity<List<FuelByLapDto>> response = controller.getFuelByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX);
+
+        // Assert
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).hasSize(1);
+        assertThat(response.getBody().get(0).getLapNumber()).isEqualTo(1);
+        assertThat(response.getBody().get(0).getFuelKg()).isEqualTo(98.5f);
+        verify(lapQueryService).getFuelByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX);
+    }
+
+    @Test
+    @DisplayName("getErsByLap делегує сервісу та повертає 200")
+    void getErsByLap_delegatesAndReturnsOk() {
+        // Arrange
+        List<ErsByLapDto> list = List.of(
+                ErsByLapDto.builder().lapNumber(1).ersStorePercentEnd(63).build());
+        when(lapQueryService.getErsByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX)).thenReturn(list);
+
+        // Act
+        ResponseEntity<List<ErsByLapDto>> response = controller.getErsByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX);
+
+        // Assert
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).hasSize(1);
+        assertThat(response.getBody().get(0).getLapNumber()).isEqualTo(1);
+        assertThat(response.getBody().get(0).getErsStorePercentEnd()).isEqualTo(63);
+        verify(lapQueryService).getErsByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX);
     }
 }

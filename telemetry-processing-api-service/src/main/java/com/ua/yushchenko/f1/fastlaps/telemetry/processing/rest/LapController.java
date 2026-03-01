@@ -1,6 +1,8 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsByLapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsPointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.FuelByLapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapCornerDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
@@ -142,6 +144,26 @@ public class LapController {
         }
         List<ErsPointDto> ers = lapQueryService.getLapErs(id, lapNum, carIndex);
         return ResponseEntity.ok(ers);
+    }
+
+    @GetMapping("/fuel-by-lap")
+    public ResponseEntity<List<FuelByLapDto>> getFuelByLap(
+            @PathVariable("id") String id,
+            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
+    ) {
+        log.debug("getFuelByLap: id={}, carIndex={}", id, carIndex);
+        List<FuelByLapDto> list = lapQueryService.getFuelByLap(id, carIndex);
+        return ResponseEntity.ok(list);
+    }
+
+    @GetMapping("/ers-by-lap")
+    public ResponseEntity<List<ErsByLapDto>> getErsByLap(
+            @PathVariable("id") String id,
+            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
+    ) {
+        log.debug("getErsByLap: id={}, carIndex={}", id, carIndex);
+        List<ErsByLapDto> list = lapQueryService.getErsByLap(id, carIndex);
+        return ResponseEntity.ok(list);
     }
 
     @GetMapping("/sectors")

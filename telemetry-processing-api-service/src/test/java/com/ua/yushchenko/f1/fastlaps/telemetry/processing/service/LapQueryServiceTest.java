@@ -1,5 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsByLapDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.FuelByLapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapCornerDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
@@ -26,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -225,6 +228,99 @@ class LapQueryServiceTest {
 
         // Act
         List<SpeedTracePointDto> result = service.getSpeedTrace(SESSION_PUBLIC_ID_STR, 1, CAR_INDEX);
+
+        // Assert
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getFuelByLap повертає fuel kg на кінець кожного кола")
+    void getFuelByLap_returnsFuelAtLapEnd() {
+        // Arrange
+        Session session = session();
+        List<Lap> laps = lapsWithEndedAtForFuelErs();
+        List<com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarStatusRaw> statusList =
+                carStatusRawForFuelErsByLap();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(SESSION_UID, CAR_INDEX))
+                .thenReturn(laps);
+        Instant tsMin = laps.get(0).getEndedAt();
+        Instant tsMax = laps.get(1).getEndedAt();
+        when(carStatusRawRepository.findBySessionUidAndCarIndexAndTsBetweenOrderByTsAsc(
+                SESSION_UID, CAR_INDEX, tsMin, tsMax)).thenReturn(statusList);
+
+        // Act
+        List<FuelByLapDto> result = service.getFuelByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX);
+
+        // Assert
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getLapNumber()).isEqualTo(1);
+        assertThat(result.get(0).getFuelKg()).isEqualTo(FUEL_AT_LAP_1_END);
+        assertThat(result.get(1).getLapNumber()).isEqualTo(2);
+        assertThat(result.get(1).getFuelKg()).isEqualTo(FUEL_AT_LAP_2_END);
+    }
+
+    @Test
+    @DisplayName("getFuelByLap повертає порожній список коли немає кіл з endedAt")
+    void getFuelByLap_returnsEmpty_whenNoLapsWithEndedAt() {
+        // Arrange
+        Session session = session();
+        Lap lapNoEnd = lap();
+        lapNoEnd.setEndedAt(null);
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(SESSION_UID, CAR_INDEX))
+                .thenReturn(List.of(lapNoEnd));
+
+        // Act
+        List<FuelByLapDto> result = service.getFuelByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX);
+
+        // Assert
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getErsByLap повертає ERS % на кінець кожного кола")
+    void getErsByLap_returnsErsPercentAtLapEnd() {
+        // Arrange
+        Session session = session();
+        List<Lap> laps = lapsWithEndedAtForFuelErs();
+        List<com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarStatusRaw> statusList =
+                carStatusRawForFuelErsByLap();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(SESSION_UID, CAR_INDEX))
+                .thenReturn(laps);
+        Instant tsMin = laps.get(0).getEndedAt();
+        Instant tsMax = laps.get(1).getEndedAt();
+        when(carStatusRawRepository.findBySessionUidAndCarIndexAndTsBetweenOrderByTsAsc(
+                SESSION_UID, CAR_INDEX, tsMin, tsMax)).thenReturn(statusList);
+
+        // Act
+        List<ErsByLapDto> result = service.getErsByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX);
+
+        // Assert
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getLapNumber()).isEqualTo(1);
+        assertThat(result.get(0).getErsStorePercentEnd()).isEqualTo(63); // 2.5M/4M * 100
+        assertThat(result.get(1).getLapNumber()).isEqualTo(2);
+        assertThat(result.get(1).getErsStorePercentEnd()).isEqualTo(55); // 2.2M/4M * 100
+    }
+
+    @Test
+    @DisplayName("getErsByLap повертає порожній список коли немає car status у діапазоні")
+    void getErsByLap_returnsEmpty_whenNoCarStatusInRange() {
+        // Arrange
+        Session session = session();
+        List<Lap> laps = lapsWithEndedAtForFuelErs();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(SESSION_UID, CAR_INDEX))
+                .thenReturn(laps);
+        Instant tsMin = laps.get(0).getEndedAt();
+        Instant tsMax = laps.get(1).getEndedAt();
+        when(carStatusRawRepository.findBySessionUidAndCarIndexAndTsBetweenOrderByTsAsc(
+                SESSION_UID, CAR_INDEX, tsMin, tsMax)).thenReturn(List.of());
+
+        // Act
+        List<ErsByLapDto> result = service.getErsByLap(SESSION_PUBLIC_ID_STR, CAR_INDEX);
 
         // Assert
         assertThat(result).isEmpty();

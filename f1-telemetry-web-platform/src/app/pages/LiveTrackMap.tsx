@@ -1,13 +1,21 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { TelemetryStat } from "../components/TelemetryStat";
 import { useLiveTelemetry } from "@/ws";
 import { getTrackName } from "@/constants/tracks";
-import { getTrackLayout } from "@/api/client";
-import type { TrackLayoutResponseDto } from "@/api/types";
+import { getTrackLayout, getActivePositions } from "@/api/client";
+import type { TrackLayoutResponseDto, CarPositionDto } from "@/api/types";
 import { toast } from "sonner";
+
+const POSITIONS_POLL_INTERVAL_MS = 2000;
+
+/** Color palette for car indices (B9 positions). */
+const CAR_COLORS = ["#00E5FF", "#00FF85", "#E10600", "#FACC15", "#A855F7", "#EC4899", "#14B8A6", "#F97316", "#8B5CF6", "#22C55E", "#EF4444", "#3B82F6", "#EAB308", "#06B6D4", "#84CC16", "#F43F5E", "#6366F1", "#0EA5E9", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899"];
+function colorForCarIndex(carIndex: number): string {
+  return CAR_COLORS[carIndex % CAR_COLORS.length] ?? "#9CA3AF";
+}
 
 /** Build SVG path d from points (polyline). */
 function pointsToPath(points: { x: number; y: number }[]): string {
@@ -80,13 +88,50 @@ export default function LiveTrackMap() {
     : "0 0 800 600";
   const pathD = pointsToPath(points);
 
-  const drivers = [
-    { id: 1, name: "VER", pos: 1, color: "#00E5FF" },
-    { id: 2, name: "HAM", pos: 2, color: "#00FF85" },
-    { id: 3, name: "LEC", pos: 3, color: "#E10600" },
-    { id: 4, name: "NOR", pos: 4, color: "#FACC15" },
-    { id: 5, name: "PIA", pos: 5, color: "#A855F7" },
-  ];
+  const [positions, setPositions] = useState<CarPositionDto[]>([]);
+  const positionsPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (noActiveSession) {
+      setPositions([]);
+      if (positionsPollRef.current) {
+        clearInterval(positionsPollRef.current);
+        positionsPollRef.current = null;
+      }
+      return;
+    }
+    const poll = () => {
+      getActivePositions()
+        .then(setPositions)
+        .catch(() => setPositions([]));
+    };
+    poll();
+    positionsPollRef.current = setInterval(poll, POSITIONS_POLL_INTERVAL_MS);
+    return () => {
+      if (positionsPollRef.current) {
+        clearInterval(positionsPollRef.current);
+        positionsPollRef.current = null;
+      }
+    };
+  }, [noActiveSession]);
+
+  const useRealPositions = positions.length > 0;
+  const driversForMap = useRealPositions
+    ? positions.map((p) => ({
+        id: p.carIndex,
+        name: `Car ${p.carIndex}`,
+        pos: p.carIndex + 1,
+        color: colorForCarIndex(p.carIndex),
+        x: p.worldPosX,
+        y: p.worldPosZ,
+      }))
+    : [
+        { id: 1, name: "VER", pos: 1, color: "#00E5FF", x: 0, y: 0 },
+        { id: 2, name: "HAM", pos: 2, color: "#00FF85", x: 0, y: 0 },
+        { id: 3, name: "LEC", pos: 3, color: "#E10600", x: 0, y: 0 },
+        { id: 4, name: "NOR", pos: 4, color: "#FACC15", x: 0, y: 0 },
+        { id: 5, name: "PIA", pos: 5, color: "#A855F7", x: 0, y: 0 },
+      ];
 
   const trackTitle =
     session?.trackDisplayName ?? (trackId != null ? getTrackName(trackId) : null) ?? "Track Map";
@@ -162,11 +207,13 @@ export default function LiveTrackMap() {
                         <text x={(points[0]?.x ?? 0) + 10} y={(points[0]?.y ?? 0) + 5} fill="#F9FAFB" fontSize="12" fontWeight="bold">START</text>
                       </>
                     )}
-                    {/* Driver positions (mock until B9) */}
-                    {drivers.map((driver, idx) => {
-                      const pos = points.length >= 5
-                        ? points[Math.floor((idx / 5) * points.length) % points.length]
-                        : [{ x: 120, y: 300 }, { x: 180, y: 220 }, { x: 350, y: 105 }, { x: 620, y: 120 }, { x: 700, y: 280 }][idx];
+                    {/* Driver positions: real (B9) when available, else mock */}
+                    {driversForMap.map((driver, idx) => {
+                      const pos = useRealPositions
+                        ? { x: driver.x, y: driver.y }
+                        : points.length >= 5
+                          ? points[Math.floor((idx / Math.max(1, driversForMap.length)) * points.length) % points.length]
+                          : [{ x: 120, y: 300 }, { x: 180, y: 220 }, { x: 350, y: 105 }, { x: 620, y: 120 }, { x: 700, y: 280 }][idx];
                       if (!pos) return null;
                       return (
                         <g key={driver.id}>
@@ -176,10 +223,10 @@ export default function LiveTrackMap() {
                             r="12"
                             fill={driver.color}
                             opacity="0.3"
-                            className="animate-pulse"
+                            className={useRealPositions ? "" : "animate-pulse"}
                           />
                           <circle cx={pos.x} cy={pos.y} r="8" fill={driver.color} />
-                          {idx === 0 && (
+                          {session?.playerCarIndex === driver.id && (
                             <circle
                               cx={pos.x}
                               cy={pos.y}
@@ -211,9 +258,11 @@ export default function LiveTrackMap() {
                 )}
 
                 <div className="absolute top-4 left-4 bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 min-w-[150px]">
-                  <div className="text-xs text-text-secondary uppercase mb-2">Positions</div>
+                  <div className="text-xs text-text-secondary uppercase mb-2">
+                    Positions {useRealPositions ? "(live)" : "(mock)"}
+                  </div>
                   <div className="space-y-2">
-                    {drivers.map((driver) => (
+                    {driversForMap.map((driver) => (
                       <div key={driver.id} className="flex items-center gap-2">
                         <div className="w-4 text-xs font-bold text-text-secondary">{driver.pos}</div>
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: driver.color }} />

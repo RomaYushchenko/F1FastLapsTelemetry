@@ -64,7 +64,7 @@ This document lists **backend features that are not implemented today** but are 
 
 **Current backend:** CarStatus has fuel and ERS data; we have `GET .../laps/{lapNum}/ers` (energy % along lap distance). There is no fuel-by-lap or “deployed vs harvested” by lap aggregation.
 
-**Gap:** No fuel-per-lap and no ERS deployed/harvested per-lap endpoints or fields.
+**Status: Implemented in Block H (Steps 25–26).** Backend: `GET /api/sessions/{sessionUid}/fuel-by-lap?carIndex=`, `GET .../ers-by-lap?carIndex=` (one value per lap at lap end). New UI: Strategy View uses API data when available; mock fallback when empty.
 
 ---
 
@@ -77,9 +77,9 @@ This document lists **backend features that are not implemented today** but are 
 
 **Current backend:** Track corner map exists (`GET /api/tracks/{trackId}/corner-maps/latest`) with corners (start/end/apex distance). No Motion (packet 0) in MVP; WebSocket is single-car only.
 
-**Status: B8 implemented in Block F (Steps 21–22).** See [block-f-live-track-map.md](.github/draft/implementation-plans/new-ui-backend/block-f-live-track-map.md). Backend: `GET /api/tracks/{trackId}/layout` returns 2D points and optional bounds from `telemetry.track_layout` table. New UI: Live Track Map fetches layout when active session exists, draws track from API; driver positions remain mock until B9.
+**Status: B8 implemented in Block F (Steps 21–22).** See [block-f-live-track-map.md](.github/draft/implementation-plans/new-ui-backend/block-f-live-track-map.md). Backend: `GET /api/tracks/{trackId}/layout` returns 2D points and optional bounds from `telemetry.track_layout` table. New UI: Live Track Map fetches layout when active session exists, draws track from API.
 
-**Gap:** No multi-car live positions (B9; would require Motion data and/or broadcast).
+**Status: B9 implemented in Block H (Steps 27–28).** Motion ingest extended to all 22 cars; `GET /api/sessions/active/positions` and WebSocket message type **POSITIONS** on `/topic/live/{sessionId}` provide live world positions. New UI: Live Track Map polls positions (or uses WS) and displays real car positions when available; mock fallback when no position data.
 
 #### B8 — Data source for track drawing (coordinates)
 
@@ -113,7 +113,7 @@ Coordinates for drawing the track will be provided separately (e.g. a file or se
 
 **Current backend:** No user entity, no auth, no profile or preferences API.
 
-**Gap:** Full new domain (user, auth, profile, preferences, deletion).
+**Status: Deferred (Block H plan).** B11–B14 to be implemented **last** in a **separate auth microservice** (register, login, refresh, logout, profile, preferences, delete sessions/account). Main telemetry API remains unchanged; optional session owner marker when auth exists. See block-h-optional-fuel-ers-positions-auth.md Steps 29–30.
 
 ---
 

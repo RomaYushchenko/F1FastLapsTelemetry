@@ -1,6 +1,8 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsByLapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsPointDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.FuelByLapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapCornerDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
@@ -12,6 +14,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.corner.SteerBasedCorne
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.LapMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarStatusRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.LapCornerMetrics;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackCorner;
@@ -265,6 +268,78 @@ public class LapQueryService {
             }
         }
         log.debug("getLapErs: returning {} ERS points", result.size());
+        return result;
+    }
+
+    /**
+     * Fuel remaining at lap end for each lap (B6). Uses CarStatusRaw.fuelInTank at nearest timestamp to lap endedAt.
+     */
+    public List<FuelByLapDto> getFuelByLap(String sessionId, Short carIndex) {
+        log.debug("getFuelByLap: sessionId={}, carIndex={}", sessionId, carIndex);
+        Session session = sessionResolveService.getSessionByPublicIdOrUid(normalizeId(sessionId));
+        Long sessionUid = session.getSessionUid();
+        List<Lap> laps = lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(sessionUid, carIndex);
+        List<Lap> lapsWithEnd = laps.stream().filter(l -> l.getEndedAt() != null).collect(Collectors.toList());
+        if (lapsWithEnd.isEmpty()) {
+            log.debug("getFuelByLap: no laps with endedAt, returning empty");
+            return List.of();
+        }
+        Instant tsMin = lapsWithEnd.get(0).getEndedAt();
+        Instant tsMax = lapsWithEnd.get(lapsWithEnd.size() - 1).getEndedAt();
+        List<CarStatusRaw> statusList = carStatusRawRepository
+                .findBySessionUidAndCarIndexAndTsBetweenOrderByTsAsc(sessionUid, carIndex, tsMin, tsMax);
+        if (statusList.isEmpty()) {
+            log.debug("getFuelByLap: no car status in lap end range, returning empty");
+            return List.of();
+        }
+        List<FuelByLapDto> result = new ArrayList<>();
+        for (Lap lap : lapsWithEnd) {
+            CarStatusRaw nearest = findNearestByTs(statusList, lap.getEndedAt());
+            if (nearest != null && nearest.getFuelInTank() != null) {
+                result.add(FuelByLapDto.builder()
+                        .lapNumber(lap.getLapNumber() != null ? lap.getLapNumber().intValue() : null)
+                        .fuelKg(nearest.getFuelInTank())
+                        .build());
+            }
+        }
+        log.debug("getFuelByLap: returning {} points", result.size());
+        return result;
+    }
+
+    /**
+     * ERS store % at lap end for each lap (B7). One value per lap; uses CarStatusRaw.ersStoreEnergy at nearest timestamp to lap endedAt.
+     */
+    public List<ErsByLapDto> getErsByLap(String sessionId, Short carIndex) {
+        log.debug("getErsByLap: sessionId={}, carIndex={}", sessionId, carIndex);
+        Session session = sessionResolveService.getSessionByPublicIdOrUid(normalizeId(sessionId));
+        Long sessionUid = session.getSessionUid();
+        List<Lap> laps = lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(sessionUid, carIndex);
+        List<Lap> lapsWithEnd = laps.stream().filter(l -> l.getEndedAt() != null).collect(Collectors.toList());
+        if (lapsWithEnd.isEmpty()) {
+            log.debug("getErsByLap: no laps with endedAt, returning empty");
+            return List.of();
+        }
+        Instant tsMin = lapsWithEnd.get(0).getEndedAt();
+        Instant tsMax = lapsWithEnd.get(lapsWithEnd.size() - 1).getEndedAt();
+        List<CarStatusRaw> statusList = carStatusRawRepository
+                .findBySessionUidAndCarIndexAndTsBetweenOrderByTsAsc(sessionUid, carIndex, tsMin, tsMax);
+        if (statusList.isEmpty()) {
+            log.debug("getErsByLap: no car status in lap end range, returning empty");
+            return List.of();
+        }
+        List<ErsByLapDto> result = new ArrayList<>();
+        for (Lap lap : lapsWithEnd) {
+            CarStatusRaw nearest = findNearestByTs(statusList, lap.getEndedAt());
+            if (nearest != null && nearest.getErsStoreEnergy() != null) {
+                float percent = 100f * nearest.getErsStoreEnergy() / ERS_MAX_ENERGY_J;
+                int energyPercent = (int) Math.max(0, Math.min(100, Math.round(percent)));
+                result.add(ErsByLapDto.builder()
+                        .lapNumber(lap.getLapNumber() != null ? lap.getLapNumber().intValue() : null)
+                        .ersStorePercentEnd(energyPercent)
+                        .build());
+            }
+        }
+        log.debug("getErsByLap: returning {} points", result.size());
         return result;
     }
 

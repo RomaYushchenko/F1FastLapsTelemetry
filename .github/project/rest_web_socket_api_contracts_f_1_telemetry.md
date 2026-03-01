@@ -440,6 +440,54 @@ Response: array of ErsPointDto — stored energy along the lap (same lap as peda
 
 ---
 
+#### 3.7.1 Fuel by lap (B6)
+
+```
+GET /api/sessions/{sessionUid}/fuel-by-lap
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: array of **FuelByLapDto** — fuel in tank at lap end for each lap.
+```json
+[
+  { "lapNumber": 1, "fuelKg": 98.5 },
+  { "lapNumber": 2, "fuelKg": 95.0 }
+]
+```
+
+- `lapNumber` (int) — 1-based lap number.
+- `fuelKg` (float) — fuel in tank at lap end, in kg (raw from CarStatus). 404 if session not found; 200 and `[]` if no laps with endedAt or no car status data.
+
+Plan: block-h-optional-fuel-ers-positions-auth.md Step 25.
+
+---
+
+#### 3.7.2 ERS by lap (B7)
+
+```
+GET /api/sessions/{sessionUid}/ers-by-lap
+```
+
+Query params:
+- `carIndex` (int, default 0)
+
+Response: array of **ErsByLapDto** — ERS store % at lap end (one value per lap).
+```json
+[
+  { "lapNumber": 1, "ersStorePercentEnd": 63 },
+  { "lapNumber": 2, "ersStorePercentEnd": 55 }
+]
+```
+
+- `lapNumber` (int) — 1-based lap number.
+- `ersStorePercentEnd` (int) — ERS energy store at lap end, 0–100%. 404 if session not found; 200 and `[]` if no data.
+
+Plan: block-h Step 25 (H1: one value per lap only).
+
+---
+
 ### 3.8 Live leaderboard (active session)
 
 ```
@@ -457,6 +505,24 @@ Response: **204 No Content** if there is no active session. Otherwise **200 OK**
 - `gap` (string) — "LEAD" for P1, "+1.234" for others, or "—" if no lap time yet.
 - `lastLapTimeMs` (integer, optional) — last completed lap time in ms.
 - `sector1Ms`, `sector2Ms`, `sector3Ms` (integer, optional) — sector times of last lap.
+
+---
+
+#### 3.8.1 Live positions (B9)
+
+```
+GET /api/sessions/active/positions
+```
+
+Returns the latest world positions of all cars for the **active** session (from Motion packet 0, all 22 cars). Used by Live Track Map.
+
+Response: **204 No Content** if there is no active session or no position data. Otherwise **200 OK** with body: array of **CarPositionDto**:
+
+- `carIndex` (int) — car index (0–21).
+- `worldPosX` (float) — world X coordinate (game space).
+- `worldPosZ` (float) — world Z coordinate (game space).
+
+Same data is pushed via WebSocket message type **POSITIONS** on `/topic/live/{sessionId}` at 10 Hz when subscribers exist. Plan: block-h Step 27–28.
 
 WebSocket: same payload is sent as message type **LEADERBOARD** on `/topic/live/{sessionId}` when LapData/position/snapshot changes (see § 4.5.3).
 
@@ -644,6 +710,24 @@ Sent on `/topic/live/{sessionId}` when leaderboard data changes (LapData, positi
   ]
 }
 ```
+
+---
+
+#### 4.5.5 Live positions (B9)
+
+Sent on `/topic/live/{sessionId}` at 10 Hz when subscribers exist. Payload: array of car world positions (same as `GET /api/sessions/active/positions`).
+
+```json
+{
+  "type": "POSITIONS",
+  "positions": [
+    { "carIndex": 0, "worldPosX": 123.4, "worldPosZ": -456.7 },
+    { "carIndex": 1, "worldPosX": 120.1, "worldPosZ": -450.2 }
+  ]
+}
+```
+
+Plan: block-h Step 27–28.
 
 ---
 

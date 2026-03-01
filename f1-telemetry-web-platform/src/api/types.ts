@@ -159,6 +159,18 @@ export interface StintDto {
   degradationIndicator: 'high' | 'medium' | 'low' | null
 }
 
+/** GET /api/sessions/{id}/fuel-by-lap — fuel at lap end (B6). */
+export interface FuelByLapDto {
+  lapNumber: number
+  fuelKg: number | null
+}
+
+/** GET /api/sessions/{id}/ers-by-lap — ERS store % at lap end (B7). */
+export interface ErsByLapDto {
+  lapNumber: number
+  ersStorePercentEnd: number | null
+}
+
 /** GET /api/sessions/active/leaderboard — live leaderboard entry */
 export interface LeaderboardEntry {
   position: number
@@ -198,4 +210,11 @@ export interface TrackLayoutResponseDto {
   trackId: number
   points: TrackLayoutPoint[]
   bounds?: TrackLayoutBounds
+}
+
+/** GET /api/sessions/active/positions or WebSocket POSITIONS — one car's world position (B9). */
+export interface CarPositionDto {
+  carIndex: number
+  worldPosX: number
+  worldPosZ: number
 }

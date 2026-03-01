@@ -177,42 +177,42 @@ Use this to track what is done and what is left. Mark with `[x]` when completed.
 
 ### Step 25 — Backend B6/B7 Fuel and ERS by lap
 
-- [ ] 25.1 — Decision B7 scope (H1) recorded
-- [ ] 25.2 — REST contract: fuel-by-lap endpoint and FuelByLapDto
-- [ ] 25.3 — REST contract: ers-by-lap endpoint and ErsByLapDto
-- [ ] 25.4 — telemetry-api-contracts: FuelByLapDto, ErsByLapDto
-- [ ] 25.5 — Service: fuel-by-lap aggregation (lap end from CarStatusRaw)
-- [ ] 25.6 — Service: ers-by-lap aggregation (lap end, %; optional deployed/harvested)
-- [ ] 25.7 — Controller: GET fuel-by-lap, GET ers-by-lap
-- [ ] 25.8 — TestData + unit tests + MockMvc; verify 85% coverage
+- [x] 25.1 — Decision B7 scope (H1) recorded
+- [x] 25.2 — REST contract: fuel-by-lap endpoint and FuelByLapDto
+- [x] 25.3 — REST contract: ers-by-lap endpoint and ErsByLapDto
+- [x] 25.4 — telemetry-api-contracts: FuelByLapDto, ErsByLapDto
+- [x] 25.5 — Service: fuel-by-lap aggregation (lap end from CarStatusRaw)
+- [x] 25.6 — Service: ers-by-lap aggregation (lap end, %; optional deployed/harvested)
+- [x] 25.7 — Controller: GET fuel-by-lap, GET ers-by-lap
+- [x] 25.8 — TestData + unit tests + MockMvc; verify 85% coverage
 - [ ] 25.9 — If deferred: document in BACKEND_FEATURES only
 
 ### Step 26 — New UI Strategy View fuel/ERS
 
-- [ ] 26.1 — api/types + api/client: getFuelByLap, getErsByLap
-- [ ] 26.2 — StrategyView: fetch fuel/ERS when B6/B7 available; loading/error
-- [ ] 26.3 — StrategyView: Fuel Consumption chart from API
-- [ ] 26.4 — StrategyView: ERS Deployment & Harvesting chart from API
-- [ ] 26.5 — If B6/B7 not implemented: keep mock
+- [x] 26.1 — api/types + api/client: getFuelByLap, getErsByLap
+- [x] 26.2 — StrategyView: fetch fuel/ERS when B6/B7 available; loading/error
+- [x] 26.3 — StrategyView: Fuel Consumption chart from API
+- [x] 26.4 — StrategyView: ERS Deployment & Harvesting chart from API
+- [x] 26.5 — If B6/B7 not implemented: keep mock
 
 ### Step 27 — Backend B9 Multi-car positions
 
-- [ ] 27.1 — Decision B9 in scope (H2)
-- [ ] 27.2 — REST/WS contract: positions payload and message type or GET
-- [ ] 27.3 — udp-ingest: MotionPacketHandler publish all 22 cars
-- [ ] 27.4 — Processing: MotionConsumer accepts all car indices
-- [ ] 27.5 — Define and implement broadcast source (latest positions)
-- [ ] 27.6 — WebSocket POSITIONS or REST GET positions
-- [ ] 27.7 — Controller/service for positions (if REST)
+- [x] 27.1 — Decision B9 in scope (H2)
+- [x] 27.2 — REST/WS contract: positions payload and message type or GET
+- [x] 27.3 — udp-ingest: MotionPacketHandler publish all 22 cars
+- [x] 27.4 — Processing: MotionConsumer accepts all car indices
+- [x] 27.5 — Define and implement broadcast source (latest positions)
+- [x] 27.6 — WebSocket POSITIONS or REST GET positions
+- [x] 27.7 — Controller/service for positions (if REST)
 - [ ] 27.8 — TestData + unit tests; 85% coverage
-- [ ] 27.9 — BACKEND_FEATURES B9 implemented/deferred
+- [x] 27.9 — BACKEND_FEATURES B9 implemented/deferred
 
 ### Step 28 — New UI Live Track Map positions
 
-- [ ] 28.1 — If B9 deferred: no change
-- [ ] 28.2 — api/types + subscribe/poll for positions
-- [ ] 28.3 — LiveTrackMap: real positions from API/WS, map to canvas
-- [ ] 28.4 — Loading/empty state
+- [x] 28.1 — If B9 deferred: no change
+- [x] 28.2 — api/types + subscribe/poll for positions
+- [x] 28.3 — LiveTrackMap: real positions from API/WS, map to canvas
+- [x] 28.4 — Loading/empty state
 
 ### Step 29 — Backend Auth and user (B11–B14) — deferred to last; separate auth microservice
 
@@ -238,12 +238,12 @@ Use this to track what is done and what is left. Mark with `[x]` when completed.
 - [ ] 30.8 — Theme persistence: Theme select → localStorage; apply class on html on load and on change
 - [ ] 30.9 — Optional: "Your session" marker when session.ownerUserId === current user
 
-###Step 31 — Documentation
+### Step 31 — Documentation
 
-- [ ] REST contract: fuel-by-lap, ers-by-lap (if 25 done)
-- [ ] REST contract: positions (if 27 done)
+- [x] REST contract: fuel-by-lap, ers-by-lap (if 25 done)
+- [x] REST contract: positions (if 27 done)
 - [ ] REST contract: auth, user profile, preferences, delete (if 29 done)
-- [ ] BACKEND_FEATURES_FOR_NEW_UI.md: B6, B7, B9, B11–B14 marked implemented or deferred
+- [x] BACKEND_FEATURES_FOR_NEW_UI.md: B6, B7, B9, B11–B14 marked implemented or deferred
 - [ ] NEW_UI_DOCS.md: §8 auth, settings, danger zone (if 30 done)
 - [ ] telemetry_processing_api_service.md: new controllers/services (if any)
 

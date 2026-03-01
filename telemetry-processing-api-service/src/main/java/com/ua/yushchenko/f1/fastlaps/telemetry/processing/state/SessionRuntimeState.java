@@ -1,14 +1,17 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.state;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.CarPositionDto;
 import lombok.Data;
 
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 
 /**
  * Runtime state for a single session (thread-safe).
@@ -43,6 +46,9 @@ public class SessionRuntimeState {
 
     /** Last known race position per car (from LapData m_carPosition). Persisted as finishing position on session end. */
     private final Map<Integer, Integer> lastCarPositionByCarIndex = new ConcurrentHashMap<>();
+
+    /** Latest world position (x, z) per car from Motion (B9). Index 0 = worldPosX, 1 = worldPosZ. */
+    private final Map<Integer, float[]> latestWorldPositionByCarIndex = new ConcurrentHashMap<>();
 
     // Snapshot for WebSocket (per carIndex)
     private final Map<Integer, CarSnapshot> snapshots = new ConcurrentHashMap<>();
@@ -166,6 +172,28 @@ public class SessionRuntimeState {
             return null;
         }
         return lastCarPositionByCarIndex.get(playerCarIndex.intValue());
+    }
+
+    /**
+     * Update latest world position for a car (from Motion packet, B9).
+     */
+    public void updatePosition(int carIndex, float worldPosX, float worldPosZ) {
+        latestWorldPositionByCarIndex.put(carIndex, new float[]{worldPosX, worldPosZ});
+        this.lastSeenAt = Instant.now();
+    }
+
+    /**
+     * Get latest positions for all cars (B9 Live Track Map). Returns list ordered by carIndex.
+     */
+    public List<CarPositionDto> getLatestPositions() {
+        return latestWorldPositionByCarIndex.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> CarPositionDto.builder()
+                        .carIndex(e.getKey())
+                        .worldPosX(e.getValue()[0])
+                        .worldPosZ(e.getValue()[1])
+                        .build())
+                .collect(Collectors.toList());
     }
 
     /**

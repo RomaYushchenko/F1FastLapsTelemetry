@@ -1,5 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.CarPositionDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LeaderboardEntryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.LeaderboardQueryService;
 import lombok.RequiredArgsConstructor;
@@ -32,5 +33,16 @@ public class LeaderboardController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(entries);
+    }
+
+    @GetMapping("/positions")
+    public ResponseEntity<List<CarPositionDto>> getPositions() {
+        log.debug("Get positions");
+        List<CarPositionDto> positions = leaderboardQueryService.getPositionsForActiveSession();
+        if (positions.isEmpty()) {
+            log.debug("Get positions: no active session or no position data, returning 204");
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(positions);
     }
 }
