@@ -139,7 +139,7 @@ Track progress by marking items when done. Copy this block into your working doc
 - [x] BACKEND_FEATURES_FOR_NEW_UI.md B1 marked implemented
 
 ### Step 10 — Git Commit
-- [ ] Add git commit with understanding message
+- [x] Add git commit with understanding message
 ---
 
 ## Decisions (resolved)
