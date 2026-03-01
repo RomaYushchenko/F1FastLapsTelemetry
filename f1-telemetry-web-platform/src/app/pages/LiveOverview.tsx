@@ -1,12 +1,15 @@
+import { Link } from "react-router";
 import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { TelemetryStat } from "../components/TelemetryStat";
-import { useLiveTelemetry } from "../../ws/useLiveTelemetry";
-import { TYRE_LABELS } from "../../ws/types";
+import { useLiveTelemetry, TYRE_LABELS } from "@/ws";
+import { getTrackName } from "@/constants/tracks";
+import { formatLapTime } from "@/api/format";
 import { Flag, Clock, CloudRain, AlertTriangle } from "lucide-react";
 
 export default function LiveOverview() {
-  const { snapshot, status } = useLiveTelemetry();
+  const { session, snapshot, status } = useLiveTelemetry();
+  const noActiveSession = status === "no-data" || session == null;
   const tyres = snapshot?.tyresSurfaceTempC;
   const fuelPercent = snapshot?.fuelRemainingPercent;
   const leaderboard = [
@@ -36,13 +39,26 @@ export default function LiveOverview() {
         </StatusBadge>
       </div>
 
+      {noActiveSession && (
+        <DataCard>
+          <div className="py-8 text-center space-y-4">
+            <p className="text-text-secondary">No active session. Start a session in F1 25 to see live telemetry.</p>
+            <Link to="/app/sessions" className="text-[#00E5FF] hover:underline font-medium">
+              View session history →
+            </Link>
+          </div>
+        </DataCard>
+      )}
+
+      {!noActiveSession && (
+        <>
       {/* Session Info */}
       <div className="grid lg:grid-cols-4 gap-6">
         <DataCard variant="live">
           <div className="space-y-2">
             <div className="text-xs text-text-secondary uppercase">Track</div>
-            <div className="text-xl font-bold">Silverstone</div>
-            <StatusBadge variant="active">Race</StatusBadge>
+            <div className="text-xl font-bold">{session?.trackDisplayName ?? getTrackName(session?.trackId ?? null) ?? "—"}</div>
+            <StatusBadge variant="active">{session?.sessionType ?? "—"}</StatusBadge>
           </div>
         </DataCard>
 
@@ -52,7 +68,10 @@ export default function LiveOverview() {
               <Flag className="w-4 h-4" />
               Lap
             </div>
-            <div className="text-3xl font-bold font-mono text-[#00E5FF]">24/52</div>
+            <div className="text-3xl font-bold font-mono text-[#00E5FF]">
+              {snapshot?.currentLap != null ? `${snapshot.currentLap}` : "—"}
+              {session?.totalLaps != null ? `/${session.totalLaps}` : ""}
+            </div>
           </div>
         </DataCard>
 
@@ -62,7 +81,7 @@ export default function LiveOverview() {
               <Clock className="w-4 h-4" />
               Session Time
             </div>
-            <div className="text-3xl font-bold font-mono">32:14</div>
+            <div className="text-3xl font-bold font-mono">—</div>
           </div>
         </DataCard>
 
@@ -72,8 +91,7 @@ export default function LiveOverview() {
               <CloudRain className="w-4 h-4" />
               Weather
             </div>
-            <div className="text-xl font-bold">Clear</div>
-            <div className="text-sm text-text-secondary">Track Temp: 42°C</div>
+            <div className="text-xl font-bold">—</div>
           </div>
         </DataCard>
       </div>
@@ -170,7 +188,7 @@ export default function LiveOverview() {
             <div className="space-y-4">
               <TelemetryStat
                 label="Speed"
-                value="287"
+                value={snapshot?.speedKph != null ? String(Math.round(snapshot.speedKph)) : "—"}
                 unit="KM/H"
                 variant="performance"
                 size="large"
@@ -179,13 +197,13 @@ export default function LiveOverview() {
               <div className="grid grid-cols-2 gap-4">
                 <TelemetryStat
                   label="Gear"
-                  value="6"
+                  value={snapshot?.gear != null ? String(snapshot.gear) : "—"}
                   variant="neutral"
                   size="medium"
                 />
                 <TelemetryStat
                   label="RPM"
-                  value="11.2k"
+                  value={snapshot?.engineRpm != null ? `${(snapshot.engineRpm / 1000).toFixed(1)}k` : "—"}
                   variant="neutral"
                   size="medium"
                 />
@@ -194,24 +212,24 @@ export default function LiveOverview() {
               <div className="pt-4 border-t border-border/50 space-y-3">
                 <TelemetryStat
                   label="Throttle"
-                  value="98%"
+                  value={snapshot?.throttle != null ? `${Math.round(snapshot.throttle * 100)}%` : "—"}
                   variant="performance"
                   size="small"
                 />
                 <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                  <div className="h-full w-[98%] bg-[#00FF85]" />
+                  <div className="h-full bg-[#00FF85]" style={{ width: snapshot?.throttle != null ? `${snapshot.throttle * 100}%` : "0%" }} />
                 </div>
               </div>
 
               <div className="space-y-3">
                 <TelemetryStat
                   label="Brake"
-                  value="0%"
+                  value={snapshot?.brake != null ? `${Math.round(snapshot.brake * 100)}%` : "—"}
                   variant="neutral"
                   size="small"
                 />
                 <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                  <div className="h-full w-0 bg-[#E10600]" />
+                  <div className="h-full bg-[#E10600]" style={{ width: snapshot?.brake != null ? `${snapshot.brake * 100}%` : "0%" }} />
                 </div>
               </div>
 
@@ -219,6 +237,30 @@ export default function LiveOverview() {
                 <TelemetryStat
                   label="ERS"
                   value={snapshot?.ersEnergyPercent != null ? `${snapshot.ersEnergyPercent}%` : "—"}
+                  variant="neutral"
+                  size="small"
+                />
+                <TelemetryStat
+                  label="Delta"
+                  value={snapshot?.deltaMs != null ? formatLapTime(snapshot.deltaMs) : "—"}
+                  variant="neutral"
+                  size="small"
+                />
+                <TelemetryStat
+                  label="Current lap"
+                  value={formatLapTime(snapshot?.currentLapTimeMs ?? null)}
+                  variant="neutral"
+                  size="small"
+                />
+                <TelemetryStat
+                  label="Best lap"
+                  value={formatLapTime(snapshot?.bestLapTimeMs ?? null)}
+                  variant="neutral"
+                  size="small"
+                />
+                <TelemetryStat
+                  label="Sector"
+                  value={snapshot?.currentSector != null ? `Sector ${snapshot.currentSector}` : "—"}
                   variant="neutral"
                   size="small"
                 />
@@ -242,12 +284,20 @@ export default function LiveOverview() {
                   ))}
                 </div>
               )}
+              {(!tyres || tyres.length < 4) && (
+                <div className="pt-4 border-t border-border/50 grid grid-cols-4 gap-2">
+                  {TYRE_LABELS.map((label) => (
+                    <TelemetryStat key={label} label={label} value="—" variant="neutral" size="small" />
+                  ))}
+                  <p className="col-span-4 text-xs text-text-secondary mt-1">Live tyre temps coming in a follow-up</p>
+                </div>
+              )}
             </div>
           </DataCard>
         </div>
       </div>
 
-      {/* Event Timeline */}
+      {/* Event Timeline (mock; Block E for real data) */}
       <DataCard title="Event Timeline">
         <div className="space-y-3">
           {events.map((event, idx) => (
@@ -291,6 +341,8 @@ export default function LiveOverview() {
           ))}
         </div>
       </DataCard>
+        </>
+      )}
     </div>
   );
 }

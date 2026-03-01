@@ -10,7 +10,7 @@ The new UI is a **React SPA** built with:
 - **Components:** Radix UI primitives + Shadcn-style wrappers in `src/app/components/ui/`
 - **Charts:** Recharts (LineChart, BarChart, etc.)
 - **State:** Local component state only; no global store (Redux/Zustand)
-- **Data:** Session History and Session Details use the **REST API** (see §5). Other pages (Live, Driver Comparison, Strategy, etc.) still use mock/static data or placeholders.
+- **Data:** Session History and Session Details use the **REST API** (see §5). Live Overview and Live Telemetry use **WebSocket** (SockJS/STOMP) for real-time snapshot data (see §5.5). Dashboard uses REST for recent sessions. Driver Comparison, Strategy, etc. still use mock/static data or placeholders.
 
 Entry flow: `index.html` → `src/main.tsx` → `App.tsx` → `RouterProvider(router)`.
 
@@ -60,7 +60,7 @@ Used across pages: accordion, alert, alert-dialog, aspect-ratio, avatar, badge, 
 - **State:** React `useState` (and local hooks) only. No global store. Notification list for the Bell is held in a small store (`src/notificationStore.ts`) with subscribe/add/markAsRead.
 - **Data flow:** Top-down via props. Pages own their state (e.g. SessionHistory: sessions, loading, error, offset; SessionDetails: session, laps, summary, chart data).
 - **Server data:** Session History and Session Details load from REST (see §5). Other pages still use mock data.
-- **Live data:** Connection status in AppLayout is hardcoded (`'live'`); WebSocket integration is planned in a later block.
+- **Live data:** A single WebSocket connection is managed by **LiveTelemetryProvider** (wraps `/app` routes). **useLiveTelemetry()** exposes status, session, snapshot, and optional sessionEnded/errorMessage. AppLayout shows real connection status (Live / Waiting / No Data / Disconnected / Error). Connect/disconnect/error toasts go through **notify** so they appear in the Bell.
 
 ---
 
@@ -69,7 +69,7 @@ Used across pages: accordion, alert, alert-dialog, aspect-ratio, avatar, badge, 
 ### 5.1 API layer (f1-telemetry-web-platform)
 
 - **Location:** `src/api/` (config, types, client, sessionId, format).
-- **`config.ts`:** Reads `VITE_API_BASE_URL` and `VITE_WS_URL` from env; defaults `http://localhost:8080` and `ws://localhost:8080/ws`.
+- **`config.ts`:** Reads `VITE_API_BASE_URL` and `VITE_WS_URL` from env; defaults `http://localhost:8080` and `ws://localhost:8080/ws`. **getWsLiveEndpoint()** returns the SockJS URL for live telemetry (`{base}/ws/live`).
 - **`types.ts`:** Session, Lap, SessionSummary, HttpError, ApiErrorBody, and chart DTOs (PacePoint, PedalTracePoint, ErsPoint, SpeedTracePoint, LapCorner, TyreWearPoint) aligned with the REST contract.
 - **`client.ts`:** Base URL from config; `requestJson<T>(path, init?)` (fetch, parse JSON; on !ok parse message, call `notify.error(message)` for status !== 404, throw `HttpError`). Methods: `getSessions({ limit?, offset? })`, `getSession(id)`, `getSessionLaps(id, carIndex)`, `getSessionSummary(id, carIndex)`, `getActiveSession()`, `updateSessionDisplayName(id, name)`, and chart endpoints: `getSessionPace`, `getLapTrace`, `getLapErs`, `getLapSpeedTrace`, `getLapCorners`, `getSessionTyreWear`.
 - **`sessionId.ts`:** `toSessionIdString(id)` (normalize API id to string), `isValidSessionId(id)` (UUID or numeric), `isSessionUuid(id)`. All URLs and API calls use string session IDs from the API.
@@ -90,7 +90,14 @@ Used across pages: accordion, alert, alert-dialog, aspect-ratio, avatar, badge, 
 - **Sessions:** `GET /api/sessions?limit=&offset=`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}` (sessionDisplayName).
 - **Laps / summary / charts:** `GET /api/sessions/{id}/laps?carIndex=`, `GET .../summary?carIndex=`, `GET .../pace`, `GET .../tyre-wear`, `GET .../laps/{lapNum}/trace`, `GET .../laps/{lapNum}/ers`, `GET .../laps/{lapNum}/speed-trace`, `GET .../laps/{lapNum}/corners`, `GET /api/sessions/active` (204 → null).
 
-Contracts and DTOs: `.github/project/rest_web_socket_api_contracts_f_1_telemetry.md`. WebSocket (SockJS/STOMP) is planned in a later block.
+Contracts and DTOs: `.github/project/rest_web_socket_api_contracts_f_1_telemetry.md`.
+
+### 5.5 WebSocket live telemetry (Block C)
+
+- **Location:** `src/ws/` — types (WsSnapshotMessage, WsSessionEndedMessage, WsErrorMessage), **LiveTelemetryProvider**, **useLiveTelemetry()**.
+- **Endpoint:** SockJS at `getWsLiveEndpoint()` (e.g. `http://localhost:8080/ws/live`). STOMP over SockJS; subscribe to `/topic/live/{sessionId}` and `/user/queue/errors`; send SUBSCRIBE/UNSUBSCRIBE via `/app/subscribe` and `/app/unsubscribe`.
+- **Single connection:** The provider is mounted around the `/app` layout so all Live pages and the header share one STOMP client. Status: live / waiting / no-data / disconnected / error. Auto-reconnect: when disconnected or after SESSION_ENDED, the provider re-polls `getActiveSession()`; when an active session appears again, it connects.
+- **Notify:** Connect, disconnect, and WebSocket error messages are sent through **notify** (info/warning/error) so they appear in the Bell and as toasts.
 
 ---
 
@@ -118,7 +125,7 @@ Contracts and DTOs: `.github/project/rest_web_socket_api_contracts_f_1_telemetry
 
 - **Session list/detail:** Use real REST API (getSessions, getSession, laps, summary, pace, trace, ERS, speed-trace, corners, tyre-wear). Session IDs from API are strings (UUID or session_uid); used in routes and all API calls. Best Lap / Total Time columns show "—" until backend adds bestLapTimeMs/totalTimeMs to list response.
 - **No auth:** Login/Register are UI-only (no submit to backend).
-- **Live:** No WebSocket yet; connection status is fake; live widgets need SockJS/STOMP and active-session polling (planned in Block C).
+- **Live:** WebSocket (Block C) is implemented: LiveTelemetryProvider, useLiveTelemetry(), real connection status in header, snapshot in Live Overview and Live Telemetry (rolling buffer, Time Range 10/30/60 s). Tyre temperatures and fuel in snapshot may be mock or "—" until follow-up (see block-c-follow-up-live-snapshot-tyre-fuel.md).
 - **Driver comparison / Strategy:** No backend endpoints for comparison or strategy; currently mock only.
 - **Track map:** Static SVG; no real track geometry or live positions from API.
 - **Settings:** Form state not persisted; no PATCH or user prefs API.

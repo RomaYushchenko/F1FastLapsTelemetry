@@ -37,6 +37,7 @@ export interface WsSessionEndedMessage {
 
 export interface WsErrorMessage {
   type: "ERROR";
+  code?: string;
   message?: string;
 }
 

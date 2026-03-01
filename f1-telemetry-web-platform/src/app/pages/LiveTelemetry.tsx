@@ -1,10 +1,16 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Link } from "react-router";
 import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
-import { useLiveTelemetry } from "../../ws/useLiveTelemetry";
-import { TYRE_LABELS } from "../../ws/types";
+import { useLiveTelemetry, TYRE_LABELS } from "@/ws";
 import { Button } from "../components/ui/button";
-import { 
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../components/ui/tooltip";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -14,11 +20,59 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Pause, Play } from "lucide-react";
 
+const SNAPSHOT_HZ = 10;
+
+interface ChartPoint {
+  time: number;
+  speed?: number;
+  throttle?: number;
+  brake?: number;
+  rpm?: number;
+  gear?: number;
+  ers?: number;
+  fuel?: number;
+}
+
 export default function LiveTelemetry() {
-  const { snapshot, status } = useLiveTelemetry();
+  const { session, snapshot, status, sessionEnded } = useLiveTelemetry();
   const [isPaused, setIsPaused] = useState(false);
   const [selectedDriver, setSelectedDriver] = useState("player");
   const [timeRange, setTimeRange] = useState("30");
+  const [buffer, setBuffer] = useState<ChartPoint[]>([]);
+  const startTimeRef = useRef<number | null>(null);
+
+  const noActiveSession = status === "no-data" || session == null;
+  const maxBufferLength = parseInt(timeRange, 10) * SNAPSHOT_HZ;
+
+  useEffect(() => {
+    if (noActiveSession || !snapshot || isPaused) return;
+    const t = startTimeRef.current ?? (snapshot.timestamp ? new Date(snapshot.timestamp).getTime() : Date.now());
+    if (startTimeRef.current == null) startTimeRef.current = t;
+    const timeSec = (Date.now() - t) / 1000;
+    setBuffer((prev) => {
+      const next = [
+        ...prev,
+        {
+          time: Math.round(timeSec * 10) / 10,
+          speed: snapshot.speedKph ?? undefined,
+          throttle: snapshot.throttle != null ? snapshot.throttle * 100 : undefined,
+          brake: snapshot.brake != null ? snapshot.brake * 100 : undefined,
+          rpm: snapshot.engineRpm ?? undefined,
+          gear: snapshot.gear ?? undefined,
+          ers: snapshot.ersEnergyPercent ?? undefined,
+          fuel: snapshot.fuelRemainingPercent ?? undefined,
+        },
+      ];
+      return next.slice(-maxBufferLength);
+    });
+  }, [snapshot, isPaused, noActiveSession, maxBufferLength]);
+
+  useEffect(() => {
+    if (noActiveSession) {
+      setBuffer([]);
+      startTimeRef.current = null;
+    }
+  }, [noActiveSession]);
 
   const tyreTempData = useMemo(() => {
     const t = snapshot?.tyresSurfaceTempC;
@@ -30,32 +84,20 @@ export default function LiveTelemetry() {
 
   const fuelPercent = snapshot?.fuelRemainingPercent;
 
-  // Mock telemetry data (used for chart history when no rolling buffer)
-  const speedData = Array.from({ length: 30 }, (_, i) => ({
-    time: i,
-    speed: 250 + Math.sin(i / 3) * 50 + Math.random() * 20,
-  }));
-
-  const throttleBrakeData = Array.from({ length: 30 }, (_, i) => ({
-    time: i,
-    throttle: Math.max(0, Math.min(100, 80 + Math.sin(i / 2) * 30 + Math.random() * 20)),
-    brake: i % 8 === 0 ? 80 + Math.random() * 20 : Math.random() * 5,
-  }));
-
-  const rpmGearData = Array.from({ length: 30 }, (_, i) => ({
-    time: i,
-    rpm: 9000 + Math.sin(i / 2.5) * 2000 + Math.random() * 500,
-    gear: Math.min(8, Math.max(1, Math.floor(5 + Math.sin(i / 4) * 2))),
-  }));
-
-  const ersData = Array.from({ length: 30 }, (_, i) => ({
-    time: i,
-    ers: Math.max(0, Math.min(100, 60 - i * 1.5 + Math.random() * 5)),
-    fuel: Math.max(0, 100 - i * 2),
-  }));
+  const chartData = buffer.length > 0 ? buffer : [];
+  const emptyChartData = [{ time: 0, speed: 0, throttle: 0, brake: 0, rpm: 0, gear: 0, ers: 0, fuel: 0 }];
+  const speedData = chartData.length ? chartData : emptyChartData;
+  const throttleBrakeData = chartData.length ? chartData : emptyChartData;
+  const rpmGearData = chartData.length ? chartData : emptyChartData;
+  const ersData = chartData.length ? chartData : emptyChartData;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {sessionEnded && (
+        <div className="rounded-lg border border-[#FACC15]/50 bg-[#FACC15]/10 px-4 py-2 text-sm text-text-secondary">
+          Session ended. Last snapshot still visible below.
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold mb-2">Live Telemetry</h1>
@@ -66,6 +108,19 @@ export default function LiveTelemetry() {
         </StatusBadge>
       </div>
 
+      {noActiveSession && (
+        <DataCard>
+          <div className="py-8 text-center space-y-4">
+            <p className="text-text-secondary">No active session. Start a session in F1 25 to see live telemetry.</p>
+            <Link to="/app/sessions" className="text-[#00E5FF] hover:underline font-medium">
+              View session history →
+            </Link>
+          </div>
+        </DataCard>
+      )}
+
+      {!noActiveSession && (
+        <>
       {/* Controls */}
       <DataCard>
         <div className="flex flex-wrap items-center gap-4">
@@ -267,7 +322,16 @@ export default function LiveTelemetry() {
             ))}
           </div>
           {tyreTempData.every((d) => d.temp == null) && (
-            <p className="text-xs text-text-secondary mt-2">Connect to a live session for real-time tyre temperatures.</p>
+            <TooltipProvider>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <p className="text-xs text-text-secondary mt-2 cursor-help">Live tyre/fuel coming soon (—)</p>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Live tyre temperatures and fuel will be available in a follow-up update.</p>
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
           )}
         </DataCard>
 
@@ -323,6 +387,8 @@ export default function LiveTelemetry() {
           </ResponsiveContainer>
         </DataCard>
       </div>
+        </>
+      )}
     </div>
   );
 }

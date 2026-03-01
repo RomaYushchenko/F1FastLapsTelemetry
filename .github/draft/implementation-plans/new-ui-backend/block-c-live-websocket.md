@@ -205,13 +205,13 @@ Use this list to implement Block C in a strict order. Each line is one concrete 
 
 | Step | Description | Done | Total | Status |
 |------|--------------|------|-------|--------|
-| 9 | WebSocket + Provider + useLiveTelemetry | 0 | 8 | ⬜ Not started |
-| 10 | AppLayout connection status | 0 | 4 | ⬜ Not started |
-| 11 | Live Overview | 0 | 5 | ⬜ Not started |
-| 12 | Live Telemetry | 0 | 6 | ⬜ Not started |
-| 13 | Dashboard recent sessions | 0 | 4 | ⬜ Not started |
-| — | Documentation & follow-up | 0 | 2 | ⬜ Not started |
-| **Total** | | **0** | **29** | |
+| 9 | WebSocket + Provider + useLiveTelemetry | 8 | 8 | ✅ Done |
+| 10 | AppLayout connection status | 4 | 4 | ✅ Done |
+| 11 | Live Overview | 5 | 5 | ✅ Done |
+| 12 | Live Telemetry | 6 | 6 | ✅ Done |
+| 13 | Dashboard recent sessions | 4 | 4 | ✅ Done |
+| — | Documentation & follow-up | 2 | 2 | ✅ Done |
+| **Total** | | **29** | **29** | |
 
 *(Update the numbers in "Done" and "Status" as you complete items below.)*
 
@@ -219,50 +219,50 @@ Use this list to implement Block C in a strict order. Each line is one concrete 
 
 ### Step 9 — WebSocket and useLiveTelemetry (single connection)
 
-- [ ] 9.1 Add sockjs-client and @stomp/stompjs to package.json; run install
-- [ ] 9.2 Add `define: { global: 'globalThis' }` to vite.config.ts
-- [ ] 9.3 Create src/ws/types.ts (WsSnapshotMessage, WsSessionEndedMessage, WsErrorMessage, WsServerMessage)
-- [ ] 9.4 Ensure WS_URL in api/config.ts (Block A or add here)
-- [ ] 9.5 Implement core live telemetry logic (state + STOMP, getActiveSession, poll, SUBSCRIBE with session.id, SNAPSHOT/SESSION_ENDED/ERROR, auto-reconnect, cleanup; use notify for toasts)
-- [ ] 9.6 Create LiveTelemetryProvider; wrap app with it
-- [ ] 9.7 Create useLiveTelemetry() that reads from context
-- [ ] 9.8 Export provider, hook, and types from src/ws/
+- [x] 9.1 Add sockjs-client and @stomp/stompjs to package.json; run install
+- [x] 9.2 Add `define: { global: 'globalThis' }` to vite.config.ts
+- [x] 9.3 Create src/ws/types.ts (WsSnapshotMessage, WsSessionEndedMessage, WsErrorMessage, WsServerMessage)
+- [x] 9.4 Ensure WS_URL in api/config.ts (Block A or add here); added getWsLiveEndpoint()
+- [x] 9.5 Implement core live telemetry logic (state + STOMP, getActiveSession, poll, SUBSCRIBE with session.id, SNAPSHOT/SESSION_ENDED/ERROR, auto-reconnect, cleanup; use notify for toasts)
+- [x] 9.6 Create LiveTelemetryProvider; wrap app with it
+- [x] 9.7 Create useLiveTelemetry() that reads from context
+- [x] 9.8 Export provider, hook, and types from src/ws/
 
 ### Step 10 — AppLayout connection status
 
-- [ ] 10.1 Use useLiveTelemetry() in AppLayout; read status
-- [ ] 10.2 Map hook status to display (live / waiting / no-data / error)
-- [ ] 10.3 Render badge and icon from real status
-- [ ] 10.4 WS connect/disconnect/error go through notify (Bell) — covered in 9.5 if hook uses notify
+- [x] 10.1 Use useLiveTelemetry() in AppLayout; read status
+- [x] 10.2 Map hook status to display (live / waiting / no-data / disconnected / error)
+- [x] 10.3 Render badge and icon from real status
+- [x] 10.4 WS connect/disconnect/error go through notify (Bell) — covered in 9.5 if hook uses notify
 
 ### Step 11 — Live Overview
 
-- [ ] 11.1 Use useLiveTelemetry() in LiveOverview; get session, snapshot, status
-- [ ] 11.2 "No active session" state with link to /app/sessions
-- [ ] 11.3 "Your Telemetry" panel from snapshot (speed, gear, RPM, throttle, brake, ERS, delta, lap, sector; formatLapTime)
-- [ ] 11.4 Session info from session/snapshot (track, lap, placeholders)
-- [ ] 11.5 Leaderboard and Event timeline left as mock/empty
+- [x] 11.1 Use useLiveTelemetry() in LiveOverview; get session, snapshot, status
+- [x] 11.2 "No active session" state with link to /app/sessions
+- [x] 11.3 "Your Telemetry" panel from snapshot (speed, gear, RPM, throttle, brake, ERS, delta, lap, sector; formatLapTime)
+- [x] 11.4 Session info from session/snapshot (track, lap, placeholders)
+- [x] 11.5 Leaderboard and Event timeline left as mock/empty
 
 ### Step 12 — Live Telemetry
 
-- [ ] 12.1 Use useLiveTelemetry() in LiveTelemetry; get session, snapshot, status
-- [ ] 12.2 "No active session" state when needed
-- [ ] 12.3 Configurable rolling buffer (Time Range 10/30/60 s) → speed, throttle/brake, RPM, gear, ERS charts
-- [ ] 12.4 Tyre temps and fuel mock or "—" with tooltip
-- [ ] 12.5 After SESSION_ENDED: keep last snapshot visible; optional "Session ended" overlay
-- [ ] 12.6 Optional: Pause/Play freezes chart updates
+- [x] 12.1 Use useLiveTelemetry() in LiveTelemetry; get session, snapshot, status
+- [x] 12.2 "No active session" state when needed
+- [x] 12.3 Configurable rolling buffer (Time Range 10/30/60 s) → speed, throttle/brake, RPM, gear, ERS charts
+- [x] 12.4 Tyre temps and fuel mock or "—" with tooltip
+- [x] 12.5 After SESSION_ENDED: keep last snapshot visible; optional "Session ended" overlay
+- [x] 12.6 Optional: Pause/Play freezes chart updates
 
 ### Step 13 — Dashboard recent sessions
 
-- [ ] 13.1 Dashboard calls getSessions({ limit: 5, offset: 0 })
-- [ ] 13.2 Loading, error, empty states
-- [ ] 13.3 "Previous Sessions" list from API with links to session detail
-- [ ] 13.4 Optional: "Last session" card from first item
+- [x] 13.1 Dashboard calls getSessions({ limit: 5, offset: 0 })
+- [x] 13.2 Loading, error, empty states
+- [x] 13.3 "Previous Sessions" list from API with links to session detail
+- [x] 13.4 Optional: "Last session" card from first item
 
 ### Step 14 —Documentation and follow-up
 
-- [ ] NEW_UI_DOCS.md §4/§5/§8: document WebSocket, useLiveTelemetry; remove "connection status is fake"
-- [ ] **Follow-up (later):** Real tyre/fuel per [block-c-follow-up-live-snapshot-tyre-fuel.md](block-c-follow-up-live-snapshot-tyre-fuel.md)
+- [x] NEW_UI_DOCS.md §4/§5/§8: document WebSocket, useLiveTelemetry; remove "connection status is fake"
+- [x] **Follow-up (later):** Real tyre/fuel per [block-c-follow-up-live-snapshot-tyre-fuel.md](block-c-follow-up-live-snapshot-tyre-fuel.md)
 
 ### Optional
 

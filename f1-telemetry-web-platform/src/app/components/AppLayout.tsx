@@ -17,6 +17,7 @@ import {
   CheckCheck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useLiveTelemetry } from "@/ws";
 import { cn } from "./ui/utils";
 import { StatusBadge } from "./StatusBadge";
 import {
@@ -61,11 +62,29 @@ function notificationTypeLabel(type: NotificationItem["type"]): string {
   }
 }
 
+function connectionStatusDisplay(status: ReturnType<typeof useLiveTelemetry>['status']) {
+  switch (status) {
+    case 'live':
+      return { label: 'Live' as const, variant: 'active' as const };
+    case 'waiting':
+      return { label: 'Waiting', variant: 'warning' };
+    case 'no-data':
+      return { label: 'No Data', variant: 'finished' };
+    case 'disconnected':
+      return { label: 'Disconnected', variant: 'warning' };
+    case 'error':
+      return { label: 'Error', variant: 'error' };
+    default:
+      return { label: 'Waiting', variant: 'warning' };
+  }
+}
+
 export default function AppLayout() {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [connectionStatus] = useState<'live' | 'waiting' | 'no-data' | 'error'>('live');
+  const { status } = useLiveTelemetry();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const { label: connectionLabel, variant: connectionVariant } = connectionStatusDisplay(status);
 
   useEffect(() => {
     return subscribe(setNotifications);
@@ -94,22 +113,14 @@ export default function AppLayout() {
           <div className="flex items-center gap-4">
             {/* Connection Status */}
             <div className="flex items-center gap-2">
-              {connectionStatus === 'live' ? (
-                <>
-                  <Wifi className="w-4 h-4 text-[#00E5FF]" />
-                  <StatusBadge variant="active">Live</StatusBadge>
-                </>
-              ) : connectionStatus === 'waiting' ? (
-                <>
-                  <Wifi className="w-4 h-4 text-[#FACC15]" />
-                  <StatusBadge variant="warning">Waiting</StatusBadge>
-                </>
+              {status === 'live' ? (
+                <Wifi className="w-4 h-4 text-[#00E5FF]" />
+              ) : status === 'error' ? (
+                <WifiOff className="w-4 h-4 text-[#EF4444]" />
               ) : (
-                <>
-                  <WifiOff className="w-4 h-4 text-[#EF4444]" />
-                  <StatusBadge variant="error">No Data</StatusBadge>
-                </>
+                <Wifi className="w-4 h-4 text-[#FACC15]" />
               )}
+              <StatusBadge variant={connectionVariant}>{connectionLabel}</StatusBadge>
             </div>
 
             {/* Notifications */}

@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router";
+import { LiveTelemetryProvider } from "@/ws";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -28,7 +29,13 @@ export const router = createBrowserRouter([
   },
   {
     path: "/app",
-    Component: AppLayout,
+    Component: function AppWithLive() {
+      return (
+        <LiveTelemetryProvider>
+          <AppLayout />
+        </LiveTelemetryProvider>
+      );
+    },
     children: [
       {
         index: true,

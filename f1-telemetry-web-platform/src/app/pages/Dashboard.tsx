@@ -1,53 +1,42 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { getSessions } from "@/api/client";
+import { useLiveTelemetry } from "@/ws";
+import { getTrackName } from "@/constants/tracks";
+import { formatLapTime } from "@/api/format";
+import type { Session } from "@/api/types";
 import { Wifi, AlertCircle, Search, Eye } from "lucide-react";
 
 export default function Dashboard() {
-  const sessions = [
-    {
-      id: 1,
-      track: "Silverstone",
-      date: "2026-02-24",
-      sessionType: "Race",
-      bestLap: "1:27.451",
-      result: "P3"
-    },
-    {
-      id: 2,
-      track: "Monaco",
-      date: "2026-02-23",
-      sessionType: "Qualifying",
-      bestLap: "1:12.234",
-      result: "P5"
-    },
-    {
-      id: 3,
-      track: "Spa-Francorchamps",
-      date: "2026-02-22",
-      sessionType: "Race",
-      bestLap: "1:44.556",
-      result: "P2"
-    },
-    {
-      id: 4,
-      track: "Monza",
-      date: "2026-02-21",
-      sessionType: "Practice",
-      bestLap: "1:21.112",
-      result: "P7"
-    },
-    {
-      id: 5,
-      track: "Suzuka",
-      date: "2026-02-20",
-      sessionType: "Race",
-      bestLap: "1:30.983",
-      result: "P1"
-    }
-  ];
+  const { status } = useLiveTelemetry();
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getSessions({ limit: 5, offset: 0 })
+      .then((res) => {
+        if (!cancelled) {
+          setSessions(res.sessions);
+          setTotal(res.total);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load sessions");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -66,8 +55,12 @@ export default function Dashboard() {
                 <Wifi className="w-6 h-6 text-[#00E5FF]" />
               </div>
               <div>
-                <StatusBadge variant="active">Live</StatusBadge>
-                <p className="text-sm text-text-secondary mt-1">Connected to F1 25</p>
+                <StatusBadge variant={status === "live" ? "active" : status === "error" ? "error" : "warning"}>
+                  {status === "live" ? "Live" : status === "waiting" ? "Waiting" : status === "no-data" ? "No Data" : status === "disconnected" ? "Disconnected" : "Error"}
+                </StatusBadge>
+                <p className="text-sm text-text-secondary mt-1">
+                  {status === "live" ? "Connected to F1 25" : status === "no-data" ? "No active session" : "Connecting…"}
+                </p>
               </div>
             </div>
             <div className="pt-4 border-t border-border/50">
@@ -89,29 +82,42 @@ export default function Dashboard() {
 
         {/* Last Session */}
         <DataCard title="Last Session">
-          <div className="space-y-3">
-            <div>
-              <div className="text-2xl font-bold">{sessions[0].track}</div>
-              <div className="text-text-secondary">{sessions[0].sessionType}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border/50">
+          {sessions.length > 0 ? (
+            <div className="space-y-3">
               <div>
-                <div className="text-xs text-text-secondary uppercase">Best Lap</div>
-                <div className="text-lg font-bold font-mono text-[#00E5FF]">{sessions[0].bestLap}</div>
+                <div className="text-2xl font-bold">
+                  {sessions[0].trackDisplayName ?? getTrackName(sessions[0].trackId ?? null) ?? "—"}
+                </div>
+                <div className="text-text-secondary">{sessions[0].sessionType ?? "—"}</div>
               </div>
-              <div>
-                <div className="text-xs text-text-secondary uppercase">Result</div>
-                <div className="text-lg font-bold text-[#00FF85]">{sessions[0].result}</div>
+              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border/50">
+                <div>
+                  <div className="text-xs text-text-secondary uppercase">Best Lap</div>
+                  <div className="text-lg font-bold font-mono text-[#00E5FF]">
+                    {formatLapTime(sessions[0].bestLapTimeMs ?? null)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-text-secondary uppercase">Result</div>
+                  <div className="text-lg font-bold text-[#00FF85]">
+                    {sessions[0].finishingPosition != null ? `P${sessions[0].finishingPosition}` : "—"}
+                  </div>
+                </div>
               </div>
+              <div className="text-sm text-text-secondary">
+                {new Date(sessions[0].startedAt).toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </div>
+              <Link to={`/app/sessions/${sessions[0].id}`}>
+                <Button variant="link" className="text-[#00E5FF] p-0 h-auto">View session →</Button>
+              </Link>
             </div>
-            <div className="text-sm text-text-secondary">
-              {new Date(sessions[0].date).toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-text-secondary">No sessions yet</p>
+          )}
         </DataCard>
 
         {/* Quick Compare */}
@@ -148,7 +154,20 @@ export default function Dashboard() {
             />
           </div>
         </div>
-        
+
+        {loading && (
+          <div className="p-8 text-center text-text-secondary">Loading sessions…</div>
+        )}
+        {error && (
+          <div className="p-8 text-center">
+            <p className="text-[#EF4444] mb-2">{error}</p>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </div>
+        )}
+        {!loading && !error && (
+          <>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-secondary/50 border-b border-border/50">
@@ -174,40 +193,54 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {sessions.map((session) => (
-                <tr key={session.id} className="hover:bg-secondary/30 transition-colors">
-                  <td className="px-4 py-4 font-medium">{session.track}</td>
-                  <td className="px-4 py-4 text-text-secondary">
-                    {new Date(session.date).toLocaleDateString('en-US', { 
-                      month: 'short', 
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="inline-flex px-2 py-1 rounded text-xs bg-secondary/50 border border-border">
-                      {session.sessionType}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 font-mono text-[#00E5FF]">{session.bestLap}</td>
-                  <td className="px-4 py-4 font-bold text-[#00FF85]">{session.result}</td>
-                  <td className="px-4 py-4">
-                    <Link to={`/app/sessions/${session.id}`}>
-                      <Button variant="ghost" size="sm" className="h-8 gap-2">
-                        <Eye className="w-4 h-4" />
-                        View
-                      </Button>
-                    </Link>
+              {sessions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-text-secondary">
+                    No sessions yet
                   </td>
                 </tr>
-              ))}
+              ) : (
+                sessions.map((session) => (
+                  <tr key={session.id} className="hover:bg-secondary/30 transition-colors">
+                    <td className="px-4 py-4 font-medium">
+                      {session.trackDisplayName ?? getTrackName(session.trackId ?? null) ?? "—"}
+                    </td>
+                    <td className="px-4 py-4 text-text-secondary">
+                      {new Date(session.startedAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex px-2 py-1 rounded text-xs bg-secondary/50 border border-border">
+                        {session.sessionType ?? "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 font-mono text-[#00E5FF]">
+                      {formatLapTime(session.bestLapTimeMs ?? null)}
+                    </td>
+                    <td className="px-4 py-4 font-bold text-[#00FF85]">
+                      {session.finishingPosition != null ? `P${session.finishingPosition}` : "—"}
+                    </td>
+                    <td className="px-4 py-4">
+                      <Link to={`/app/sessions/${session.id}`}>
+                        <Button variant="ghost" size="sm" className="h-8 gap-2">
+                          <Eye className="w-4 h-4" />
+                          View
+                        </Button>
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
         <div className="p-4 border-t border-border/50 flex items-center justify-between">
           <div className="text-sm text-text-secondary">
-            Showing 5 of 23 sessions
+            Showing {sessions.length} of {total} sessions
           </div>
           <Link to="/app/sessions">
             <Button variant="link" className="text-[#00E5FF]">
@@ -215,6 +248,8 @@ export default function Dashboard() {
             </Button>
           </Link>
         </div>
+          </>
+        )}
       </DataCard>
     </div>
   );
