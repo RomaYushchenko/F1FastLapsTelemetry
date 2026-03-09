@@ -23,6 +23,7 @@ import type {
   SpeedTracePoint,
   StintDto,
   TrackLayoutResponseDto,
+  TrackLayoutStatusDto,
   TyreWearPoint,
 } from './types'
 
@@ -448,4 +449,10 @@ export async function getTrackLayout(
       : `Request to /api/tracks/${trackId}/layout failed with status ${response.status}`) ?? ''
   notify.error(message)
   throw new HttpError(response.status, message, body ?? undefined)
+}
+
+/** GET /api/tracks/{trackId}/layout/status — layout recording/availability status. */
+export async function getTrackLayoutStatus(trackId: number): Promise<TrackLayoutStatusDto> {
+  const path = `/api/tracks/${trackId}/layout/status`
+  return requestJson<TrackLayoutStatusDto>(path)
 }

@@ -3,13 +3,12 @@ import { Link } from "react-router";
 import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { TelemetryStat } from "../components/TelemetryStat";
+import { TrackMap2D } from "../components/TrackMap2D";
 import { useLiveTelemetry } from "@/ws";
 import { getTrackName } from "@/constants/tracks";
-import { getTrackLayout, getActivePositions } from "@/api/client";
-import type { TrackLayoutResponseDto, CarPositionDto } from "@/api/types";
+import { getTrackLayout, getTrackLayoutStatus } from "@/api/client";
+import type { TrackLayoutResponseDto, TrackLayoutStatusDto, CarPositionDto } from "@/api/types";
 import { toast } from "sonner";
-
-const POSITIONS_POLL_INTERVAL_MS = 2000;
 
 /** Color palette for car indices (B9 positions). */
 const CAR_COLORS = ["#00E5FF", "#00FF85", "#E10600", "#FACC15", "#A855F7", "#EC4899", "#14B8A6", "#F97316", "#8B5CF6", "#22C55E", "#EF4444", "#3B82F6", "#EAB308", "#06B6D4", "#84CC16", "#F43F5E", "#6366F1", "#0EA5E9", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899"];
@@ -17,121 +16,92 @@ function colorForCarIndex(carIndex: number): string {
   return CAR_COLORS[carIndex % CAR_COLORS.length] ?? "#9CA3AF";
 }
 
-/** Build SVG path d from points (polyline). */
-function pointsToPath(points: { x: number; y: number }[]): string {
-  if (points.length === 0) return "";
-  const [first, ...rest] = points;
-  let d = `M ${first.x} ${first.y}`;
-  for (const p of rest) {
-    d += ` L ${p.x} ${p.y}`;
-  }
-  return d;
-}
-
-/** Compute bounding box from points. */
-function boundsFromPoints(points: { x: number; y: number }[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
-  if (points.length === 0) return null;
-  let minX = points[0].x;
-  let minY = points[0].y;
-  let maxX = points[0].x;
-  let maxY = points[0].y;
-  for (const p of points) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
-  }
-  return { minX, minY, maxX, maxY };
-}
-
 export default function LiveTrackMap() {
-  const { session, status, snapshot } = useLiveTelemetry();
+  const { session, status, snapshot, positions } = useLiveTelemetry();
   const noActiveSession = status === "no-data" || session == null;
   const trackId = session?.trackId ?? null;
 
-  const [layout, setLayout] = useState<TrackLayoutResponseDto | null | undefined>(undefined);
-  const [layoutError, setLayoutError] = useState<string | null>(null);
+  const [layout, setLayout] = useState<TrackLayoutResponseDto | null>(null);
+  const [layoutStatus, setLayoutStatus] = useState<TrackLayoutStatusDto | null>(null);
+  const [isLoadingLayout, setIsLoadingLayout] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchLayout = useCallback(async (id: number) => {
-    setLayoutError(null);
+    setIsLoadingLayout(true);
     try {
       const data = await getTrackLayout(id);
       setLayout(data ?? null);
-      if (data == null) {
-        setLayoutError("Track layout not available for this track");
-      }
     } catch (e) {
       setLayout(null);
-      setLayoutError(e instanceof Error ? e.message : "Failed to load track layout");
-      toast.error("Failed to load track layout");
+      const msg = e instanceof Error ? e.message : "Failed to load track layout";
+      toast.error(msg);
     }
+    setIsLoadingLayout(false);
   }, []);
 
   useEffect(() => {
     if (trackId != null && typeof trackId === "number") {
-      setLayout(undefined);
-      fetchLayout(trackId);
+      setLayout(null);
+      setLayoutStatus(null);
+      setIsLoadingLayout(false);
+      if (pollRef.current) {
+        clearTimeout(pollRef.current);
+        pollRef.current = null;
+      }
+      fetchLayout(trackId).catch(() => {
+        // layout may not exist yet — status polling will handle it
+      });
     } else {
       setLayout(null);
-      setLayoutError(null);
+      setLayoutStatus(null);
+      setIsLoadingLayout(false);
     }
   }, [trackId, fetchLayout]);
 
-  const layoutLoading = trackId != null && layout === undefined;
-  const points = layout?.points ?? [];
-  const bounds = useMemo(() => {
-    if (layout?.bounds) return layout.bounds;
-    return boundsFromPoints(points);
-  }, [layout?.bounds, points]);
-  const viewBox = bounds
-    ? `${bounds.minX} ${bounds.minY} ${bounds.maxX - bounds.minX} ${bounds.maxY - bounds.minY}`
-    : "0 0 800 600";
-  const pathD = pointsToPath(points);
-
-  const [positions, setPositions] = useState<CarPositionDto[]>([]);
-  const positionsPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
-    if (noActiveSession) {
-      setPositions([]);
-      if (positionsPollRef.current) {
-        clearInterval(positionsPollRef.current);
-        positionsPollRef.current = null;
-      }
+    if (!trackId || layout) {
       return;
     }
-    const poll = () => {
-      getActivePositions()
-        .then(setPositions)
-        .catch(() => setPositions([]));
-    };
-    poll();
-    positionsPollRef.current = setInterval(poll, POSITIONS_POLL_INTERVAL_MS);
-    return () => {
-      if (positionsPollRef.current) {
-        clearInterval(positionsPollRef.current);
-        positionsPollRef.current = null;
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled || !trackId || layout) return;
+      try {
+        const st = await getTrackLayoutStatus(trackId);
+        if (cancelled) return;
+        setLayoutStatus(st);
+        if (st.status === "READY") {
+          const data = await getTrackLayout(trackId);
+          if (!cancelled && data) {
+            setLayout(data);
+          }
+          return;
+        }
+        const interval = st.status === "RECORDING" ? 2000 : 4000;
+        pollRef.current = setTimeout(poll, interval);
+      } catch {
+        const interval = 4000;
+        pollRef.current = setTimeout(poll, interval);
       }
     };
-  }, [noActiveSession]);
+    poll();
+    return () => {
+      cancelled = true;
+      if (pollRef.current) {
+        clearTimeout(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [trackId, layout]);
 
   const useRealPositions = positions.length > 0;
-  const driversForMap = useRealPositions
-    ? positions.map((p) => ({
-        id: p.carIndex,
-        name: `Car ${p.carIndex}`,
-        pos: p.carIndex + 1,
+  const carsForMap: (CarPositionDto & { color: string; racingNumber?: number })[] = useMemo(
+    () =>
+      positions.map((p) => ({
+        ...p,
         color: colorForCarIndex(p.carIndex),
-        x: p.worldPosX,
-        y: p.worldPosZ,
-      }))
-    : [
-        { id: 1, name: "VER", pos: 1, color: "#00E5FF", x: 0, y: 0 },
-        { id: 2, name: "HAM", pos: 2, color: "#00FF85", x: 0, y: 0 },
-        { id: 3, name: "LEC", pos: 3, color: "#E10600", x: 0, y: 0 },
-        { id: 4, name: "NOR", pos: 4, color: "#FACC15", x: 0, y: 0 },
-        { id: 5, name: "PIA", pos: 5, color: "#A855F7", x: 0, y: 0 },
-      ];
+      })),
+    [positions],
+  );
 
   const trackTitle =
     session?.trackDisplayName ?? (trackId != null ? getTrackName(trackId) : null) ?? "Track Map";
@@ -169,108 +139,54 @@ export default function LiveTrackMap() {
           <div className="lg:col-span-2">
             <DataCard title={trackTitle} variant="live" noPadding>
               <div className="aspect-[4/3] bg-secondary/30 relative p-8">
-                {layoutLoading && (
+                {isLoadingLayout && (
                   <div className="absolute inset-0 flex items-center justify-center bg-secondary/50 rounded-lg">
                     <div className="animate-pulse text-text-secondary">Loading track layout…</div>
                   </div>
                 )}
-                {!layoutLoading && layoutError && (
-                  <div className="absolute inset-0 flex items-center justify-center p-4">
-                    <p className="text-text-secondary text-center">{layoutError}</p>
-                  </div>
-                )}
-                {!layoutLoading && points.length > 0 && (
-                  <svg viewBox={viewBox} className="w-full h-full min-h-[280px]" preserveAspectRatio="xMidYMid meet">
-                    <path
-                      d={pathD}
-                      fill="none"
-                      stroke="rgba(249,250,251,0.1)"
-                      strokeWidth="40"
-                    />
-                    <path
-                      d={pathD}
-                      fill="none"
-                      stroke="rgba(249,250,251,0.3)"
-                      strokeWidth="4"
-                    />
-                    {/* Static sector markers (Option B) */}
-                    {points.length >= 3 && (
-                      <>
-                        <circle cx={points[0]?.x} cy={points[0]?.y} r="8" fill="#A855F7" opacity="0.5" />
-                        <circle cx={points[Math.floor(points.length / 3)]?.x} cy={points[Math.floor(points.length / 3)]?.y} r="8" fill="#00FF85" opacity="0.5" />
-                        <circle cx={points[Math.floor((2 * points.length) / 3)]?.x} cy={points[Math.floor((2 * points.length) / 3)]?.y} r="8" fill="#FACC15" opacity="0.5" />
-                      </>
-                    )}
-                    {points.length > 0 && (
-                      <>
-                        <rect x={(points[0]?.x ?? 0) - 5} y={(points[0]?.y ?? 0) - 15} width="10" height="30" fill="#F9FAFB" opacity="0.8" />
-                        <text x={(points[0]?.x ?? 0) + 10} y={(points[0]?.y ?? 0) + 5} fill="#F9FAFB" fontSize="12" fontWeight="bold">START</text>
-                      </>
-                    )}
-                    {/* Driver positions: real (B9) when available, else mock */}
-                    {driversForMap.map((driver, idx) => {
-                      const pos = useRealPositions
-                        ? { x: driver.x, y: driver.y }
-                        : points.length >= 5
-                          ? points[Math.floor((idx / Math.max(1, driversForMap.length)) * points.length) % points.length]
-                          : [{ x: 120, y: 300 }, { x: 180, y: 220 }, { x: 350, y: 105 }, { x: 620, y: 120 }, { x: 700, y: 280 }][idx];
-                      if (!pos) return null;
-                      return (
-                        <g key={driver.id}>
-                          <circle
-                            cx={pos.x}
-                            cy={pos.y}
-                            r="12"
-                            fill={driver.color}
-                            opacity="0.3"
-                            className={useRealPositions ? "" : "animate-pulse"}
-                          />
-                          <circle cx={pos.x} cy={pos.y} r="8" fill={driver.color} />
-                          {session?.playerCarIndex === driver.id && (
-                            <circle
-                              cx={pos.x}
-                              cy={pos.y}
-                              r="14"
-                              fill="none"
-                              stroke={driver.color}
-                              strokeWidth="2"
-                            />
-                          )}
-                          <text
-                            x={pos.x}
-                            y={pos.y + 4}
-                            fill="#0B0F14"
-                            fontSize="10"
-                            fontWeight="bold"
-                            textAnchor="middle"
-                          >
-                            {driver.pos}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                )}
-                {!layoutLoading && !layoutError && points.length === 0 && trackId != null && (
-                  <div className="absolute inset-0 flex items-center justify-center p-4">
-                    <p className="text-text-secondary text-center">Track layout not available for this track</p>
+
+                {!isLoadingLayout && layoutStatus?.status === "RECORDING" && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 py-8">
+                    <div className="relative flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-full bg-red-500/10 animate-ping absolute" />
+                      <div className="w-8 h-8 rounded-full bg-red-500/30 animate-ping absolute" />
+                      <div className="w-4 h-4 rounded-full bg-red-500" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-text-primary font-medium">Recording track layout...</p>
+                      <p className="text-text-secondary text-sm mt-1">
+                        Drive one full lap to generate the track map
+                      </p>
+                    </div>
+                    <div className="w-64">
+                      <div className="flex justify-between text-xs text-text-secondary mb-1">
+                        <span>Progress</span>
+                        <span>{layoutStatus.pointsCollected} / 300+ points</span>
+                      </div>
+                      <div className="h-2 bg-surface-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-yellow-400 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, (layoutStatus.pointsCollected / 300) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-secondary">
+                      Track map will appear automatically when the lap is complete
+                    </p>
                   </div>
                 )}
 
-                <div className="absolute top-4 left-4 bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 min-w-[150px]">
-                  <div className="text-xs text-text-secondary uppercase mb-2">
-                    Positions {useRealPositions ? "(live)" : "(mock)"}
+                {!isLoadingLayout && !layout && layoutStatus?.status === "NOT_AVAILABLE" && trackId != null && (
+                  <div className="absolute inset-0 flex items-center justify-center p-4">
+                    <p className="text-text-secondary text-center">
+                      Track layout not yet available. Drive a lap to record it automatically.
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    {driversForMap.map((driver) => (
-                      <div key={driver.id} className="flex items-center gap-2">
-                        <div className="w-4 text-xs font-bold text-text-secondary">{driver.pos}</div>
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: driver.color }} />
-                        <div className="text-sm font-bold">{driver.name}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                )}
+
+                {!isLoadingLayout && layout && (
+                  <TrackMap2D layout={layout} cars={carsForMap} />
+                )}
               </div>
             </DataCard>
           </div>

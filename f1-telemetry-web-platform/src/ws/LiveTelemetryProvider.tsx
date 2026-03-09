@@ -18,7 +18,7 @@ import { Client, type IMessage, type StompSubscription } from '@stomp/stompjs'
 import { getWsLiveEndpoint } from '@/api/config'
 import { getActiveSession, getLeaderboard } from '@/api/client'
 import { notify } from '@/notify'
-import type { Session } from '@/api/types'
+import type { CarPositionDto, LeaderboardEntry, Session, SessionEventDto } from '@/api/types'
 import type {
   WsErrorMessage,
   WsLeaderboardMessage,
@@ -27,7 +27,6 @@ import type {
   WsSessionEventMessage,
   WsSnapshotMessage,
 } from './types'
-import type { LeaderboardEntry, SessionEventDto } from '@/api/types'
 
 const ACTIVE_SESSION_POLL_INTERVAL_MS = 4000
 
@@ -48,6 +47,8 @@ export interface LiveTelemetryState {
   sessionEventsAppend: SessionEventDto[]
   sessionEnded: WsSessionEndedMessage | null
   errorMessage: string | null
+  /** Latest world positions for all cars (B9 POSITIONS messages). */
+  positions: CarPositionDto[]
 }
 
 function toDisplayStatus(
@@ -86,6 +87,7 @@ const defaultState: LiveTelemetryState = {
   sessionEventsAppend: [],
   sessionEnded: null,
   errorMessage: null,
+  positions: [],
 }
 
 const LiveTelemetryContext = createContext<LiveTelemetryState>(defaultState)
@@ -100,6 +102,7 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
   const [sessionEventsAppend, setSessionEventsAppend] = useState<SessionEventDto[]>([])
   const [sessionEnded, setSessionEnded] = useState<WsSessionEndedMessage | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [positions, setPositions] = useState<CarPositionDto[]>([])
 
   const stompClientRef = useRef<Client | null>(null)
   const liveSubRef = useRef<StompSubscription | null>(null)
@@ -142,6 +145,8 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
             } else if (payload.type === 'SESSION_EVENT') {
               const ev = (payload as WsSessionEventMessage).event
               if (ev) setSessionEventsAppend((prev) => [...prev, ev])
+            } else if (payload.type === 'POSITIONS') {
+              setPositions(payload.positions ?? [])
             } else if (payload.type === 'SESSION_ENDED') {
               // Deactivate STOMP client so reconnect does not create a second connection
               const client = stompClientRef.current
@@ -267,6 +272,7 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
       setSessionEventsAppend([])
       setSessionEnded(null)
       setErrorMessage(null)
+      setPositions([])
       // Schedule poll for auto-reconnect when session appears again
       pollTimeoutRef.current = setTimeout(() => {
         pollTimeoutRef.current = null
@@ -335,8 +341,9 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
       sessionEventsAppend,
       sessionEnded,
       errorMessage,
+      positions,
     }),
-    [internalStatus, session, snapshot, leaderboard, sessionEventsAppend, sessionEnded, errorMessage]
+    [internalStatus, session, snapshot, leaderboard, sessionEventsAppend, sessionEnded, errorMessage, positions]
   )
 
   return (

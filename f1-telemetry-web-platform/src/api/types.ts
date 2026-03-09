@@ -193,28 +193,48 @@ export interface SessionEventDto {
   createdAt: string
 }
 
-/** GET /api/tracks/{trackId}/layout — 2D track map points and optional bounds */
-export interface TrackLayoutPoint {
-  x: number
-  y: number
+/** GET /api/tracks/{trackId}/layout — 3D track map points and optional bounds */
+export interface TrackPoint3D {
+  x: number   // worldPositionX (horizontal)
+  y: number   // worldPositionY (elevation)
+  z: number   // worldPositionZ (horizontal depth)
 }
 
-export interface TrackLayoutBounds {
+export interface TrackBounds {
   minX: number
-  minY: number
   maxX: number
-  maxY: number
+  minZ: number
+  maxZ: number
+  minElev: number
+  maxElev: number
+}
+
+export interface SectorBoundary {
+  sector: 1 | 2 | 3
+  x: number
+  y: number
+  z: number
 }
 
 export interface TrackLayoutResponseDto {
   trackId: number
-  points: TrackLayoutPoint[]
-  bounds?: TrackLayoutBounds
+  points: TrackPoint3D[]
+  bounds?: TrackBounds
+  source?: 'STATIC' | 'RECORDED' | string
+  sectorBoundaries?: SectorBoundary[] | null
+}
+
+export interface TrackLayoutStatusDto {
+  trackId: number
+  status: 'READY' | 'RECORDING' | 'NOT_AVAILABLE'
+  pointsCollected: number
+  source?: 'STATIC' | 'RECORDED' | string | null
 }
 
 /** GET /api/sessions/active/positions or WebSocket POSITIONS — one car's world position (B9). */
 export interface CarPositionDto {
   carIndex: number
   worldPosX: number
+  worldPosY: number
   worldPosZ: number
 }
