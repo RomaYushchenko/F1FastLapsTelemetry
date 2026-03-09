@@ -4,6 +4,7 @@ import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { TelemetryStat } from "../components/TelemetryStat";
 import { TrackMap2D } from "../components/TrackMap2D";
+import { TrackMap3D } from "../components/TrackMap3D";
 import { useLiveTelemetry } from "@/ws";
 import { getTrackName } from "@/constants/tracks";
 import { getTrackLayout, getTrackLayoutStatus } from "@/api/client";
@@ -16,6 +17,8 @@ function colorForCarIndex(carIndex: number): string {
   return CAR_COLORS[carIndex % CAR_COLORS.length] ?? "#9CA3AF";
 }
 
+type ViewMode = '2d' | '3d';
+
 export default function LiveTrackMap() {
   const { session, status, snapshot, positions } = useLiveTelemetry();
   const noActiveSession = status === "no-data" || session == null;
@@ -25,6 +28,7 @@ export default function LiveTrackMap() {
   const [layoutStatus, setLayoutStatus] = useState<TrackLayoutStatusDto | null>(null);
   const [isLoadingLayout, setIsLoadingLayout] = useState(false);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('2d');
 
   const fetchLayout = useCallback(async (id: number) => {
     setIsLoadingLayout(true);
@@ -106,6 +110,25 @@ export default function LiveTrackMap() {
   const trackTitle =
     session?.trackDisplayName ?? (trackId != null ? getTrackName(trackId) : null) ?? "Track Map";
 
+  const headerActions =
+    layout != null ? (
+      <div className="flex gap-1 rounded-lg bg-surface-secondary p-1">
+        {(['2d', '3d'] as ViewMode[]).map(mode => (
+          <button
+            key={mode}
+            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+              viewMode === mode
+                ? 'bg-accent text-black'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+            onClick={() => setViewMode(mode)}
+          >
+            {mode.toUpperCase()}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -137,7 +160,7 @@ export default function LiveTrackMap() {
       {!noActiveSession && (
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <DataCard title={trackTitle} variant="live" noPadding>
+            <DataCard title={trackTitle} variant="live" noPadding actions={headerActions}>
               <div className="aspect-[4/3] bg-secondary/30 relative p-8">
                 {isLoadingLayout && (
                   <div className="absolute inset-0 flex items-center justify-center bg-secondary/50 rounded-lg">
@@ -184,8 +207,11 @@ export default function LiveTrackMap() {
                   </div>
                 )}
 
-                {!isLoadingLayout && layout && (
+                {!isLoadingLayout && layout && viewMode === '2d' && (
                   <TrackMap2D layout={layout} cars={carsForMap} />
+                )}
+                {!isLoadingLayout && layout && viewMode === '3d' && (
+                  <TrackMap3D layout={layout} cars={carsForMap} />
                 )}
               </div>
             </DataCard>

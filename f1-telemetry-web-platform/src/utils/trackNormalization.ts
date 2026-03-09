@@ -116,3 +116,78 @@ export function splitIntoSectors(
   ]
 }
 
+// ─── 3D (Three.js normalization) ─────────────────────────────────────────────
+
+export interface ThreeTransform {
+  centerX: number
+  centerY: number
+  centerZ: number
+  scale: number
+}
+
+export function computeThreeTransform(
+  bounds: TrackBounds,
+  sceneSize = 100,
+): ThreeTransform {
+  const rangeX = bounds.maxX - bounds.minX
+  const rangeZ = bounds.maxZ - bounds.minZ
+  const maxHRange = Math.max(rangeX, rangeZ, 1)
+
+  return {
+    centerX: (bounds.minX + bounds.maxX) / 2,
+    centerY: (bounds.minElev + bounds.maxElev) / 2,
+    centerZ: (bounds.minZ + bounds.maxZ) / 2,
+    scale: sceneSize / maxHRange,
+  }
+}
+
+export function worldToThree(
+  worldX: number,
+  worldY: number,
+  worldZ: number,
+  t: ThreeTransform,
+): [number, number, number] {
+  return [
+    (worldX - t.centerX) * t.scale,
+    (worldY - t.centerY) * t.scale,
+    -(worldZ - t.centerZ) * t.scale,
+  ]
+}
+
+export function pointsToThreeBuffer(
+  points: TrackPoint3D[],
+  transform: ThreeTransform,
+): Float32Array {
+  const arr = new Float32Array(points.length * 3)
+  points.forEach((p, i) => {
+    const [tx, ty, tz] = worldToThree(p.x, p.y, p.z, transform)
+    arr[i * 3] = tx
+    arr[i * 3 + 1] = ty
+    arr[i * 3 + 2] = tz
+  })
+  return arr
+}
+
+export function elevationToColor(
+  elev: number,
+  minElev: number,
+  maxElev: number,
+): string {
+  if (maxElev === minElev) return '#6B7280'
+  const t = (elev - minElev) / (maxElev - minElev)
+
+  if (t < 0.5) {
+    const s = t * 2
+    const r = 0
+    const g = Math.round(102 + s * 153)
+    const b = Math.round(255 - s * 122)
+    return `rgb(${r},${g},${b})`
+  }
+
+  const s = (t - 0.5) * 2
+  const r = Math.round(s * 225)
+  const g = Math.round(255 - s * 249)
+  const b = Math.round(133 - s * 133)
+  return `rgb(${r},${g},${b})`
+}
+
