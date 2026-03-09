@@ -72,14 +72,14 @@ This document lists **backend features that are not implemented today** but are 
 
 | ID | Feature | Description | New UI usage |
 |----|---------|-------------|--------------|
-| B8 | **Track layout for map** | 2D track outline or centreline (e.g. polyline or simplified geometry) for a given track so the UI can draw the track. | LiveTrackMap: replace static SVG with backend-driven track shape. |
-| B9 | **Live positions of all cars** | Real-time positions (e.g. X,Y or distance/sector) for all cars in the active session. | LiveTrackMap: show all cars on the track. |
+| B8 | **Track layout for map** | 2D/3D track layout (recorded from Motion world coordinates X/Y/Z, with bounds and sector boundaries) for a given track so the UI can draw both a top‑down SVG and a 3D track. | LiveTrackMap: replace static SVG with backend-driven track shape (2D + optional 3D), including auto-recording and export/import JSON tools. |
+| B9 | **Live positions of all cars** | Real-time world positions (X, Y, Z) for all cars in the active session, compatible with the same coordinate system as recorded layouts. | LiveTrackMap: show all cars on the track in both 2D and 3D modes. |
 
 **Current backend:** Track corner map exists (`GET /api/tracks/{trackId}/corner-maps/latest`) with corners (start/end/apex distance). No Motion (packet 0) in MVP; WebSocket is single-car only.
 
-**Status: B8 implemented in Block F (Steps 21–22).** See [block-f-live-track-map.md](.github/draft/implementation-plans/new-ui-backend/block-f-live-track-map.md). Backend: `GET /api/tracks/{trackId}/layout` returns 2D points and optional bounds from `telemetry.track_layout` table. New UI: Live Track Map fetches layout when active session exists, draws track from API.
+**Status: B8 implemented in Block F (Steps 21–22) and extended by plan 14 (auto-recording + 3D).** See [block-f-live-track-map.md](.github/draft/implementation-plans/new-ui-backend/block-f-live-track-map.md) and [14-live-track-map-telemetry-recording.md](.github/draft/implementation-plans/new-ui-backend/14-live-track-map-telemetry-recording.md). Backend: `telemetry.track_layout` stores recorded layouts (`points` as `{x,y,z}` in world coordinates, bounds including elevation, sector boundaries, source, recordedAt, sessionUid); REST: `GET /api/tracks/{trackId}/layout` returns full 3D points + bounds + optional sectorBoundaries + source, `GET /api/tracks/{trackId}/layout/status` reports recording/availability status, and `/api/tracks/.../layout/export[/-all]` + `/layout/import[/-all]` support JSON export/import for dev workflows. New UI: Live Track Map fetches layout and status, shows recording progress, renders coloured sectors in 2D SVG and 3D (`@react-three/fiber`), and provides Export/Import buttons.
 
-**Status: B9 implemented in Block H (Steps 27–28).** Motion ingest extended to all 22 cars; `GET /api/sessions/active/positions` and WebSocket message type **POSITIONS** on `/topic/live/{sessionId}` provide live world positions. New UI: Live Track Map polls positions (or uses WS) and displays real car positions when available; mock fallback when no position data.
+**Status: B9 implemented in Block H (Steps 27–28).** Motion ingest extended to all 22 cars; `GET /api/sessions/active/positions` and WebSocket message type **POSITIONS** on `/topic/live/{sessionId}` provide live world positions (`worldPosX`, `worldPosY`, `worldPosZ`) in the same coordinate system as recorded layouts. New UI: Live Track Map uses these positions for all cars in both 2D (XZ projection) and 3D views; mock fallback remains when no position data is available.
 
 #### B8 — Data source for track drawing (coordinates)
 
