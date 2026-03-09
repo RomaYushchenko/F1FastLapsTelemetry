@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Response for GET /api/tracks/{trackId}/layout. Plan: block-f-live-track-map.md.
+ * Response for GET /api/tracks/{trackId}/layout.
  */
 @Data
 @NoArgsConstructor
@@ -19,4 +19,12 @@ public class TrackLayoutResponseDto {
     private Integer trackId;
     private List<TrackLayoutPointDto> points;
     private TrackLayoutBoundsDto bounds;
+    /**
+     * Layout source: STATIC = manually created; RECORDED = auto-recorded from UDP telemetry.
+     */
+    private String source;
+    /**
+     * Optional sector boundaries in world coordinates (start of each sector). Null for static tracks.
+     */
+    private List<SectorBoundaryDto> sectorBoundaries;
 }

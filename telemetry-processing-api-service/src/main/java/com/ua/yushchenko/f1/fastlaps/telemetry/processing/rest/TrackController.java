@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackCornerMapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutResponseDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutStatusDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackCornerMapService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,13 @@ public class TrackController {
         log.debug("getLayout: trackId={}", trackId);
         Optional<TrackLayoutResponseDto> dto = trackLayoutService.getLayout(trackId);
         return dto.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{trackId}/layout/status")
+    public ResponseEntity<TrackLayoutStatusDto> getLayoutStatus(@PathVariable("trackId") short trackId) {
+        log.debug("getLayoutStatus: trackId={}", trackId);
+        TrackLayoutStatusDto status = trackLayoutService.getLayoutStatus(trackId);
+        return ResponseEntity.ok(status);
     }
 
     @GetMapping("/{trackId}/corner-maps/latest")
