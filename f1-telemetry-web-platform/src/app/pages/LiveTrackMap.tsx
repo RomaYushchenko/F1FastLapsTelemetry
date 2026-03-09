@@ -7,8 +7,8 @@ import { TrackMap2D } from "../components/TrackMap2D";
 import { TrackMap3D } from "../components/TrackMap3D";
 import { useLiveTelemetry } from "@/ws";
 import { getTrackName } from "@/constants/tracks";
-import { getTrackLayout, getTrackLayoutStatus } from "@/api/client";
-import type { TrackLayoutResponseDto, TrackLayoutStatusDto, CarPositionDto } from "@/api/types";
+import { exportAllTrackLayouts, exportTrackLayout, getTrackLayout, getTrackLayoutStatus, importAllTrackLayouts, importTrackLayout } from "@/api/client";
+import type { TrackLayoutResponseDto, TrackLayoutStatusDto, CarPositionDto, TrackLayoutExportDto, TrackLayoutBulkExportDto } from "@/api/types";
 import { toast } from "sonner";
 
 /** Color palette for car indices (B9 positions). */
@@ -42,6 +42,74 @@ export default function LiveTrackMap() {
     }
     setIsLoadingLayout(false);
   }, []);
+
+  const handleExport = useCallback(async () => {
+    if (!trackId) return;
+    try {
+      await exportTrackLayout(trackId);
+    } catch {
+      // error toast already handled in client
+    }
+  }, [trackId]);
+
+  const handleExportAll = useCallback(async () => {
+    try {
+      await exportAllTrackLayouts();
+    } catch {
+      // error toast already handled in client
+    }
+  }, []);
+
+  const handleImport = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text) as TrackLayoutExportDto | TrackLayoutBulkExportDto;
+
+        // Bulk file contains tracks array
+        if (Array.isArray((data as TrackLayoutBulkExportDto).tracks)) {
+          const bulk = data as TrackLayoutBulkExportDto;
+          const result = await importAllTrackLayouts(bulk);
+          if (result.errors.length > 0) {
+            toast.warning(
+              `Imported ${result.imported} tracks. ${result.skipped} failed: ${result.errors[0]}`,
+            );
+          } else {
+            toast.success(`Imported ${result.imported} track layouts`);
+          }
+          if (trackId && bulk.tracks?.some(t => t.trackId === trackId)) {
+            const layoutDto = await getTrackLayout(trackId);
+            if (layoutDto) setLayout(layoutDto);
+          }
+          return;
+        }
+
+        const single = data as TrackLayoutExportDto;
+        if (!single.trackId || !single.points || single.points.length === 0) {
+          toast.error("Invalid track layout file");
+          return;
+        }
+
+        if (trackId && single.trackId !== trackId) {
+          toast.warning(
+            `Importing track ${single.trackId} but current session is on track ${trackId}`,
+          );
+        }
+
+        await importTrackLayout(single);
+        toast.success(`Track layout imported for track ${single.trackId}`);
+
+        if (trackId && single.trackId === trackId) {
+          const layoutDto = await getTrackLayout(trackId);
+          if (layoutDto) setLayout(layoutDto);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Import failed";
+        toast.error(msg);
+      }
+    },
+    [trackId],
+  );
 
   useEffect(() => {
     if (trackId != null && typeof trackId === "number") {
@@ -112,20 +180,36 @@ export default function LiveTrackMap() {
 
   const headerActions =
     layout != null ? (
-      <div className="flex gap-1 rounded-lg bg-surface-secondary p-1">
-        {(['2d', '3d'] as ViewMode[]).map(mode => (
-          <button
-            key={mode}
-            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-              viewMode === mode
-                ? 'bg-accent text-black'
-                : 'text-text-secondary hover:text-text-primary'
-            }`}
-            onClick={() => setViewMode(mode)}
-          >
-            {mode.toUpperCase()}
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleExport}
+          className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-surface-secondary transition-colors"
+        >
+          Export
+        </button>
+        <button
+          type="button"
+          onClick={handleExportAll}
+          className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-surface-secondary transition-colors"
+        >
+          Export All
+        </button>
+        <div className="flex gap-1 rounded-lg bg-surface-secondary p-1">
+          {(['2d', '3d'] as ViewMode[]).map(mode => (
+            <button
+              key={mode}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                viewMode === mode
+                  ? 'bg-accent text-black'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+              onClick={() => setViewMode(mode)}
+            >
+              {mode.toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
     ) : null;
 
@@ -200,10 +284,27 @@ export default function LiveTrackMap() {
                 )}
 
                 {!isLoadingLayout && !layout && layoutStatus?.status === "NOT_AVAILABLE" && trackId != null && (
-                  <div className="absolute inset-0 flex items-center justify-center p-4">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 gap-4">
                     <p className="text-text-secondary text-center">
                       Track layout not yet available. Drive a lap to record it automatically.
                     </p>
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleImport(file);
+                          }
+                          e.target.value = "";
+                        }}
+                      />
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border text-xs text-text-secondary hover:text-text-primary hover:border-accent transition-colors">
+                        Import track JSON
+                      </span>
+                    </label>
                   </div>
                 )}
 

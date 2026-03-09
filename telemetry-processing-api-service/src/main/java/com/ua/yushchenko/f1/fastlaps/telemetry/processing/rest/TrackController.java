@@ -1,12 +1,17 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.BulkImportResultDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackCornerMapResponseDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutBulkExportDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutExportDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutStatusDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackCornerMapService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -37,6 +42,43 @@ public class TrackController {
         log.debug("getLayoutStatus: trackId={}", trackId);
         TrackLayoutStatusDto status = trackLayoutService.getLayoutStatus(trackId);
         return ResponseEntity.ok(status);
+    }
+
+    @GetMapping("/{trackId}/layout/export")
+    public ResponseEntity<TrackLayoutExportDto> exportLayout(@PathVariable("trackId") Short trackId) {
+        log.debug("exportLayout: trackId={}", trackId);
+        return trackLayoutService.exportLayout(trackId)
+                .map(dto -> ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "attachment; filename=\"track-" + trackId + "-layout.json\"")
+                        .body(dto))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/layout/export-all")
+    public ResponseEntity<TrackLayoutBulkExportDto> exportAllLayouts() {
+        log.debug("exportAllLayouts");
+        TrackLayoutBulkExportDto bulk = trackLayoutService.exportAllLayouts();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"all-tracks-layout.json\"")
+                .body(bulk);
+    }
+
+    @PostMapping("/layout/import")
+    public ResponseEntity<TrackLayoutResponseDto> importLayout(
+            @RequestBody @Valid TrackLayoutExportDto dto
+    ) {
+        TrackLayoutResponseDto saved = trackLayoutService.importLayout(dto);
+        return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping("/layout/import-all")
+    public ResponseEntity<BulkImportResultDto> importAllLayouts(
+            @RequestBody TrackLayoutBulkExportDto dto
+    ) {
+        BulkImportResultDto result = trackLayoutService.importAllLayouts(dto);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/{trackId}/corner-maps/latest")
