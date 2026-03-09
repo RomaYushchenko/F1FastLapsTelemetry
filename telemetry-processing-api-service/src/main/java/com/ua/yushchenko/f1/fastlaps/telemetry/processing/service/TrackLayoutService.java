@@ -12,7 +12,12 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutStatusDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TrackLayoutRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +28,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 
 /**
  * Serves 2D track layout (points + optional bounds) for Live Track Map. Block F — B8.
@@ -34,6 +40,8 @@ public class TrackLayoutService {
 
     private final TrackLayoutRepository trackLayoutRepository;
     private final ObjectMapper objectMapper;
+    private final SessionStateManager sessionStateManager;
+    private final SessionRepository sessionRepository;
 
     /**
      * Returns layout for the given track, or empty if not found or trackId is null.
@@ -53,26 +61,59 @@ public class TrackLayoutService {
      */
     public TrackLayoutStatusDto getLayoutStatus(short trackId) {
         log.debug("getLayoutStatus: trackId={}", trackId);
-        return trackLayoutRepository.findById(trackId)
-                .map(entity -> {
-                    int pointsCount = 0;
-                    if (entity.getPointsJson() != null && !entity.getPointsJson().isBlank()) {
-                        try {
-                            List<?> pts = objectMapper.readValue(entity.getPointsJson(), new TypeReference<List<?>>() {});
-                            pointsCount = pts.size();
-                        } catch (Exception e) {
-                            log.warn("getLayoutStatus: failed to parse points JSON for trackId={}: {}", trackId, e.getMessage());
-                        }
-                    }
-                    String source = entity.getSource();
-                    return new TrackLayoutStatusDto(
-                            trackId,
-                            "READY",
-                            pointsCount,
-                            source
-                    );
-                })
-                .orElseGet(() -> new TrackLayoutStatusDto(trackId, "NOT_AVAILABLE", 0, null));
+        Optional<TrackLayout> layoutOpt = trackLayoutRepository.findById(trackId);
+
+        if (layoutOpt.isPresent()) {
+            TrackLayout entity = layoutOpt.get();
+            int pointsCount = 0;
+            if (entity.getPointsJson() != null && !entity.getPointsJson().isBlank()) {
+                try {
+                    List<?> pts = objectMapper.readValue(entity.getPointsJson(), new TypeReference<List<?>>() {});
+                    pointsCount = pts.size();
+                } catch (Exception e) {
+                    log.warn("getLayoutStatus: failed to parse points JSON for trackId={}: {}", trackId, e.getMessage());
+                }
+            }
+            String source = entity.getSource();
+            return new TrackLayoutStatusDto(
+                    trackId,
+                    "READY",
+                    pointsCount,
+                    source
+            );
+        }
+
+        int pointsCount = 0;
+        String status = "NOT_AVAILABLE";
+        String source = null;
+
+        Map<Long, SessionRuntimeState> activeStates = sessionStateManager.getAllActive();
+        if (!activeStates.isEmpty()) {
+            List<Session> sessions = sessionRepository.findAllById(activeStates.keySet());
+            for (Session session : sessions) {
+                Short sessionTrackId = session.getTrackId();
+                if (sessionTrackId == null || sessionTrackId.shortValue() != trackId) {
+                    continue;
+                }
+                SessionRuntimeState runtimeState = activeStates.get(session.getSessionUid());
+                if (runtimeState == null) {
+                    continue;
+                }
+                TrackRecordingState recState = runtimeState.getTrackRecordingState();
+                if (recState == null) {
+                    continue;
+                }
+                TrackRecordingState.Status recStatus = recState.getStatus();
+                if (recStatus == TrackRecordingState.Status.RECORDING
+                        || recStatus == TrackRecordingState.Status.SAVING) {
+                    pointsCount = recState.getBuffer().size();
+                    status = "RECORDING";
+                    break;
+                }
+            }
+        }
+
+        return new TrackLayoutStatusDto(trackId, status, pointsCount, source);
     }
 
     /**

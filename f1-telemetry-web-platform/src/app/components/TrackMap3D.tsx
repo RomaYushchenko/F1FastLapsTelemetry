@@ -8,6 +8,7 @@ import {
   computeThreeTransform,
   splitIntoSectors,
   worldToThree,
+  elevationToColor,
 } from '@/utils/trackNormalization'
 
 interface Props {
@@ -25,6 +26,15 @@ export function TrackMap3D({ layout, cars }: Props) {
   const toThreePoints = (pts: TrackPoint3D[]) =>
     pts.map(p => worldToThree(p.x, p.y, p.z, transform))
 
+  const coloredTrackPoints = useMemo(
+    () =>
+      layout.points.map(p => ({
+        position: worldToThree(p.x, p.y, p.z, transform),
+        color: elevationToColor(p.y, bounds.minElev, bounds.maxElev),
+      })),
+    [layout.points, transform, bounds.minElev, bounds.maxElev],
+  )
+
   const elevRange = bounds.maxElev - bounds.minElev
 
   return (
@@ -33,14 +43,13 @@ export function TrackMap3D({ layout, cars }: Props) {
         <ambientLight intensity={0.5} />
         <directionalLight position={[50, 100, 50]} intensity={0.8} />
 
-        {s1pts.length > 1 && (
-          <Line points={toThreePoints(s1pts)} color={SECTOR_COLORS[1]} lineWidth={4} />
-        )}
-        {s2pts.length > 1 && (
-          <Line points={toThreePoints(s2pts)} color={SECTOR_COLORS[2]} lineWidth={4} />
-        )}
-        {s3pts.length > 1 && (
-          <Line points={toThreePoints(s3pts)} color={SECTOR_COLORS[3]} lineWidth={4} />
+        {coloredTrackPoints.length > 1 && (
+          <Line
+            points={coloredTrackPoints.map(p => p.position)}
+            colors={coloredTrackPoints.map(p => p.color)}
+            vertexColors
+            lineWidth={4}
+          />
         )}
 
         {sectors
