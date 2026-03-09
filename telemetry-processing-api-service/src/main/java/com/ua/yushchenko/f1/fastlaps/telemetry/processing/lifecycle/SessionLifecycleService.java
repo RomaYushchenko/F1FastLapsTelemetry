@@ -38,6 +38,7 @@ public class SessionLifecycleService {
     private final SessionPersistenceService sessionPersistenceService;
     private final LapAggregator lapAggregator;
     private final LiveDataBroadcaster liveDataBroadcaster;
+    private final com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService trackLayoutRecordingService;
 
     /** Serializes session persist so only one consumer inserts; others see the row after commit. */
     private final Object sessionCreationLock = new Object();
@@ -115,6 +116,9 @@ public class SessionLifecycleService {
                     .sessionDisplayName(displayName)
                     .build();
             persistSessionUnderLock(session);
+            if (trackIdShort != null) {
+                trackLayoutRecordingService.onSessionStart(sessionUID, trackIdShort);
+            }
         } else {
             log.warn("Received SSTA for session in state {}, ignoring (sessionUID={})",
                     state.getState(), sessionUID);
@@ -168,6 +172,7 @@ public class SessionLifecycleService {
 
             // After flush, transition to TERMINAL
             finalizeSession(sessionUID);
+            trackLayoutRecordingService.onSessionFinished(sessionUID);
         } else {
             log.warn("Received SEND for session in state {}, ignoring (sessionUID={})",
                     state.getState(), sessionUID);
@@ -242,6 +247,12 @@ public class SessionLifecycleService {
         SessionRuntimeState runtimeState = stateManager.get(sessionUID);
         if (runtimeState != null) {
             runtimeState.setLastSeenAt(Instant.now());
+            if (dto.getSector2LapDistanceStart() != null) {
+                runtimeState.setSector2LapDistanceStart(dto.getSector2LapDistanceStart());
+            }
+            if (dto.getSector3LapDistanceStart() != null) {
+                runtimeState.setSector3LapDistanceStart(dto.getSector3LapDistanceStart());
+            }
         }
         sessionRepository.findById(sessionUID).ifPresent(session -> {
             boolean updated = false;
