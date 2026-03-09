@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class LapDataProcessor {
 
     private final SessionStateManager stateManager;
     private final LapAggregator lapAggregator;
+    private final TrackLayoutRecordingService trackLayoutRecordingService;
 
     /**
      * Process lap data packet. Updates watermark, runs sector/lap logic, updates WebSocket snapshot.
@@ -39,6 +41,11 @@ public class LapDataProcessor {
                 sessionUid, carIndex, lap.getLapNumber(), lap.getSector(), lap.getCurrentLapTimeMs());
 
         lapAggregator.processLapData(sessionUid, carIndex, lap);
+
+        if (lap.getLastLapTimeMs() != null) {
+            boolean lapInvalid = lap.isInvalid();
+            trackLayoutRecordingService.onLapComplete(sessionUid, lapInvalid);
+        }
 
         if (lap.getCarPosition() != null && lap.getCarPosition() > 0) {
             state.setLastCarPosition(carIndex, lap.getCarPosition());

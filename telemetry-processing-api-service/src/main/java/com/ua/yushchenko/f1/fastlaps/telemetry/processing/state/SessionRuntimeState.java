@@ -33,6 +33,13 @@ public class SessionRuntimeState {
     private volatile Instant endedAt;
     private volatile Instant lastSeenAt;
 
+    // Track layout recording state (Motion-based, single instance per session).
+    private final TrackRecordingState trackRecordingState = new TrackRecordingState();
+
+    // Lap distance at which each sector starts (metres from start/finish), from SessionDataDto.
+    private float sector2LapDistanceStart = -1f;
+    private float sector3LapDistanceStart = -1f;
+
     /**
      * Watermarks per packet type and carIndex, to allow out-of-order arrival across Kafka topics.
      * Each topic (lap data, car telemetry, car status) can advance independently.
@@ -180,6 +187,18 @@ public class SessionRuntimeState {
     public void updatePosition(int carIndex, float worldPosX, float worldPosZ) {
         latestWorldPositionByCarIndex.put(carIndex, new float[]{worldPosX, worldPosZ});
         this.lastSeenAt = Instant.now();
+    }
+
+    /**
+     * Get latest lap distance in metres for the given car, if available.
+     * Uses snapshots updated from LapData (lapDistanceM field).
+     *
+     * @return latest lap distance for carIndex, or -1f if unknown
+     */
+    public float getLatestLapDistance(int carIndex) {
+        CarSnapshot snapshot = snapshots.get(carIndex);
+        Float lapDistanceM = snapshot != null ? snapshot.getLapDistanceM() : null;
+        return lapDistanceM != null ? lapDistanceM : -1f;
     }
 
     /**

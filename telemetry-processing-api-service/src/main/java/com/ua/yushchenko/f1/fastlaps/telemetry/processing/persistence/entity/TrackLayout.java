@@ -1,10 +1,15 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.Instant;
 
 /**
  * 2D track layout (centreline/outline points) for Live Track Map. Block F — B8.
@@ -38,4 +43,22 @@ public class TrackLayout {
 
     @Column(name = "max_y")
     private Double maxY;
+
+    @Column(name = "min_elev")
+    private Double minElev;
+
+    @Column(name = "max_elev")
+    private Double maxElev;
+
+    @Column(name = "source")
+    private String source;
+
+    @Column(name = "recorded_at")
+    private Instant recordedAt;
+
+    @Column(name = "session_uid")
+    private Long sessionUid;
+
+    @Column(name = "sector_boundaries", columnDefinition = "jsonb")
+    private String sectorBoundariesJson;
 }
