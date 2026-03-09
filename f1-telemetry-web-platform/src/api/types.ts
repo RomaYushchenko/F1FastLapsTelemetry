@@ -196,8 +196,8 @@ export interface SessionEventDto {
 /** GET /api/tracks/{trackId}/layout — 3D track map points and optional bounds */
 export interface TrackPoint3D {
   x: number   // worldPositionX (horizontal)
-  y: number   // worldPositionY (elevation)
-  z: number   // worldPositionZ (horizontal depth)
+  y: number   // worldPositionY (elevation; may be null for static tracks)
+  z?: number | null  // worldPositionZ (horizontal depth; null for old static layouts before migration)
 }
 
 export interface TrackBounds {
@@ -205,8 +205,8 @@ export interface TrackBounds {
   maxX: number
   minZ: number
   maxZ: number
-  minElev: number
-  maxElev: number
+  minElev?: number | null
+  maxElev?: number | null
 }
 
 export interface SectorBoundary {

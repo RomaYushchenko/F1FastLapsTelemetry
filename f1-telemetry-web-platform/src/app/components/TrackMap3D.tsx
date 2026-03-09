@@ -24,14 +24,30 @@ export function TrackMap3D({ layout, cars }: Props) {
   const [s1pts, s2pts, s3pts] = splitIntoSectors(layout.points, sectors)
 
   const toThreePoints = (pts: TrackPoint3D[]) =>
-    pts.map(p => worldToThree(p.x, p.y, p.z, transform))
+    pts
+      .filter(p => p.x != null && (p.z != null || p.y != null))
+      .map(p => {
+        const worldY = p.y ?? 0
+        const worldZ = p.z ?? p.y!
+        return worldToThree(p.x, worldY, worldZ, transform)
+      })
 
   const coloredTrackPoints = useMemo(
     () =>
-      layout.points.map(p => ({
-        position: worldToThree(p.x, p.y, p.z, transform),
-        color: elevationToColor(p.y, bounds.minElev, bounds.maxElev),
-      })),
+      layout.points
+        .filter(p => p.x != null && (p.z != null || p.y != null))
+        .map(p => {
+          const worldY = p.y ?? 0
+          const worldZ = p.z ?? p.y!
+          return {
+            position: worldToThree(p.x, worldY, worldZ, transform),
+            color: elevationToColor(
+              worldY,
+              bounds.minElev ?? worldY,
+              bounds.maxElev ?? worldY,
+            ),
+          }
+        }),
     [layout.points, transform, bounds.minElev, bounds.maxElev],
   )
 
@@ -55,7 +71,9 @@ export function TrackMap3D({ layout, cars }: Props) {
         {sectors
           .filter(b => b.sector !== 1)
           .map(b => {
-            const pos = worldToThree(b.x, b.y, b.z, transform)
+            const worldY = b.y ?? 0
+            const worldZ = b.z ?? b.y!
+            const pos = worldToThree(b.x, worldY, worldZ, transform)
             const color = SECTOR_COLORS[b.sector as 2 | 3]
             return (
               <group key={`sector-${b.sector}`} position={pos}>
@@ -83,7 +101,9 @@ export function TrackMap3D({ layout, cars }: Props) {
 
         {sectors.find(b => b.sector === 1) && (() => {
           const s1 = sectors.find(b => b.sector === 1)!
-          const pos = worldToThree(s1.x, s1.y, s1.z, transform)
+          const worldY = s1.y ?? 0
+          const worldZ = s1.z ?? s1.y!
+          const pos = worldToThree(s1.x, worldY, worldZ, transform)
           return (
             <group position={pos}>
               <mesh>
@@ -138,7 +158,7 @@ export function TrackMap3D({ layout, cars }: Props) {
         />
       </Canvas>
 
-      {elevRange > 0.5 && (
+      {Number.isFinite(elevRange) && elevRange > 0.5 && (
         <p className="text-xs text-text-secondary mt-1 text-center">
           Elevation change: {elevRange.toFixed(1)} m
         </p>

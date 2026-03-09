@@ -14,8 +14,8 @@ export function computeBounds(points: TrackPoint3D[]): TrackBounds {
     }
   }
   const xs = points.map(p => p.x)
-  const zs = points.map(p => p.z)
-  const ys = points.map(p => p.y)
+  const zs = points.map(p => (p.z ?? p.y ?? 0))
+  const ys = points.map(p => (p.y ?? 0))
   return {
     minX: Math.min(...xs), maxX: Math.max(...xs),
     minZ: Math.min(...zs), maxZ: Math.max(...zs),
@@ -58,7 +58,8 @@ export function pointsToSvgPath(
   return (
     points
       .map((p, i) => {
-        const { nx, ny } = normalize2D(p.x, p.z, bounds, canvas)
+        const z = p.z ?? p.y ?? bounds.minZ
+        const { nx, ny } = normalize2D(p.x, z, bounds, canvas)
         return `${i === 0 ? 'M' : 'L'}${nx.toFixed(1)},${ny.toFixed(1)}`
       })
       .join(' ') + ' Z'
@@ -82,7 +83,8 @@ export function findNearestPointIndex(
   let bestIdx = 0
   let bestDist = Number.POSITIVE_INFINITY
   points.forEach((p, i) => {
-    const d = (p.x - targetX) ** 2 + (p.z - targetZ) ** 2
+    const pz = p.z ?? p.y ?? targetZ
+    const d = (p.x - targetX) ** 2 + (pz - targetZ) ** 2
     if (d < bestDist) {
       bestDist = d
       bestIdx = i
@@ -104,8 +106,8 @@ export function splitIntoSectors(
     return [points, [], []]
   }
 
-  const s2Idx = findNearestPointIndex(points, s2.x, s2.z)
-  const s3Idx = findNearestPointIndex(points, s3.x, s3.z)
+  const s2Idx = findNearestPointIndex(points, s2.x, s2.z ?? s2.y)
+  const s3Idx = findNearestPointIndex(points, s3.x, s3.z ?? s3.y)
 
   const [startS2, startS3] = s2Idx < s3Idx ? [s2Idx, s3Idx] : [s3Idx, s2Idx]
 
@@ -135,7 +137,7 @@ export function computeThreeTransform(
 
   return {
     centerX: (bounds.minX + bounds.maxX) / 2,
-    centerY: (bounds.minElev + bounds.maxElev) / 2,
+    centerY: ((bounds.minElev ?? 0) + (bounds.maxElev ?? 0)) / 2,
     centerZ: (bounds.minZ + bounds.maxZ) / 2,
     scale: sceneSize / maxHRange,
   }
@@ -160,7 +162,9 @@ export function pointsToThreeBuffer(
 ): Float32Array {
   const arr = new Float32Array(points.length * 3)
   points.forEach((p, i) => {
-    const [tx, ty, tz] = worldToThree(p.x, p.y, p.z, transform)
+    const worldY = p.y ?? 0
+    const worldZ = p.z ?? p.y ?? 0
+    const [tx, ty, tz] = worldToThree(p.x, worldY, worldZ, transform)
     arr[i * 3] = tx
     arr[i * 3 + 1] = ty
     arr[i * 3 + 2] = tz
@@ -173,6 +177,7 @@ export function elevationToColor(
   minElev: number,
   maxElev: number,
 ): string {
+  if (elev == null || Number.isNaN(elev)) return '#6B7280'
   if (maxElev === minElev) return '#6B7280'
   const t = (elev - minElev) / (maxElev - minElev)
 

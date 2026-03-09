@@ -29,7 +29,8 @@ export function TrackMap2D({ layout, cars }: Props) {
     const d =
       pts
         .map((p, i) => {
-          const { nx, ny } = normalize2D(p.x, p.z, bounds, CANVAS)
+          const z = p.z ?? p.y
+          const { nx, ny } = normalize2D(p.x, z, bounds, CANVAS)
           return `${i === 0 ? 'M' : 'L'}${nx.toFixed(1)},${ny.toFixed(1)}`
         })
         .join(' ') + (closeZ ? ' Z' : '')
@@ -94,7 +95,8 @@ export function TrackMap2D({ layout, cars }: Props) {
 
       {sectors.map(b => {
         if (b.sector === 1) return null
-        const { nx, ny } = normalize2D(b.x, b.z, bounds, CANVAS)
+        const z = b.z ?? b.y
+        const { nx, ny } = normalize2D(b.x, z, bounds, CANVAS)
         const color = SECTOR_COLORS[b.sector as 2 | 3]
         return (
           <g key={`sector-${b.sector}`}>
@@ -119,7 +121,8 @@ export function TrackMap2D({ layout, cars }: Props) {
 
       {sectors.find(b => b.sector === 1) && (() => {
         const s1 = sectors.find(b => b.sector === 1)!
-        const { nx, ny } = normalize2D(s1.x, s1.z, bounds, CANVAS)
+        const z = s1.z ?? s1.y
+        const { nx, ny } = normalize2D(s1.x, z, bounds, CANVAS)
         return (
           <g>
             <rect
