@@ -85,6 +85,7 @@ public class MotionConsumer {
                     float lapDistance = state.getLatestLapDistance(carIndex);
                     trackLayoutRecordingService.onMotionFrame(
                             sessionUid,
+                            carIndex,
                             payload.getWorldPositionX(),
                             payload.getWorldPositionY(),
                             payload.getWorldPositionZ(),

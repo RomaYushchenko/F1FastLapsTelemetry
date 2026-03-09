@@ -41,17 +41,28 @@ public class TrackLayoutRecordingService {
     }
 
     /**
+     * @param carIndex   car index from packet header; recording is gated to player car only
      * @param worldX     worldPositionX (horizontal)
      * @param worldY     worldPositionY (elevation)
      * @param worldZ     worldPositionZ (horizontal depth)
      * @param lapDistance lap distance from LapData (metres), used for sector boundaries
      */
     public void onMotionFrame(long sessionUid,
+                              int carIndex,
                               float worldX,
                               float worldY,
                               float worldZ,
                               float lapDistance) {
-        TrackRecordingState state = getRecState(sessionUid);
+        SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
+        if (sessionState == null) {
+            return;
+        }
+        Integer playerCarIndex = sessionState.getPlayerCarIndex();
+        if (playerCarIndex == null || carIndex != playerCarIndex.intValue()) {
+            return;
+        }
+
+        TrackRecordingState state = sessionState.getTrackRecordingState();
 
         if (state.getStatus() == WAITING_FOR_LAP_START && lapDistance > 0) {
             state.setStatus(RECORDING);
@@ -63,8 +74,17 @@ public class TrackLayoutRecordingService {
         }
     }
 
-    public void onLapComplete(long sessionUid, boolean lapInvalid) {
-        TrackRecordingState state = getRecState(sessionUid);
+    public void onLapComplete(long sessionUid, int carIndex, boolean lapInvalid) {
+        SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
+        if (sessionState == null) {
+            return;
+        }
+        Integer playerCarIndex = sessionState.getPlayerCarIndex();
+        if (playerCarIndex == null || carIndex != playerCarIndex.intValue()) {
+            return;
+        }
+
+        TrackRecordingState state = sessionState.getTrackRecordingState();
         if (state.getStatus() != RECORDING) {
             return;
         }

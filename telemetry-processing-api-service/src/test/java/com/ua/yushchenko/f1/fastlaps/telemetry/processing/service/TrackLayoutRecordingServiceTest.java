@@ -21,6 +21,7 @@ import java.util.Map;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.SESSION_UID;
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.TRACK_ID;
+import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.CAR_INDEX;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,20 +65,21 @@ class TrackLayoutRecordingServiceTest {
     void onMotionFrame_transitionsToRecording_andSamplesPoints() {
         // Arrange
         SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
         when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
         TrackRecordingState recState = runtimeState.getTrackRecordingState();
         recState.setTrackId(TRACK_ID);
         recState.setStatus(TrackRecordingState.Status.WAITING_FOR_LAP_START);
 
         // Act: first frame with lapDistance > 0 should switch to RECORDING
-        service.onMotionFrame(SESSION_UID, 10.0f, 1.0f, 20.0f, 5.0f);
+        service.onMotionFrame(SESSION_UID, CAR_INDEX, 10.0f, 1.0f, 20.0f, 5.0f);
 
         // Assert
         assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.RECORDING);
 
         // Act: call several times to ensure sampling uses SAMPLE_EVERY = 5
         for (int i = 0; i < 10; i++) {
-            service.onMotionFrame(SESSION_UID, 10.0f + i, 1.0f, 20.0f + i, 5.0f + i);
+            service.onMotionFrame(SESSION_UID, CAR_INDEX, 10.0f + i, 1.0f, 20.0f + i, 5.0f + i);
         }
 
         // Assert: buffer has at least one sampled point and stores XYZ + lapDistance
@@ -91,10 +93,30 @@ class TrackLayoutRecordingServiceTest {
     }
 
     @Test
+    @DisplayName("onMotionFrame ignores non-player car index")
+    void onMotionFrame_ignoresNonPlayerCar() {
+        // Arrange
+        SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
+        when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
+        TrackRecordingState recState = runtimeState.getTrackRecordingState();
+        recState.setTrackId(TRACK_ID);
+        recState.setStatus(TrackRecordingState.Status.WAITING_FOR_LAP_START);
+
+        // Act
+        service.onMotionFrame(SESSION_UID, CAR_INDEX + 1, 10.0f, 1.0f, 20.0f, 5.0f);
+
+        // Assert
+        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.WAITING_FOR_LAP_START);
+        assertThat(recState.getBuffer()).isEmpty();
+    }
+
+    @Test
     @DisplayName("onLapComplete discards invalid lap and resets state")
     void onLapComplete_discardsInvalidLap() {
         // Arrange
         SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
         when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
         TrackRecordingState recState = runtimeState.getTrackRecordingState();
         recState.setTrackId(TRACK_ID);
@@ -102,7 +124,7 @@ class TrackLayoutRecordingServiceTest {
         recState.getBuffer().add(new PointXYZD(1.0f, 2.0f, 3.0f, 10.0f));
 
         // Act
-        service.onLapComplete(SESSION_UID, true);
+        service.onLapComplete(SESSION_UID, CAR_INDEX, true);
 
         // Assert
         assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.WAITING_FOR_LAP_START);
@@ -114,6 +136,7 @@ class TrackLayoutRecordingServiceTest {
     void onLapComplete_savesLayout_forValidLap() throws Exception {
         // Arrange
         SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
         when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
         runtimeState.setSector2LapDistanceStart(30.0f);
         runtimeState.setSector3LapDistanceStart(60.0f);
@@ -129,7 +152,7 @@ class TrackLayoutRecordingServiceTest {
         }
 
         // Act
-        service.onLapComplete(SESSION_UID, false);
+        service.onLapComplete(SESSION_UID, CAR_INDEX, false);
 
         // Assert
         ArgumentCaptor<TrackLayout> captor = ArgumentCaptor.forClass(TrackLayout.class);
@@ -151,6 +174,26 @@ class TrackLayoutRecordingServiceTest {
         List<Map<String, Object>> boundaries = mapper.readValue(saved.getSectorBoundariesJson(), new TypeReference<>() {});
         assertThat(boundaries).hasSize(3);
         assertThat(boundaries).extracting(b -> (Integer) b.get("sector")).containsExactly(1, 2, 3);
+    }
+
+    @Test
+    @DisplayName("onLapComplete ignores non-player car index")
+    void onLapComplete_ignoresNonPlayerCar() {
+        // Arrange
+        SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
+        when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
+        TrackRecordingState recState = runtimeState.getTrackRecordingState();
+        recState.setTrackId(TRACK_ID);
+        recState.setStatus(TrackRecordingState.Status.RECORDING);
+        recState.getBuffer().add(new PointXYZD(1.0f, 2.0f, 3.0f, 10.0f));
+
+        // Act
+        service.onLapComplete(SESSION_UID, CAR_INDEX + 1, false);
+
+        // Assert
+        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.RECORDING);
+        assertThat(recState.getBuffer()).hasSize(1);
     }
 
     @Test

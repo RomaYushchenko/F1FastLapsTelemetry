@@ -44,7 +44,7 @@ public class LapDataProcessor {
 
         if (lap.getLastLapTimeMs() != null) {
             boolean lapInvalid = lap.isInvalid();
-            trackLayoutRecordingService.onLapComplete(sessionUid, lapInvalid);
+            trackLayoutRecordingService.onLapComplete(sessionUid, carIndex, lapInvalid);
         }
 
         if (lap.getCarPosition() != null && lap.getCarPosition() > 0) {

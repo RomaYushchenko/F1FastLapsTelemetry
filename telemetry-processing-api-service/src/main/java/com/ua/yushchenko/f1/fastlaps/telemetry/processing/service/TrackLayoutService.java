@@ -174,7 +174,7 @@ public class TrackLayoutService {
                 .minElev(boundsDto != null ? boundsDto.getMinElev() : null)
                 .maxElev(boundsDto != null ? boundsDto.getMaxElev() : null)
                 .sectorBoundariesJson(serializeSectorBoundaries(dto.getSectorBoundaries()))
-                .source(dto.getSource() != null ? dto.getSource() : "IMPORTED")
+                .source(dto.getSource() != null ? dto.getSource() : "STATIC")
                 .recordedAt(null)
                 .sessionUid(null)
                 .build();
