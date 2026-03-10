@@ -1,9 +1,11 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.consumer;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.EventCode;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionLifecycleEvent;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.config.TraceIdFilter;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle.SessionLifecycleService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor.SessionEventProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Component;
 public class SessionEventConsumer {
 
     private final IdempotencyService idempotencyService;
+    private final SessionLifecycleService lifecycleService;
     private final SessionEventProcessor sessionEventProcessor;
 
     @KafkaListener(
@@ -56,6 +59,9 @@ public class SessionEventConsumer {
 
             SessionEventDto payload = event.getPayload();
             sessionEventProcessor.process(sessionUid, payload);
+            if (payload != null && payload.getEventCode() == EventCode.SSTA) {
+                lifecycleService.setPlayerCarIndex(sessionUid, (short) event.getCarIndex());
+            }
 
             acknowledgment.acknowledge();
         } catch (Exception e) {

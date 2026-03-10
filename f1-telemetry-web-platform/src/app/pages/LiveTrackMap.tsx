@@ -268,12 +268,12 @@ export default function LiveTrackMap() {
                     <div className="w-64">
                       <div className="flex justify-between text-xs text-text-secondary mb-1">
                         <span>Progress</span>
-                        <span>{layoutStatus.pointsCollected} / 300+ points</span>
+                        <span>{layoutStatus.pointsCollected} pts</span>
                       </div>
                       <div className="h-2 bg-surface-secondary rounded-full overflow-hidden">
                         <div
                           className="h-full bg-yellow-400 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(100, (layoutStatus.pointsCollected / 300) * 100)}%` }}
+                          style={{ width: `${Math.min(100, (layoutStatus.pointsCollected / 10) * 100)}%` }}
                         />
                       </div>
                     </div>

@@ -27,7 +27,8 @@ import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackReco
 @Slf4j
 public class TrackLayoutRecordingService {
 
-    private static final int MIN_POINTS_THRESHOLD = 300;
+    /** Minimum points when saving after lap complete (avoids saving empty buffer; lap completion is the only criterion). */
+    private static final int MIN_POINTS_WHEN_LAP_COMPLETE = 10;
 
     private final TrackLayoutRepository trackLayoutRepository;
     private final SessionStateManager sessionStateManager;
@@ -38,6 +39,41 @@ public class TrackLayoutRecordingService {
         state.setTrackId(trackId);
         state.setStatus(exists ? IDLE : WAITING_FOR_LAP_START);
         log.info("[TrackRec] trackId={} exists={} → {}", trackId, exists, state.getStatus());
+    }
+
+    /**
+     * Set or correct trackId for recording from full PacketSessionData (authoritative).
+     * When not yet recording (IDLE/WAITING_FOR_LAP_START): sets trackId and status.
+     * When already RECORDING or SAVING: still updates trackId so that the saved layout uses the
+     * correct id (SSTA can send wrong trackId on some builds; SessionData is authoritative).
+     */
+    public void setTrackIdFromSessionData(long sessionUid, short trackId) {
+        SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
+        if (sessionState == null) {
+            return;
+        }
+        TrackRecordingState state = sessionState.getTrackRecordingState();
+        short previous = state.getTrackId();
+        if (trackId < 0) {
+            return;
+        }
+        state.setTrackId(trackId);
+
+        TrackRecordingState.Status status = state.getStatus();
+        if (status == RECORDING || status == SAVING) {
+            if (previous != trackId) {
+                log.info("[TrackRec] trackId corrected {} → {} from SessionData (during {}), save will use {}", previous, trackId, status, trackId);
+            }
+            return;
+        }
+
+        boolean exists = trackLayoutRepository.existsById(trackId);
+        state.setStatus(exists ? IDLE : WAITING_FOR_LAP_START);
+        if (previous == -1) {
+            log.info("[TrackRec] trackId={} from SessionData (was unset), exists={} → {}", trackId, exists, state.getStatus());
+        } else if (previous != trackId) {
+            log.info("[TrackRec] trackId corrected {} → {} from SessionData, exists={} → {}", previous, trackId, exists, state.getStatus());
+        }
     }
 
     /**
@@ -64,13 +100,31 @@ public class TrackLayoutRecordingService {
 
         TrackRecordingState state = sessionState.getTrackRecordingState();
 
-        if (state.getStatus() == WAITING_FOR_LAP_START && lapDistance > 0) {
-            state.setStatus(RECORDING);
-            log.info("[TrackRec] Lap started, trackId={}", state.getTrackId());
+        if (state.getStatus() == WAITING_FOR_LAP_START) {
+            if (lapDistance > 0) {
+                state.setStatus(RECORDING);
+                log.info("[TrackRec] Lap started, trackId={}", state.getTrackId());
+            } else if (lapDistance < 0) {
+                // LapData may not be processed yet (Kafka ordering); start recording anyway to avoid losing motion
+                state.setStatus(RECORDING);
+                log.info("[TrackRec] Lap started (no lapDistance yet), trackId={}", state.getTrackId());
+            }
         }
 
         if (state.getStatus() == RECORDING && state.shouldSample()) {
             state.addPoint(worldX, worldY, worldZ, lapDistance);
+            int size = state.getBuffer().size();
+            // Lap complete may be processed before motion (different Kafka topics); save when we have minimum points
+            if (state.isPendingLapComplete() && size >= MIN_POINTS_WHEN_LAP_COMPLETE) {
+                state.setPendingLapComplete(false);
+                boolean invalid = state.isPendingLapInvalid();
+                state.setPendingLapInvalid(false);
+                state.setStatus(SAVING);
+                if (invalid) {
+                    log.info("[TrackRec] Saving track from deferred lap complete (lap invalid, points={})", size);
+                }
+                saveTrackLayout(sessionUid, state);
+            }
         }
     }
 
@@ -90,11 +144,20 @@ public class TrackLayoutRecordingService {
         }
 
         int count = state.getBuffer().size();
-        if (lapInvalid || count < MIN_POINTS_THRESHOLD) {
-            log.warn("[TrackRec] Lap discarded: invalid={}, points={}", lapInvalid, count);
-            state.reset();
-            state.setStatus(WAITING_FOR_LAP_START);
+        if (count < MIN_POINTS_WHEN_LAP_COMPLETE) {
+            // Lap complete often arrives before motion (different Kafka topics); defer save until we have enough points
+            boolean wasAlreadyPending = state.isPendingLapComplete();
+            state.setPendingLapComplete(true);
+            state.setPendingLapInvalid(lapInvalid);
+            if (!wasAlreadyPending) {
+                log.info("[TrackRec] Lap complete deferred: invalid={}, points={} (waiting for motion to reach {} pts)",
+                        lapInvalid, count, MIN_POINTS_WHEN_LAP_COMPLETE);
+            }
             return;
+        }
+        // Have enough points: save track even if lap invalid (layout geometry is still valid)
+        if (lapInvalid) {
+            log.info("[TrackRec] Saving track from lap complete (lap invalid, points={})", count);
         }
 
         state.setStatus(SAVING);
@@ -102,7 +165,11 @@ public class TrackLayoutRecordingService {
     }
 
     public void onSessionFinished(long sessionUid) {
-        TrackRecordingState state = getRecState(sessionUid);
+        SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
+        if (sessionState == null) {
+            return;
+        }
+        TrackRecordingState state = sessionState.getTrackRecordingState();
         if (state.getStatus() == RECORDING || state.getStatus() == WAITING_FOR_LAP_START) {
             state.reset();
             state.setStatus(ABORTED);

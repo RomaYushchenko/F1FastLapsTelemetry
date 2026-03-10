@@ -23,6 +23,8 @@ import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.SESSIO
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.TRACK_ID;
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.CAR_INDEX;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -112,9 +114,33 @@ class TrackLayoutRecordingServiceTest {
     }
 
     @Test
-    @DisplayName("onLapComplete discards invalid lap and resets state")
-    void onLapComplete_discardsInvalidLap() {
-        // Arrange
+    @DisplayName("onLapComplete saves track even when lap invalid (layout geometry still valid)")
+    void onLapComplete_savesTrackWhenLapInvalid() {
+        // Arrange: enough points; lap invalid (e.g. cut track) but we still save layout
+        SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
+        when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
+        TrackRecordingState recState = runtimeState.getTrackRecordingState();
+        recState.setTrackId(TRACK_ID);
+        recState.setStatus(TrackRecordingState.Status.RECORDING);
+        for (int i = 0; i < 310; i++) {
+            recState.getBuffer().add(new PointXYZD(1.0f + i, 2.0f, 3.0f, 10.0f + i));
+        }
+
+        // Act
+        service.onLapComplete(SESSION_UID, CAR_INDEX, true);
+
+        // Assert: track is saved (invalid lap still has valid track geometry)
+        ArgumentCaptor<TrackLayout> captor = ArgumentCaptor.forClass(TrackLayout.class);
+        verify(trackLayoutRepository).save(captor.capture());
+        assertThat(captor.getValue().getTrackId()).isEqualTo(TRACK_ID);
+        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.DONE);
+    }
+
+    @Test
+    @DisplayName("onLapComplete defers save when points < threshold (cross-topic ordering)")
+    void onLapComplete_defersWhenPointsBelowThreshold() {
+        // Arrange: lap complete arrived before enough motion (e.g. different Kafka topics)
         SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
         runtimeState.setPlayerCarIndex(CAR_INDEX);
         when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
@@ -124,11 +150,68 @@ class TrackLayoutRecordingServiceTest {
         recState.getBuffer().add(new PointXYZD(1.0f, 2.0f, 3.0f, 10.0f));
 
         // Act
-        service.onLapComplete(SESSION_UID, CAR_INDEX, true);
+        service.onLapComplete(SESSION_UID, CAR_INDEX, false);
+
+        // Assert: not reset, pending set so save will run when motion adds enough points
+        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.RECORDING);
+        assertThat(recState.getBuffer()).hasSize(1);
+        assertThat(recState.isPendingLapComplete()).isTrue();
+        assertThat(recState.isPendingLapInvalid()).isFalse();
+    }
+
+    @Test
+    @DisplayName("onMotionFrame does not save without lap complete (criterion is lap only)")
+    void onMotionFrame_doesNotSaveWithoutLapComplete() {
+        // Arrange: RECORDING with many points, no lap complete signal
+        SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
+        when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
+
+        TrackRecordingState recState = runtimeState.getTrackRecordingState();
+        recState.setTrackId(TRACK_ID);
+        recState.setStatus(TrackRecordingState.Status.RECORDING);
+        recState.setPendingLapComplete(false);
+        for (int i = 0; i < 200; i++) {
+            recState.getBuffer().add(new PointXYZD(100.0f + i, 5.0f, 200.0f + i, (float) i));
+        }
+
+        // Act: more motion frames (no lap complete)
+        for (int i = 0; i < 10; i++) {
+            service.onMotionFrame(SESSION_UID, CAR_INDEX, 399.0f, 5.0f, 499.0f, 299.0f + i);
+        }
+
+        // Assert: not saved (criterion is lap completion, not point count)
+        verify(trackLayoutRepository, never()).save(any());
+        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.RECORDING);
+    }
+
+    @Test
+    @DisplayName("onMotionFrame triggers deferred save when buffer reaches min points after pending lap complete")
+    void onMotionFrame_triggersDeferredSaveWhenPendingAndEnoughPoints() {
+        // Arrange: lap complete was deferred (too few points); motion catches up to min (10)
+        SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
+        when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
+
+        TrackRecordingState recState = runtimeState.getTrackRecordingState();
+        recState.setTrackId(TRACK_ID);
+        recState.setStatus(TrackRecordingState.Status.RECORDING);
+        recState.setPendingLapComplete(true);
+        recState.setPendingLapInvalid(false);
+        for (int i = 0; i < 9; i++) {
+            recState.getBuffer().add(new PointXYZD(100.0f + i, 5.0f, 200.0f + i, (float) i));
+        }
+
+        // Act: one more sampled motion frame reaches 10 and triggers deferred save (every 5th frame samples)
+        for (int i = 0; i < 5; i++) {
+            service.onMotionFrame(SESSION_UID, CAR_INDEX, 399.0f, 5.0f, 499.0f, 299.0f + i);
+        }
 
         // Assert
-        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.WAITING_FOR_LAP_START);
-        assertThat(recState.getBuffer()).isEmpty();
+        ArgumentCaptor<TrackLayout> captor = ArgumentCaptor.forClass(TrackLayout.class);
+        verify(trackLayoutRepository).save(captor.capture());
+        assertThat(captor.getValue().getTrackId()).isEqualTo(TRACK_ID);
+        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.DONE);
     }
 
     @Test

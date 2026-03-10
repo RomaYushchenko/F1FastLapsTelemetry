@@ -42,16 +42,19 @@ public class LapDataProcessor {
 
         lapAggregator.processLapData(sessionUid, carIndex, lap);
 
+        SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
         if (lap.getLastLapTimeMs() != null) {
-            boolean lapInvalid = lap.isInvalid();
-            trackLayoutRecordingService.onLapComplete(sessionUid, carIndex, lapInvalid);
+            trackLayoutRecordingService.onLapComplete(sessionUid, carIndex, lap.isInvalid());
+        } else if (snapshot != null && snapshot.getCurrentLap() != null
+                && lap.getLapNumber() > 1 && lap.getLapNumber() > snapshot.getCurrentLap()) {
+            // First packet of new lap without lastLapTimeMs (game may not send it); still signal lap complete for track recording
+            trackLayoutRecordingService.onLapComplete(sessionUid, carIndex, false);
         }
 
         if (lap.getCarPosition() != null && lap.getCarPosition() > 0) {
             state.setLastCarPosition(carIndex, lap.getCarPosition());
         }
 
-        SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
         if (snapshot == null) {
             snapshot = new SessionRuntimeState.CarSnapshot();
             state.updateSnapshot(carIndex, snapshot);

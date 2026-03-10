@@ -219,6 +219,12 @@ public class SessionLifecycleService {
                 log.info("Updated session metadata: sessionUID={}, sessionType={}, trackId={}",
                         sessionUID, session.getSessionType(), session.getTrackId());
             }
+            if (event.getTrackId() != null) {
+                short tid = event.getTrackId().shortValue();
+                if (tid >= 0) {
+                    trackLayoutRecordingService.setTrackIdFromSessionData(sessionUID, tid);
+                }
+            }
         });
     }
 
@@ -264,6 +270,12 @@ public class SessionLifecycleService {
             if (session.getTrackId() == null && dto.getTrackId() != null) {
                 session.setTrackId(dto.getTrackId().shortValue());
                 updated = true;
+            }
+            if (dto.getTrackId() != null) {
+                short tid = dto.getTrackId().shortValue();
+                if (tid >= 0) {
+                    trackLayoutRecordingService.setTrackIdFromSessionData(sessionUID, tid);
+                }
             }
             if (session.getTotalLaps() == null && dto.getTotalLaps() != null) {
                 session.setTotalLaps(dto.getTotalLaps().shortValue());

@@ -8,8 +8,9 @@ import java.nio.ByteBuffer;
 
 /**
  * Parses F1 2025 Session packet payload (ByteBuffer) into {@link SessionEventDto}.
- * Packet layout: event code (4 bytes), skip 20, session type, track id, total laps.
- * Session type and track display names are resolved from ids in processing (F1SessionType, F1Track).
+ * Used for short session packets (e.g. SSTA/SEND). Layout: event code (4 bytes), skip 20,
+ * then sessionType (u8), trackId (i8), totalLaps (u8). Track id can be wrong on some builds;
+ * processing uses full PacketSessionData (SessionData) as authoritative when available.
  */
 @Component
 public class SessionPacketParser {

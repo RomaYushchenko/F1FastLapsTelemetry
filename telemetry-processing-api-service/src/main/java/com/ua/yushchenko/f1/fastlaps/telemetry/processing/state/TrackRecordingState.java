@@ -29,6 +29,13 @@ public class TrackRecordingState {
     private short trackId = -1;
 
     /**
+     * When lap-complete is received before enough motion frames (cross-topic ordering),
+     * we defer save until buffer reaches MIN_POINTS_WHEN_LAP_COMPLETE.
+     */
+    private volatile boolean pendingLapComplete;
+    private volatile boolean pendingLapInvalid;
+
+    /**
      * Returns true when this motion frame should be sampled into the buffer.
      * Uses SAMPLE_EVERY = 5 → ~12 Hz at 60 FPS.
      */
@@ -49,6 +56,8 @@ public class TrackRecordingState {
     public void reset() {
         buffer.clear();
         frameCounter.set(0);
+        pendingLapComplete = false;
+        pendingLapInvalid = false;
     }
 }
 

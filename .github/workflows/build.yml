@@ -23,6 +23,9 @@ jobs:
         id: build
         run: mvn clean install -B -q -Djacoco.haltOnFailure=false
 
+      - name: Integration tests (track layout recording, Testcontainers)
+        run: mvn -pl telemetry-processing-api-service test -Dtest=TrackLayoutRecordingFromLogSequenceIntegrationTest -B -q
+
       - name: Upload JaCoCo report (telemetry-processing-api-service)
         uses: actions/upload-artifact@v4
         if: steps.build.outcome == 'success'
