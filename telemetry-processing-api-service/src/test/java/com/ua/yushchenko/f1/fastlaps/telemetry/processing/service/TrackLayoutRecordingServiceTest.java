@@ -1,7 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.SectorBoundary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TrackLayoutRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.PointXYZD;
@@ -17,7 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Map;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.SESSION_UID;
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.TRACK_ID;
@@ -63,17 +61,20 @@ class TrackLayoutRecordingServiceTest {
     }
 
     @Test
-    @DisplayName("onMotionFrame starts recording when lapDistance > 0 and samples points")
+    @DisplayName("onMotionFrame starts recording when lap 1 and lapDistance > 0 and samples points")
     void onMotionFrame_transitionsToRecording_andSamplesPoints() {
-        // Arrange
+        // Arrange: snapshot with currentLap=1 so we start from first lap only
         SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
         runtimeState.setPlayerCarIndex(CAR_INDEX);
+        SessionRuntimeState.CarSnapshot snapshot = new SessionRuntimeState.CarSnapshot();
+        snapshot.setCurrentLap(1);
+        runtimeState.updateSnapshot(CAR_INDEX, snapshot);
         when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
         TrackRecordingState recState = runtimeState.getTrackRecordingState();
         recState.setTrackId(TRACK_ID);
         recState.setStatus(TrackRecordingState.Status.WAITING_FOR_LAP_START);
 
-        // Act: first frame with lapDistance > 0 should switch to RECORDING
+        // Act: first frame with lap 1 and lapDistance > 0 should switch to RECORDING
         service.onMotionFrame(SESSION_UID, CAR_INDEX, 10.0f, 1.0f, 20.0f, 5.0f);
 
         // Assert
@@ -92,6 +93,60 @@ class TrackLayoutRecordingServiceTest {
         assertThat(first.y()).isNotNull();
         assertThat(first.z()).isNotNull();
         assertThat(first.lapDistance()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("onMotionFrame does not start when currentLap is null (LapData not yet processed)")
+    void onMotionFrame_doesNotStartWhenCurrentLapNull() {
+        SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
+        when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
+        TrackRecordingState recState = runtimeState.getTrackRecordingState();
+        recState.setTrackId(TRACK_ID);
+        recState.setStatus(TrackRecordingState.Status.WAITING_FOR_LAP_START);
+
+        service.onMotionFrame(SESSION_UID, CAR_INDEX, 10.0f, 1.0f, 20.0f, 5.0f);
+
+        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.WAITING_FOR_LAP_START);
+    }
+
+    @Test
+    @DisplayName("onMotionFrame does not start recording when currentLap is 0 (formation lap)")
+    void onMotionFrame_doesNotStartWhenLap0() {
+        // Arrange: lap 0 = before first racing lap (formation lap)
+        SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
+        SessionRuntimeState.CarSnapshot snapshot = new SessionRuntimeState.CarSnapshot();
+        snapshot.setCurrentLap(0);
+        runtimeState.updateSnapshot(CAR_INDEX, snapshot);
+        when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
+        TrackRecordingState recState = runtimeState.getTrackRecordingState();
+        recState.setTrackId(TRACK_ID);
+        recState.setStatus(TrackRecordingState.Status.WAITING_FOR_LAP_START);
+
+        service.onMotionFrame(SESSION_UID, CAR_INDEX, 10.0f, 1.0f, 20.0f, 5.0f);
+
+        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.WAITING_FOR_LAP_START);
+        assertThat(recState.getBuffer()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("onMotionFrame does not start recording when currentLap is 2 (second lap)")
+    void onMotionFrame_doesNotStartWhenLap2() {
+        SessionRuntimeState runtimeState = new SessionRuntimeState(SESSION_UID);
+        runtimeState.setPlayerCarIndex(CAR_INDEX);
+        SessionRuntimeState.CarSnapshot snapshot = new SessionRuntimeState.CarSnapshot();
+        snapshot.setCurrentLap(2);
+        runtimeState.updateSnapshot(CAR_INDEX, snapshot);
+        when(sessionStateManager.get(SESSION_UID)).thenReturn(runtimeState);
+        TrackRecordingState recState = runtimeState.getTrackRecordingState();
+        recState.setTrackId(TRACK_ID);
+        recState.setStatus(TrackRecordingState.Status.WAITING_FOR_LAP_START);
+
+        service.onMotionFrame(SESSION_UID, CAR_INDEX, 10.0f, 1.0f, 20.0f, 100.0f);
+
+        assertThat(recState.getStatus()).isEqualTo(TrackRecordingState.Status.WAITING_FOR_LAP_START);
+        assertThat(recState.getBuffer()).isEmpty();
     }
 
     @Test
@@ -242,21 +297,14 @@ class TrackLayoutRecordingServiceTest {
         verify(trackLayoutRepository).save(captor.capture());
         TrackLayout saved = captor.getValue();
         assertThat(saved.getTrackId()).isEqualTo(TRACK_ID);
-        assertThat(saved.getPointsJson()).isNotBlank();
+        assertThat(saved.getPoints()).isNotEmpty().hasSize(310);
         assertThat(saved.getMinElev()).isNotNull();
         assertThat(saved.getMaxElev()).isNotNull();
         assertThat(saved.getSource()).isEqualTo("RECORDED");
         assertThat(saved.getRecordedAt()).isNotNull();
         assertThat(saved.getSessionUid()).isEqualTo(SESSION_UID);
-        assertThat(saved.getSectorBoundariesJson()).isNotBlank();
-
-        ObjectMapper mapper = new ObjectMapper();
-        List<Map<String, Object>> points = mapper.readValue(saved.getPointsJson(), new TypeReference<>() {});
-        assertThat(points).hasSize(310);
-
-        List<Map<String, Object>> boundaries = mapper.readValue(saved.getSectorBoundariesJson(), new TypeReference<>() {});
-        assertThat(boundaries).hasSize(3);
-        assertThat(boundaries).extracting(b -> (Integer) b.get("sector")).containsExactly(1, 2, 3);
+        assertThat(saved.getSectorBoundaries()).isNotEmpty().hasSize(3);
+        assertThat(saved.getSectorBoundaries()).extracting(SectorBoundary::sector).containsExactly(1, 2, 3);
     }
 
     @Test

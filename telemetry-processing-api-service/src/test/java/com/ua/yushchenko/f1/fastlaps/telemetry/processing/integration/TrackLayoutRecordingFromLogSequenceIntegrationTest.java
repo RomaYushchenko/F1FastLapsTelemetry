@@ -42,8 +42,8 @@ import static org.mockito.Mockito.verify;
  * <p>Replays event sequence from logs-dev (telemetry-processing-api-service, 2026-03-10):
  * <ul>
  *   <li>SessionData: trackId=3 (Sakhir), frame=0 → WAITING_FOR_LAP_START</li>
- *   <li>LapData: frame=2, lapNumber=1, lapDistance=-5287.425, sector=0, carPosition=1, invalid=false</li>
- *   <li>Motion frame 1577 → Lap started, trackId=3</li>
+ *   <li>LapData: frame=2, lapNumber=1, lapDistance &gt; 0 (first lap started past S/F), sector=0, carPosition=1, invalid=false</li>
+ *   <li>Motion frame 1577 → Lap 1 started (lapDistance from LapData), trackId=3</li>
  *   <li>Lap frame 7777 → Lap complete (deferred or immediate)</li>
  *   <li>Motion frame 7780+ → motion after deferred lap complete</li>
  * </ul>
@@ -57,7 +57,8 @@ class TrackLayoutRecordingFromLogSequenceIntegrationTest {
 
     private static final short TRACK_ID = 3; // Sakhir (Bahrain)
     private static final short CAR_INDEX = 0;
-    private static final float LAP_DISTANCE_FIRST_PACKET = -5287.425f;
+    /** First lap started (car past S/F line); recording starts only when lap 1 and lapDistance > 0. */
+    private static final float LAP_DISTANCE_FIRST_PACKET = 10f;
     private static final int FRAME_SSTA = 0;
     private static final int FRAME_FIRST_LAP = 2;
     private static final int FRAME_MOTION_START = 1577;
@@ -185,7 +186,7 @@ class TrackLayoutRecordingFromLogSequenceIntegrationTest {
             assertThat(saved).isNotNull();
             assertThat(saved.getTrackId()).isEqualTo(TRACK_ID);
             assertThat(saved.getSource()).isEqualTo("RECORDED");
-            assertThat(saved.getPointsJson()).isNotBlank();
+            assertThat(saved.getPoints()).isNotEmpty();
             assertThat(saved.getSessionUid()).isEqualTo(sessionUid);
         }
 

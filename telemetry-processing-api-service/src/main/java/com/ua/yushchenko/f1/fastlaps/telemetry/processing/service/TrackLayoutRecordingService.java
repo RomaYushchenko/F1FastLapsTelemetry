@@ -1,5 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.Point3D;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.SectorBoundary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TrackLayoutRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.PointXYZD;
@@ -11,9 +13,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState.Status.ABORTED;
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState.Status.DONE;
@@ -101,13 +103,16 @@ public class TrackLayoutRecordingService {
         TrackRecordingState state = sessionState.getTrackRecordingState();
 
         if (state.getStatus() == WAITING_FOR_LAP_START) {
-            if (lapDistance > 0) {
+            // Start recording only when first lap has started (from S/F line), to avoid formation lap
+            // and pre-lap data that cause looping sectors on the map.
+            Integer currentLap = null;
+            SessionRuntimeState.CarSnapshot snapshot = sessionState.getSnapshot(carIndex);
+            if (snapshot != null && snapshot.getCurrentLap() != null) {
+                currentLap = snapshot.getCurrentLap();
+            }
+            if (currentLap != null && currentLap == 1 && lapDistance > 0) {
                 state.setStatus(RECORDING);
-                log.info("[TrackRec] Lap started, trackId={}", state.getTrackId());
-            } else if (lapDistance < 0) {
-                // LapData may not be processed yet (Kafka ordering); start recording anyway to avoid losing motion
-                state.setStatus(RECORDING);
-                log.info("[TrackRec] Lap started (no lapDistance yet), trackId={}", state.getTrackId());
+                log.info("[TrackRec] Lap 1 started (lapDistance>0), trackId={}", state.getTrackId());
             }
         }
 
@@ -178,7 +183,9 @@ public class TrackLayoutRecordingService {
     }
 
     private void saveTrackLayout(long sessionUid, TrackRecordingState recState) {
-        List<PointXYZD> pts = List.copyOf(recState.getBuffer());
+        // Order by lap distance so the path follows the lap (Kafka can deliver motion out of order)
+        List<PointXYZD> pts = new ArrayList<>(recState.getBuffer());
+        pts.sort(Comparator.comparingDouble(PointXYZD::lapDistance));
         short trackId = recState.getTrackId();
         SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
 
@@ -190,15 +197,11 @@ public class TrackLayoutRecordingService {
         double minElev = pts.stream().mapToDouble(PointXYZD::y).min().orElse(0);
         double maxElev = pts.stream().mapToDouble(PointXYZD::y).max().orElse(0);
 
-        List<Map<String, Double>> jsonPoints = pts.stream()
-                .map(p -> Map.of(
-                        "x", (double) p.x(),
-                        "y", (double) p.y(),
-                        "z", (double) p.z()
-                ))
+        List<Point3D> pointList = pts.stream()
+                .map(p -> new Point3D(p.x(), p.y(), p.z()))
                 .toList();
 
-        List<Map<String, Object>> sectorBoundaries = buildSectorBoundaries(
+        List<SectorBoundary> sectorBoundaries = buildSectorBoundaries(
                 pts,
                 sessionState != null ? sessionState.getSector2LapDistanceStart() : -1f,
                 sessionState != null ? sessionState.getSector3LapDistanceStart() : -1f
@@ -206,7 +209,7 @@ public class TrackLayoutRecordingService {
 
         TrackLayout entity = TrackLayout.builder()
                 .trackId(trackId)
-                .pointsJson(com.fasterxml.jackson.databind.json.JsonMapper.builder().build().valueToTree(jsonPoints).toString())
+                .points(pointList)
                 .version((short) 1)
                 .minX(minX)
                 .minY(minZ)
@@ -217,9 +220,7 @@ public class TrackLayoutRecordingService {
                 .source("RECORDED")
                 .recordedAt(Instant.now())
                 .sessionUid(sessionUid)
-                .sectorBoundariesJson(sectorBoundaries.isEmpty()
-                        ? null
-                        : com.fasterxml.jackson.databind.json.JsonMapper.builder().build().valueToTree(sectorBoundaries).toString())
+                .sectorBoundaries(sectorBoundaries.isEmpty() ? null : sectorBoundaries)
                 .build();
 
         try {
@@ -233,8 +234,14 @@ public class TrackLayoutRecordingService {
         }
     }
 
-    private List<Map<String, Object>> buildSectorBoundaries(List<PointXYZD> pts, float s2Dist, float s3Dist) {
-        if (pts.isEmpty()) {
+    /**
+     * Build sector boundaries (S/F at 0, S2 start, S3 start) from points sorted by lap distance.
+     * Ensures S2 boundary index is always less than S3 so the frontend can assume lap order 0 → S2 → S3 → 0.
+     * Some tracks/game builds send sector3LapDistanceStart &lt; sector2LapDistanceStart; we normalize so
+     * the boundary with the smaller lap distance is emitted as S2 and the other as S3.
+     */
+    private List<SectorBoundary> buildSectorBoundaries(List<PointXYZD> pts, float s2Dist, float s3Dist) {
+        if (pts.isEmpty() || s2Dist < 0 || s3Dist < 0) {
             return List.of();
         }
 
@@ -243,15 +250,27 @@ public class TrackLayoutRecordingService {
         PointXYZD s2 = pts.stream()
                 .min(Comparator.comparingDouble(p -> Math.abs(p.lapDistance() - s2Dist)))
                 .orElse(pts.get(pts.size() / 2));
+        int s2Idx = pts.indexOf(s2);
 
         PointXYZD s3 = pts.stream()
                 .min(Comparator.comparingDouble(p -> Math.abs(p.lapDistance() - s3Dist)))
                 .orElse(pts.get(pts.size() * 2 / 3));
+        int s3Idx = pts.indexOf(s3);
+
+        // Ensure S2 comes before S3 along the lap (by index); some tracks send distances in reverse order
+        if (s3Idx < s2Idx) {
+            PointXYZD tmp = s2;
+            s2 = s3;
+            s3 = tmp;
+            int tmpIdx = s2Idx;
+            s2Idx = s3Idx;
+            s3Idx = tmpIdx;
+        }
 
         return List.of(
-                Map.of("sector", 1, "x", (double) s1.x(), "y", (double) s1.y(), "z", (double) s1.z()),
-                Map.of("sector", 2, "x", (double) s2.x(), "y", (double) s2.y(), "z", (double) s2.z()),
-                Map.of("sector", 3, "x", (double) s3.x(), "y", (double) s3.y(), "z", (double) s3.z())
+                new SectorBoundary(1, s1.x(), s1.y(), s1.z(), 0),
+                new SectorBoundary(2, s2.x(), s2.y(), s2.z(), s2Idx),
+                new SectorBoundary(3, s3.x(), s3.y(), s3.z(), s3Idx)
         );
     }
 

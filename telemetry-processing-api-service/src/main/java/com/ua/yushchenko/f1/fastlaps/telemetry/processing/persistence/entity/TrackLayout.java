@@ -1,5 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.Point3D;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.SectorBoundary;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -8,8 +10,11 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * 2D track layout (centreline/outline points) for Live Track Map. Block F — B8.
@@ -26,8 +31,9 @@ public class TrackLayout {
     @Column(name = "track_id", nullable = false)
     private Short trackId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "points", nullable = false, columnDefinition = "jsonb")
-    private String pointsJson;
+    private List<Point3D> points;
 
     @Column(name = "version", nullable = false)
     private Short version;
@@ -59,6 +65,7 @@ public class TrackLayout {
     @Column(name = "session_uid")
     private Long sessionUid;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "sector_boundaries", columnDefinition = "jsonb")
-    private String sectorBoundariesJson;
+    private List<SectorBoundary> sectorBoundaries;
 }

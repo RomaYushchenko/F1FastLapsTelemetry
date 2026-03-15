@@ -4,6 +4,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Mot
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.MotionRawRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -11,6 +12,9 @@ import java.time.Instant;
 /**
  * Writes motion samples to motion_raw. Called from MotionConsumer.
  * Plan: 13-session-summary-speed-corner-graph.md Phase 4.
+ * <p>
+ * Write is async so the consumer does not block on DB; live position updates
+ * and track recording see fresh data immediately, reducing UI delay.
  */
 @Slf4j
 @Component
@@ -19,6 +23,7 @@ public class MotionRawWriter {
 
     private final MotionRawRepository repository;
 
+    @Async
     public void write(
             Instant ts,
             long sessionUid,

@@ -203,7 +203,8 @@ public class SessionLifecycleService {
                 session.setSessionType(event.getSessionTypeId().shortValue());
                 updated = true;
             }
-            if (session.getTrackId() == null && event.getTrackId() != null) {
+            // SessionData/SessionInfo are authoritative for trackId (SSTA can send wrong id on some builds)
+            if (event.getTrackId() != null && event.getTrackId().intValue() >= 0) {
                 session.setTrackId(event.getTrackId().shortValue());
                 updated = true;
             }
@@ -267,7 +268,8 @@ public class SessionLifecycleService {
                 session.setSessionType(dto.getSessionType().shortValue());
                 updated = true;
             }
-            if (session.getTrackId() == null && dto.getTrackId() != null) {
+            // PacketSessionData is authoritative for trackId (SSTA can send wrong id on some builds)
+            if (dto.getTrackId() != null && dto.getTrackId().intValue() >= 0) {
                 session.setTrackId(dto.getTrackId().shortValue());
                 updated = true;
             }

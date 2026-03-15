@@ -1,6 +1,5 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutStatusDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
@@ -44,7 +43,7 @@ class TrackLayoutServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new TrackLayoutService(trackLayoutRepository, new ObjectMapper(), sessionStateManager, sessionRepository);
+        service = new TrackLayoutService(trackLayoutRepository, sessionStateManager, sessionRepository);
     }
 
     @Test
@@ -63,7 +62,8 @@ class TrackLayoutServiceTest {
         assertThat(dto.getTrackId()).isEqualTo((int) TRACK_LAYOUT_TRACK_ID);
         assertThat(dto.getPoints()).hasSize(4);
         assertThat(dto.getPoints().get(0).getX()).isEqualTo(100.0);
-        assertThat(dto.getPoints().get(0).getY()).isEqualTo(300.0);
+        assertThat(dto.getPoints().get(0).getY()).isEqualTo(0.0);
+        assertThat(dto.getPoints().get(0).getZ()).isEqualTo(300.0);
         assertThat(dto.getBounds()).isNotNull();
         assertThat(dto.getBounds().getMinX()).isEqualTo(100.0);
         assertThat(dto.getBounds().getMaxZ()).isEqualTo(500.0);

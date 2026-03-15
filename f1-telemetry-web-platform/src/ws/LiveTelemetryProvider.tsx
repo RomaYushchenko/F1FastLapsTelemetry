@@ -29,6 +29,8 @@ import type {
 } from './types'
 
 const ACTIVE_SESSION_POLL_INTERVAL_MS = 4000
+/** Refresh session from server while connected so trackId (from SessionData) is picked up for all tracks. */
+const SESSION_REFRESH_WHILE_CONNECTED_MS = 5000
 
 export type LiveStatus =
   | 'live'
@@ -321,6 +323,21 @@ export function LiveTelemetryProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [startOrPoll])
+
+  // While connected, periodically refresh session so trackId (set by SessionData after SSTA) is available for Live Track Map on all tracks
+  useEffect(() => {
+    if (internalStatus !== 'connected' || session?.id == null) return
+    const sessionId = session.id
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await getActiveSession()
+        if (fresh?.id === sessionId) setSession(fresh)
+      } catch {
+        // ignore; keep current session
+      }
+    }, SESSION_REFRESH_WHILE_CONNECTED_MS)
+    return () => clearInterval(interval)
+  }, [internalStatus, session?.id])
 
   // Auto-reconnect: when status is disconnected, re-poll getActiveSession
   useEffect(() => {

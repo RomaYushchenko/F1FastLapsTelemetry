@@ -8,12 +8,14 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.Point3D;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TyreWearPerLap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TyreWearSnapshot;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -444,13 +446,17 @@ public final class TestData {
 
     /** Silverstone layout (track_id 8) for Block F — B8. */
     public static final short TRACK_LAYOUT_TRACK_ID = 8;
-    public static final String TRACK_LAYOUT_POINTS_JSON =
-            "[{\"x\":100.0,\"y\":300.0},{\"x\":250.0,\"y\":100.0},{\"x\":700.0,\"y\":250.0},{\"x\":100.0,\"y\":300.0}]";
+    public static final List<Point3D> TRACK_LAYOUT_POINTS = List.of(
+            new Point3D(100.0, 0.0, 300.0),
+            new Point3D(250.0, 0.0, 100.0),
+            new Point3D(700.0, 0.0, 250.0),
+            new Point3D(100.0, 0.0, 300.0)
+    );
 
     public static TrackLayout trackLayout() {
         return TrackLayout.builder()
                 .trackId(TRACK_LAYOUT_TRACK_ID)
-                .pointsJson(TRACK_LAYOUT_POINTS_JSON)
+                .points(TRACK_LAYOUT_POINTS)
                 .version((short) 1)
                 .minX(100.0)
                 .minY(100.0)

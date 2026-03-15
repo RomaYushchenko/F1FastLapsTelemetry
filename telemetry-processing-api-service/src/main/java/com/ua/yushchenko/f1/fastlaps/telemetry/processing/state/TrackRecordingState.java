@@ -37,10 +37,10 @@ public class TrackRecordingState {
 
     /**
      * Returns true when this motion frame should be sampled into the buffer.
-     * Uses SAMPLE_EVERY = 5 → ~12 Hz at 60 FPS.
+     * Uses SAMPLE_EVERY = 3 → ~20 Hz at 60 FPS for smoother track shape.
      */
     public boolean shouldSample() {
-        return frameCounter.incrementAndGet() % 5 == 0;
+        return frameCounter.incrementAndGet() % 3 == 0;
     }
 
     /**

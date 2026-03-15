@@ -22,6 +22,10 @@ spring:
     consumer:
       group-id: telemetry-processing-group
       auto-offset-reset: earliest
+      # Smaller batches = more frequent commits, less delay before new positions reach live UI.
+      # If live map still lags, increase UDP ingest throttle (udp-ingest f1.telemetry.kafka.throttle.permits-per-second)
+      # and ensure DB can keep up (motion_raw writes are async to avoid blocking the consumer).
+      max-poll-records: ${SPRING_KAFKA_CONSUMER_MAX_POLL_RECORDS:100}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
 

@@ -28,9 +28,9 @@ export function DataCard({
   return (
     <div className={cn('rounded-xl overflow-hidden', variants[variant], className)}>
       {title && (
-        <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
+        <div className="relative z-10 px-4 py-3 border-b border-border/50 flex items-center justify-between bg-inherit">
           <h3 className="text-lg font-semibold">{title}</h3>
-          {actions && <div>{actions}</div>}
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
         </div>
       )}
       <div className={noPadding ? '' : 'p-4'}>

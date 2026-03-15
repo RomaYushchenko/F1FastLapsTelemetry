@@ -4,7 +4,8 @@ import {
   SECTOR_COLORS,
   computeBounds,
   normalize2D,
-  pointsToSvgPath,
+  pointsToSmoothOpenSvgPath,
+  pointsToSmoothSvgPath,
   splitIntoSectors,
 } from '@/utils/trackNormalization'
 
@@ -20,20 +21,14 @@ interface Props {
 export function TrackMap2D({ layout, cars }: Props) {
   const bounds = layout.bounds ?? computeBounds(layout.points)
   const sectors = layout.sectorBoundaries ?? []
+  const pointsInLapOrder = layout.source === 'RECORDED'
+  const [s1pts, s2pts, s3pts] = splitIntoSectors(layout.points, sectors, { pointsInLapOrder })
+  const useSectorSegments = sectors.length > 0 && s2pts.length > 0 && s3pts.length > 0
+  const trackPath = pointsToSmoothSvgPath(layout.points, bounds, CANVAS)
 
-  const [s1pts, s2pts, s3pts] = splitIntoSectors(layout.points, sectors)
-  const trackPath = pointsToSvgPath(layout.points, bounds, CANVAS)
-
-  const renderSegment = (pts: TrackPoint3D[], color: string, closeZ = false) => {
+  const renderSegment = (pts: TrackPoint3D[], color: string) => {
     if (pts.length < 2) return null
-    const d =
-      pts
-        .map((p, i) => {
-          const z = p.z ?? p.y
-          const { nx, ny } = normalize2D(p.x, z, bounds, CANVAS)
-          return `${i === 0 ? 'M' : 'L'}${nx.toFixed(1)},${ny.toFixed(1)}`
-        })
-        .join(' ') + (closeZ ? ' Z' : '')
+    const d = pointsToSmoothOpenSvgPath(pts, bounds, CANVAS)
     return (
       <>
         <path
@@ -64,7 +59,7 @@ export function TrackMap2D({ layout, cars }: Props) {
       viewBox={`0 0 ${SVG_W} ${SVG_H}`}
       className="w-full h-auto"
     >
-      {!sectors.length && (
+      {!useSectorSegments && (
         <>
           <path
             d={trackPath}
@@ -85,11 +80,12 @@ export function TrackMap2D({ layout, cars }: Props) {
         </>
       )}
 
-      {sectors.length > 0 && (
+      {useSectorSegments && (
         <>
           {renderSegment(s1pts, SECTOR_COLORS[1])}
           {renderSegment(s2pts, SECTOR_COLORS[2])}
-          {renderSegment(s3pts, SECTOR_COLORS[3], true)}
+          {/* Sector 3: no Z close — we already end at points[0] (S/F); Z would draw back to S3 boundary and create a loop */}
+          {renderSegment(s3pts, SECTOR_COLORS[3])}
         </>
       )}
 
@@ -119,10 +115,11 @@ export function TrackMap2D({ layout, cars }: Props) {
         )
       })}
 
-      {sectors.find(b => b.sector === 1) && (() => {
-        const s1 = sectors.find(b => b.sector === 1)!
-        const z = s1.z ?? s1.y
-        const { nx, ny } = normalize2D(s1.x, z, bounds, CANVAS)
+      {/* S/F at start of sector 1 (green): points[0] is always the first point of the S1 segment */}
+      {layout.points.length > 0 && (() => {
+        const start = layout.points[0]
+        const z = start.z ?? start.y ?? 0
+        const { nx, ny } = normalize2D(start.x, z, bounds, CANVAS)
         return (
           <g>
             <rect
@@ -147,28 +144,6 @@ export function TrackMap2D({ layout, cars }: Props) {
           </g>
         )
       })()}
-
-      <g transform="translate(12, 12)">
-        {[1, 2, 3].map((s, i) => (
-          <g key={s} transform={`translate(0, ${i * 18})`}>
-            <rect
-              width={14}
-              height={6}
-              y={1}
-              rx={3}
-              fill={SECTOR_COLORS[s as 1 | 2 | 3]}
-            />
-            <text
-              x={18}
-              y={9}
-              fill="#9CA3AF"
-              fontSize={10}
-            >
-              Sector {s}
-            </text>
-          </g>
-        ))}
-      </g>
 
       {cars.map(car => {
         const { nx, ny } = normalize2D(car.worldPosX, car.worldPosZ, bounds, CANVAS)

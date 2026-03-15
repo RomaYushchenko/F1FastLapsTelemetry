@@ -1,7 +1,5 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.BulkImportResultDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SectorBoundaryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutBoundsDto;
@@ -11,6 +9,8 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutExportDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutStatusDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.Point3D;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.SectorBoundary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TrackLayoutRepository;
@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Serves 2D track layout (points + optional bounds) for Live Track Map. Block F — B8.
@@ -39,7 +40,6 @@ import java.util.Map;
 public class TrackLayoutService {
 
     private final TrackLayoutRepository trackLayoutRepository;
-    private final ObjectMapper objectMapper;
     private final SessionStateManager sessionStateManager;
     private final SessionRepository sessionRepository;
 
@@ -65,15 +65,7 @@ public class TrackLayoutService {
 
         if (layoutOpt.isPresent()) {
             TrackLayout entity = layoutOpt.get();
-            int pointsCount = 0;
-            if (entity.getPointsJson() != null && !entity.getPointsJson().isBlank()) {
-                try {
-                    List<?> pts = objectMapper.readValue(entity.getPointsJson(), new TypeReference<List<?>>() {});
-                    pointsCount = pts.size();
-                } catch (Exception e) {
-                    log.warn("getLayoutStatus: failed to parse points JSON for trackId={}: {}", trackId, e.getMessage());
-                }
-            }
+            int pointsCount = entity.getPoints() != null ? entity.getPoints().size() : 0;
             String source = entity.getSource();
             return new TrackLayoutStatusDto(
                     trackId,
@@ -165,7 +157,7 @@ public class TrackLayoutService {
 
         TrackLayout entity = TrackLayout.builder()
                 .trackId((short) dto.getTrackId())
-                .pointsJson(serializePoints(dto.getPoints()))
+                .points(dtoPointsToPoints(dto.getPoints()))
                 .version((short) (dto.getVersion() > 0 ? dto.getVersion() : 1))
                 .minX(boundsDto != null ? boundsDto.getMinX() : null)
                 .minY(boundsDto != null ? boundsDto.getMinZ() : null)
@@ -173,7 +165,7 @@ public class TrackLayoutService {
                 .maxY(boundsDto != null ? boundsDto.getMaxZ() : null)
                 .minElev(boundsDto != null ? boundsDto.getMinElev() : null)
                 .maxElev(boundsDto != null ? boundsDto.getMaxElev() : null)
-                .sectorBoundariesJson(serializeSectorBoundaries(dto.getSectorBoundaries()))
+                .sectorBoundaries(dtoSectorBoundariesToSectorBoundaries(dto.getSectorBoundaries()))
                 .source(dto.getSource() != null ? dto.getSource() : "STATIC")
                 .recordedAt(null)
                 .sessionUid(null)
@@ -224,7 +216,7 @@ public class TrackLayoutService {
     }
 
     private TrackLayoutResponseDto toDto(TrackLayout entity) {
-        List<TrackLayoutPointDto> points = parsePoints(entity.getPointsJson());
+        List<TrackLayoutPointDto> points = pointsToDto(entity.getPoints());
         TrackLayoutBoundsDto bounds = null;
         if (entity.getMinX() != null
                 && entity.getMinY() != null
@@ -239,7 +231,7 @@ public class TrackLayoutService {
                     .maxElev(entity.getMaxElev())
                     .build();
         }
-        List<SectorBoundaryDto> sectorBoundaries = parseSectorBoundaries(entity.getSectorBoundariesJson());
+        List<SectorBoundaryDto> sectorBoundaries = sectorBoundariesToDto(entity.getSectorBoundaries());
         return TrackLayoutResponseDto.builder()
                 .trackId(entity.getTrackId() != null ? entity.getTrackId().intValue() : null)
                 .points(points)
@@ -250,7 +242,7 @@ public class TrackLayoutService {
     }
 
     private TrackLayoutExportDto toExportDto(TrackLayout entity) {
-        List<TrackLayoutPointDto> points = parsePoints(entity.getPointsJson());
+        List<TrackLayoutPointDto> points = pointsToDto(entity.getPoints());
         TrackLayoutBoundsExportDto bounds = null;
         if (entity.getMinX() != null
                 && entity.getMinY() != null
@@ -275,50 +267,50 @@ public class TrackLayoutService {
                 .source(entity.getSource())
                 .points(points)
                 .bounds(bounds)
-                .sectorBoundaries(parseSectorBoundaries(entity.getSectorBoundariesJson()))
+                .sectorBoundaries(sectorBoundariesToDto(entity.getSectorBoundaries()))
                 .build();
     }
 
-    private List<TrackLayoutPointDto> parsePoints(String pointsJson) {
-        if (pointsJson == null || pointsJson.isBlank()) {
+    private static List<TrackLayoutPointDto> pointsToDto(List<Point3D> points) {
+        if (points == null || points.isEmpty()) {
             return Collections.emptyList();
         }
-        try {
-            return objectMapper.readValue(pointsJson, new TypeReference<>() {});
-        } catch (Exception e) {
-            log.warn("getLayout: failed to parse points JSON for track, returning empty list: {}", e.getMessage());
-            return Collections.emptyList();
-        }
+        return points.stream()
+                .map(p -> TrackLayoutPointDto.builder()
+                        .x(p.x())
+                        .y(p.y())
+                        .z(p.z())
+                        .build())
+                .collect(Collectors.toList());
     }
 
-    private List<SectorBoundaryDto> parseSectorBoundaries(String json) {
-        if (json == null || json.isBlank()) {
+    private static List<SectorBoundaryDto> sectorBoundariesToDto(List<SectorBoundary> boundaries) {
+        if (boundaries == null || boundaries.isEmpty()) {
             return Collections.emptyList();
         }
-        try {
-            return objectMapper.readValue(json, new TypeReference<>() {});
-        } catch (Exception e) {
-            log.warn("getLayout: failed to parse sector boundaries JSON for track, returning empty list: {}", e.getMessage());
+        return boundaries.stream()
+                .map(sb -> new SectorBoundaryDto(sb.sector(), sb.x(), sb.y(), sb.z(), sb.pointIndex()))
+                .collect(Collectors.toList());
+    }
+
+    private static List<Point3D> dtoPointsToPoints(List<TrackLayoutPointDto> points) {
+        if (points == null || points.isEmpty()) {
             return Collections.emptyList();
         }
+        return points.stream()
+                .map(p -> new Point3D(
+                        p.getX() != null ? p.getX() : 0.0,
+                        p.getY() != null ? p.getY() : 0.0,
+                        p.getZ() != null ? p.getZ() : 0.0))
+                .collect(Collectors.toList());
     }
 
-    private String serializePoints(List<TrackLayoutPointDto> points) {
-        try {
-            return objectMapper.writeValueAsString(points);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to serialize track layout points", e);
-        }
-    }
-
-    private String serializeSectorBoundaries(List<SectorBoundaryDto> boundaries) {
+    private static List<SectorBoundary> dtoSectorBoundariesToSectorBoundaries(List<SectorBoundaryDto> boundaries) {
         if (boundaries == null || boundaries.isEmpty()) {
             return null;
         }
-        try {
-            return objectMapper.writeValueAsString(boundaries);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to serialize sector boundaries", e);
-        }
+        return boundaries.stream()
+                .map(sb -> new SectorBoundary(sb.sector(), sb.x(), sb.y(), sb.z(), sb.pointIndex()))
+                .collect(Collectors.toList());
     }
 }

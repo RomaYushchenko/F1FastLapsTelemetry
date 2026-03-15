@@ -214,6 +214,8 @@ export interface SectorBoundary {
   x: number
   y: number
   z: number
+  /** Index into layout points where this sector starts; when set, split uses this for correct 1→2→3→1 order */
+  pointIndex?: number | null
 }
 
 export interface TrackLayoutResponseDto {
@@ -229,6 +231,27 @@ export interface TrackLayoutStatusDto {
   status: 'READY' | 'RECORDING' | 'NOT_AVAILABLE'
   pointsCollected: number
   source?: 'STATIC' | 'RECORDED' | string | null
+}
+
+/** Single track layout export (GET export, or item in bulk export). */
+export interface TrackLayoutExportDto {
+  exportVersion: number
+  exportedAt: string
+  trackId: number
+  trackName?: string | null
+  version?: number
+  source?: string | null
+  points: TrackPoint3D[]
+  bounds?: TrackBounds | null
+  sectorBoundaries?: SectorBoundary[] | null
+}
+
+/** Bulk export: all track layouts (GET export-all). */
+export interface TrackLayoutBulkExportDto {
+  exportVersion?: number
+  exportedAt?: string
+  count?: number
+  tracks: TrackLayoutExportDto[]
 }
 
 /** GET /api/sessions/active/positions or WebSocket POSITIONS — one car's world position (B9). */

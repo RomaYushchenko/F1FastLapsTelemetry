@@ -2,6 +2,19 @@ import type { TrackBounds, TrackPoint3D, SectorBoundary } from '@/api/types'
 
 // ─── Shared ────────────────────────────────────────────────────────────────
 
+/**
+ * Normalize a track point to world 3D (x, y=elevation, z).
+ * Legacy points have no z: then p.y is worldPositionZ; elevation is 0.
+ */
+export function trackPointToWorld3D(p: TrackPoint3D): { x: number; y: number; z: number } {
+  const hasZ = p.z != null
+  return {
+    x: p.x,
+    y: hasZ ? (p.y ?? 0) : 0,
+    z: (p.z ?? p.y ?? 0),
+  }
+}
+
 export function computeBounds(points: TrackPoint3D[]): TrackBounds {
   if (!points.length) {
     return {
@@ -15,11 +28,12 @@ export function computeBounds(points: TrackPoint3D[]): TrackBounds {
   }
   const xs = points.map(p => p.x)
   const zs = points.map(p => (p.z ?? p.y ?? 0))
-  const ys = points.map(p => (p.y ?? 0))
+  const ys = points.map(p => (p.z != null ? (p.y ?? 0) : 0))
   return {
     minX: Math.min(...xs), maxX: Math.max(...xs),
     minZ: Math.min(...zs), maxZ: Math.max(...zs),
-    minElev: Math.min(...ys), maxElev: Math.max(...ys),
+    minElev: ys.length ? Math.min(...ys) : 0,
+    maxElev: ys.length ? Math.max(...ys) : 0,
   }
 }
 
@@ -49,6 +63,8 @@ export function normalize2D(
   return { nx, ny }
 }
 
+const PATH_PRECISION = 2
+
 export function pointsToSvgPath(
   points: TrackPoint3D[],
   bounds: TrackBounds,
@@ -60,10 +76,93 @@ export function pointsToSvgPath(
       .map((p, i) => {
         const z = p.z ?? p.y ?? bounds.minZ
         const { nx, ny } = normalize2D(p.x, z, bounds, canvas)
-        return `${i === 0 ? 'M' : 'L'}${nx.toFixed(1)},${ny.toFixed(1)}`
+        return `${i === 0 ? 'M' : 'L'}${nx.toFixed(PATH_PRECISION)},${ny.toFixed(PATH_PRECISION)}`
       })
       .join(' ') + ' Z'
   )
+}
+
+/**
+ * Builds a smooth closed SVG path through the points using Catmull-Rom-style
+ * cubic Bezier segments, so the 2D track matches the apparent precision of the 3D line.
+ * Uses higher coordinate precision to avoid jagged edges.
+ */
+export function pointsToSmoothSvgPath(
+  points: TrackPoint3D[],
+  bounds: TrackBounds,
+  canvas: CanvasConfig,
+): string {
+  if (!points.length) return ''
+  if (points.length === 1) {
+    const z = points[0].z ?? points[0].y ?? bounds.minZ
+    const { nx, ny } = normalize2D(points[0].x, z, bounds, canvas)
+    return `M${nx.toFixed(PATH_PRECISION)},${ny.toFixed(PATH_PRECISION)} Z`
+  }
+  const n = points.length
+  const pt = (i: number) => {
+    const p = points[((i % n) + n) % n]
+    const z = p.z ?? p.y ?? bounds.minZ
+    return normalize2D(p.x, z, bounds, canvas)
+  }
+  const fmt = (nx: number, ny: number) =>
+    `${nx.toFixed(PATH_PRECISION)},${ny.toFixed(PATH_PRECISION)}`
+  const parts: string[] = []
+  const p0 = pt(0)
+  parts.push(`M${fmt(p0.nx, p0.ny)}`)
+  for (let i = 0; i < n; i++) {
+    const pPrev = pt(i - 1)
+    const pCur = pt(i)
+    const pNext = pt(i + 1)
+    const pNext2 = pt(i + 2)
+    const c1x = pCur.nx + (pNext.nx - pPrev.nx) / 6
+    const c1y = pCur.ny + (pNext.ny - pPrev.ny) / 6
+    const c2x = pNext.nx - (pNext2.nx - pCur.nx) / 6
+    const c2y = pNext.ny - (pNext2.ny - pCur.ny) / 6
+    parts.push(`C${fmt(c1x, c1y)} ${fmt(c2x, c2y)} ${fmt(pNext.nx, pNext.ny)}`)
+  }
+  return parts.join(' ') + ' Z'
+}
+
+/**
+ * Builds a smooth open SVG path through the points (for sector segments).
+ * Uses Catmull-Rom-style cubic Bezier with end tangents extended from the first/last segment.
+ */
+export function pointsToSmoothOpenSvgPath(
+  points: TrackPoint3D[],
+  bounds: TrackBounds,
+  canvas: CanvasConfig,
+): string {
+  if (!points.length) return ''
+  if (points.length === 1) {
+    const z = points[0].z ?? points[0].y ?? bounds.minZ
+    const { nx, ny } = normalize2D(points[0].x, z, bounds, canvas)
+    return `M${nx.toFixed(PATH_PRECISION)},${ny.toFixed(PATH_PRECISION)}`
+  }
+  const n = points.length
+  const pt = (i: number) => {
+    if (i < 0) return normalize2D(points[0].x, points[0].z ?? points[0].y ?? bounds.minZ, bounds, canvas)
+    if (i >= n) return normalize2D(points[n - 1].x, points[n - 1].z ?? points[n - 1].y ?? bounds.minZ, bounds, canvas)
+    const p = points[i]
+    const z = p.z ?? p.y ?? bounds.minZ
+    return normalize2D(p.x, z, bounds, canvas)
+  }
+  const fmt = (nx: number, ny: number) =>
+    `${nx.toFixed(PATH_PRECISION)},${ny.toFixed(PATH_PRECISION)}`
+  const parts: string[] = []
+  const p0 = pt(0)
+  parts.push(`M${fmt(p0.nx, p0.ny)}`)
+  for (let i = 0; i < n - 1; i++) {
+    const pPrev = pt(i - 1)
+    const pCur = pt(i)
+    const pNext = pt(i + 1)
+    const pNext2 = pt(i + 2)
+    const c1x = pCur.nx + (pNext.nx - pPrev.nx) / 6
+    const c1y = pCur.ny + (pNext.ny - pPrev.ny) / 6
+    const c2x = pNext.nx - (pNext2.nx - pCur.nx) / 6
+    const c2y = pNext.ny - (pNext2.ny - pCur.ny) / 6
+    parts.push(`C${fmt(c1x, c1y)} ${fmt(c2x, c2y)} ${fmt(pNext.nx, pNext.ny)}`)
+  }
+  return parts.join(' ')
 }
 
 // ─── Sectors (2D + 3D shared helpers) ─────────────────────────────────────
@@ -93,9 +192,19 @@ export function findNearestPointIndex(
   return bestIdx
 }
 
+/** Minimum share of points per sector (avoid degenerate split when boundaries are wrong). */
+const MIN_SECTOR_FRACTION = 0.05
+
+/**
+ * @param points - Track centreline points
+ * @param boundaries - Sector boundary markers (sector 2 and 3 starts)
+ * @param options - pointsInLapOrder: true when points are ordered by lap distance (RECORDED layouts);
+ *   then sector 3 is closed back to point 0 (S/F). For STATIC layouts pass false to avoid wrong closing line.
+ */
 export function splitIntoSectors(
   points: TrackPoint3D[],
   boundaries: SectorBoundary[] | null | undefined,
+  options?: { pointsInLapOrder?: boolean },
 ): [TrackPoint3D[], TrackPoint3D[], TrackPoint3D[]] {
   if (!points.length || !boundaries?.length) return [points, [], []]
 
@@ -106,16 +215,36 @@ export function splitIntoSectors(
     return [points, [], []]
   }
 
-  const s2Idx = findNearestPointIndex(points, s2.x, s2.z ?? s2.y)
-  const s3Idx = findNearestPointIndex(points, s3.x, s3.z ?? s3.y)
+  const pointsInLapOrder = options?.pointsInLapOrder ?? false
 
-  const [startS2, startS3] = s2Idx < s3Idx ? [s2Idx, s3Idx] : [s3Idx, s2Idx]
+  // Prefer backend-provided indices so 1→2→3→1 order is correct (no wrong match by 2D distance on overlapping tracks).
+  // Use firstCut < secondCut so S3 segment (secondCut..0) always closes the loop; some tracks/game builds send S3 index before S2.
+  const s2Idx =
+    typeof s2.pointIndex === 'number' && s2.pointIndex >= 0
+      ? Math.min(s2.pointIndex, points.length - 1)
+      : findNearestPointIndex(points, s2.x, s2.z ?? s2.y)
+  const s3Idx =
+    typeof s3.pointIndex === 'number' && s3.pointIndex >= 0
+      ? Math.min(s3.pointIndex, points.length - 1)
+      : findNearestPointIndex(points, s3.x, s3.z ?? s3.y)
 
-  return [
-    points.slice(0, startS2 + 1),
-    points.slice(startS2, startS3 + 1),
-    points.slice(startS3),
-  ]
+  const firstCut = Math.min(s2Idx, s3Idx)
+  const secondCut = Math.max(s2Idx, s3Idx)
+
+  const s1pts = points.slice(0, firstCut + 1)
+  const s2pts = points.slice(firstCut, secondCut + 1)
+  // Only close sector 3 to point 0 when points are in lap order (RECORDED); for STATIC, points[0] may not be S/F
+  const s3pts =
+    pointsInLapOrder && secondCut > 0
+      ? points.slice(secondCut).concat([points[0]])
+      : points.slice(secondCut)
+  const minPoints = Math.max(3, Math.floor(points.length * MIN_SECTOR_FRACTION))
+
+  if (s1pts.length < minPoints || s2pts.length < minPoints || s3pts.length < minPoints) {
+    return [points, [], []]
+  }
+
+  return [s1pts, s2pts, s3pts]
 }
 
 // ─── 3D (Three.js normalization) ─────────────────────────────────────────────
@@ -125,21 +254,36 @@ export interface ThreeTransform {
   centerY: number
   centerZ: number
   scale: number
+  /** Multiply Y (elevation) in scene space so elevation changes are visible; 1 = no exaggeration */
+  elevationScale?: number
 }
 
 export function computeThreeTransform(
   bounds: TrackBounds,
   sceneSize = 100,
+  options?: { targetElevationSceneUnits?: number; minElevationScale?: number },
 ): ThreeTransform {
   const rangeX = bounds.maxX - bounds.minX
   const rangeZ = bounds.maxZ - bounds.minZ
   const maxHRange = Math.max(rangeX, rangeZ, 1)
+  const scale = sceneSize / maxHRange
+
+  const minElev = bounds.minElev ?? 0
+  const maxElev = bounds.maxElev ?? 0
+  const elevRange = maxElev - minElev
+  const targetElev = options?.targetElevationSceneUnits ?? 25
+  const minScale = options?.minElevationScale ?? 1
+  const elevationScale =
+    elevRange > 0.5
+      ? Math.max(minScale, Math.min(15, targetElev / (elevRange * scale)))
+      : 1
 
   return {
     centerX: (bounds.minX + bounds.maxX) / 2,
-    centerY: ((bounds.minElev ?? 0) + (bounds.maxElev ?? 0)) / 2,
+    centerY: (minElev + maxElev) / 2,
     centerZ: (bounds.minZ + bounds.maxZ) / 2,
-    scale: sceneSize / maxHRange,
+    scale,
+    elevationScale: elevRange > 0.5 ? elevationScale : undefined,
   }
 }
 
@@ -149,9 +293,10 @@ export function worldToThree(
   worldZ: number,
   t: ThreeTransform,
 ): [number, number, number] {
+  const elevScale = t.elevationScale ?? 1
   return [
     (worldX - t.centerX) * t.scale,
-    (worldY - t.centerY) * t.scale,
+    (worldY - t.centerY) * t.scale * elevScale,
     -(worldZ - t.centerZ) * t.scale,
   ]
 }
@@ -162,9 +307,8 @@ export function pointsToThreeBuffer(
 ): Float32Array {
   const arr = new Float32Array(points.length * 3)
   points.forEach((p, i) => {
-    const worldY = p.y ?? 0
-    const worldZ = p.z ?? p.y ?? 0
-    const [tx, ty, tz] = worldToThree(p.x, worldY, worldZ, transform)
+    const w = trackPointToWorld3D(p)
+    const [tx, ty, tz] = worldToThree(w.x, w.y, w.z, transform)
     arr[i * 3] = tx
     arr[i * 3 + 1] = ty
     arr[i * 3 + 2] = tz

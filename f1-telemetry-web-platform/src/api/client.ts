@@ -488,7 +488,14 @@ export async function exportTrackLayout(trackId: number): Promise<void> {
   notify.success('Track layout exported')
 }
 
-/** GET /api/tracks/layout/export-all — download all track layouts JSON. */
+/**
+ * Delay helper for staggering multiple downloads (avoids browser blocking).
+ */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** GET /api/tracks/layout/export-all — fetch all layouts, then download each track as a separate JSON file. */
 export async function exportAllTrackLayouts(): Promise<void> {
   const url = `${API_BASE_URL}/api/tracks/layout/export-all`
   const response = await fetch(url, { headers: { Accept: 'application/json' } })
@@ -504,17 +511,24 @@ export async function exportAllTrackLayouts(): Promise<void> {
     notify.error(message)
     throw new HttpError(response.status, message, body ?? undefined)
   }
-  const blob = await response.blob()
-  const disposition = response.headers.get('Content-Disposition')
-  const suggestedName =
-    disposition?.match(/filename="?([^";\n]+)"?/)?.[1] ||
-    'all-tracks-layout.json'
-  const link = document.createElement('a')
-  link.href = URL.createObjectURL(blob)
-  link.download = suggestedName
-  link.click()
-  URL.revokeObjectURL(link.href)
-  notify.success('All track layouts exported')
+  const data = (await response.json()) as TrackLayoutBulkExportDto
+  const tracks = data?.tracks ?? []
+  if (tracks.length === 0) {
+    notify.warning('No track layouts to export')
+    return
+  }
+  for (let i = 0; i < tracks.length; i++) {
+    const track = tracks[i]
+    const blob = new Blob([JSON.stringify(track, null, 2)], { type: 'application/json' })
+    const filename = `track-${track.trackId}-layout.json`
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(link.href)
+    if (i < tracks.length - 1) await delay(250)
+  }
+  notify.success(`${tracks.length} track layout(s) exported`)
 }
 
 /** POST /api/tracks/layout/import — import single track layout from JSON. */
