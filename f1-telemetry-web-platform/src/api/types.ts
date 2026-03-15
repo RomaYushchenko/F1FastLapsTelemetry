@@ -258,6 +258,10 @@ export interface TrackLayoutBulkExportDto {
 export interface CarPositionDto {
   carIndex: number
   worldPosX: number
-  worldPosY: number
+  worldPosY?: number
   worldPosZ: number
+  /** Race number from game (Participants packet). */
+  racingNumber?: number | null
+  /** Driver name from game (Participants packet); for map legend. */
+  driverLabel?: string | null
 }

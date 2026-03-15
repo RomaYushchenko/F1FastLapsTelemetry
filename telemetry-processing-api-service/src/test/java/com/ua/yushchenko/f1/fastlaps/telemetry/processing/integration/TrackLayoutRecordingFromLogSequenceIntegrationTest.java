@@ -137,6 +137,7 @@ class TrackLayoutRecordingFromLogSequenceIntegrationTest {
                 .frameIdentifier(frameId)
                 .sessionTime(0f)
                 .carIndex(CAR_INDEX)
+                .playerCarIndex(CAR_INDEX)
                 .producedAt(Instant.now())
                 .payload(payload)
                 .build();

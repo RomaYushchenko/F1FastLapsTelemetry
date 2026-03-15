@@ -15,6 +15,58 @@ export function trackPointToWorld3D(p: TrackPoint3D): { x: number; y: number; z:
   }
 }
 
+/**
+ * Get track elevation at world (x, z) by interpolating along the nearest track segment.
+ * Used to place cars on the track surface in 3D when car elevation (worldPosY) is not provided.
+ * Returns elevation in world units; if track has no 3D points, returns fallback (e.g. bounds.minElev).
+ */
+export function getTrackElevationAt(
+  worldX: number,
+  worldZ: number,
+  points: TrackPoint3D[],
+  fallbackElev = 0,
+): number {
+  if (points.length === 0) return fallbackElev
+  const withElev = points
+    .filter(p => p.z != null)
+    .map(p => ({ x: p.x, z: p.z ?? 0, y: p.y ?? 0 }))
+  if (withElev.length === 0) return fallbackElev
+
+  let bestT = 0
+  let bestDistSq = Infinity
+  let bestY0 = withElev[0].y
+  let bestY1 = withElev[0].y
+
+  for (let i = 0; i < withElev.length; i++) {
+    const p0 = withElev[i]
+    const p1 = withElev[(i + 1) % withElev.length]
+    const dx = p1.x - p0.x
+    const dz = p1.z - p0.z
+    const lenSq = dx * dx + dz * dz
+    if (lenSq < 1e-12) {
+      const d = (worldX - p0.x) ** 2 + (worldZ - p0.z) ** 2
+      if (d < bestDistSq) {
+        bestDistSq = d
+        bestT = 0
+        bestY0 = p0.y
+        bestY1 = p0.y
+      }
+      continue
+    }
+    const t = Math.max(0, Math.min(1, ((worldX - p0.x) * dx + (worldZ - p0.z) * dz) / lenSq))
+    const cx = p0.x + t * dx
+    const cz = p0.z + t * dz
+    const distSq = (worldX - cx) ** 2 + (worldZ - cz) ** 2
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq
+      bestT = t
+      bestY0 = p0.y
+      bestY1 = p1.y
+    }
+  }
+  return bestY0 + bestT * (bestY1 - bestY0)
+}
+
 export function computeBounds(points: TrackPoint3D[]): TrackBounds {
   if (!points.length) {
     return {
@@ -47,6 +99,8 @@ export interface CanvasConfig {
 
 /**
  * XZ world coordinates → SVG pixels (top-down view).
+ * Uses a single scale (same as 3D) so track proportions match the 3D view:
+ * fit the longer side to the canvas and center the track (letterbox).
  * worldPositionY (elevation) is ignored for 2D.
  */
 export function normalize2D(
@@ -58,8 +112,13 @@ export function normalize2D(
   const pad = canvas.padding ?? 20
   const w = canvas.width - 2 * pad
   const h = canvas.height - 2 * pad
-  const nx = ((x - bounds.minX) / (bounds.maxX - bounds.minX || 1)) * w + pad
-  const ny = (1 - (z - bounds.minZ) / (bounds.maxZ - bounds.minZ || 1)) * h + pad
+  const rangeX = bounds.maxX - bounds.minX || 1
+  const rangeZ = bounds.maxZ - bounds.minZ || 1
+  const scale = Math.min(w / rangeX, h / rangeZ)
+  const offsetX = pad + (w - rangeX * scale) / 2
+  const offsetY = pad + (h - rangeZ * scale) / 2
+  const nx = (x - bounds.minX) * scale + offsetX
+  const ny = offsetY + (bounds.maxZ - z) * scale
   return { nx, ny }
 }
 

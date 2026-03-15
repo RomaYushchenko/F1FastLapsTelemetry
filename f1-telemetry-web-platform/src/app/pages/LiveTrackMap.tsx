@@ -226,17 +226,27 @@ export default function LiveTrackMap() {
 
   const positionsForMap = positions.length > 0 ? positions : polledPositions;
   const useRealPositions = positionsForMap.length > 0;
-  const carsForMap: (CarPositionDto & { color: string; racingNumber?: number; driverLabel?: string | null })[] = useMemo(
+  const carsForMap: (CarPositionDto & { color: string })[] = useMemo(
     () =>
       positionsForMap.map((p) => {
         const entry = leaderboard.find((e) => e.carIndex === p.carIndex);
         return {
           ...p,
           color: colorForCarIndex(p.carIndex),
-          driverLabel: entry?.driverLabel ?? null,
+          // Prefer driver name from positions (Participants packet), then leaderboard
+          driverLabel: p.driverLabel ?? entry?.driverLabel ?? null,
         };
       }),
     [positionsForMap, leaderboard],
+  );
+
+  /** Player car from map data for correct number/label in Selected Driver panel. */
+  const playerCarOnMap = useMemo(
+    () =>
+      session?.playerCarIndex != null
+        ? carsForMap.find((c) => c.carIndex === session.playerCarIndex)
+        : null,
+    [session?.playerCarIndex, carsForMap],
   );
 
   const trackTitle =
@@ -405,10 +415,12 @@ export default function LiveTrackMap() {
                                 style={{ backgroundColor: car.color }}
                                 aria-hidden
                               />
-                              <span className="font-medium tabular-nums truncate max-w-[6rem]">
+                              <span className="font-medium tabular-nums">
+                                #{car.racingNumber ?? car.carIndex}
+                              </span>
+                              <span className="text-text-secondary truncate max-w-[5rem]" title={car.driverLabel ?? undefined}>
                                 {car.driverLabel ?? `Car ${car.carIndex}`}
                               </span>
-                              <span className="text-text-secondary text-xs">#{car.carIndex}</span>
                             </li>
                           ))}
                       </ul>
@@ -423,11 +435,21 @@ export default function LiveTrackMap() {
             <DataCard title="Selected Driver">
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-[#00E5FF]/20 flex items-center justify-center">
-                    <span className="text-2xl font-bold text-[#00E5FF]">1</span>
+                  <div
+                    className="w-12 h-12 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: `${playerCarOnMap?.color ?? colorForCarIndex(session?.playerCarIndex ?? 0)}20` }}
+                  >
+                    <span
+                      className="text-2xl font-bold"
+                      style={{ color: playerCarOnMap?.color ?? colorForCarIndex(session?.playerCarIndex ?? 0) }}
+                    >
+                      {playerCarOnMap?.racingNumber ?? session?.playerCarIndex ?? "—"}
+                    </span>
                   </div>
                   <div>
-                    <div className="text-xl font-bold">VER</div>
+                    <div className="text-xl font-bold">
+                      {playerLeaderboardEntry?.driverLabel ?? playerCarOnMap?.driverLabel ?? "—"}
+                    </div>
                     <div className="text-sm text-text-secondary">You</div>
                   </div>
                 </div>

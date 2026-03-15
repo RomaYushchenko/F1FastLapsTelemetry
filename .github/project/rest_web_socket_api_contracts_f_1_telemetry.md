@@ -694,8 +694,9 @@ Response: **204 No Content** if there is no active session or no position data. 
 
 - `carIndex` (int) — car index (0–21).
 - `worldPosX` (float) — world X coordinate (game space).
-- `worldPosY` (float) — world Y coordinate (elevation, metres above surface).
 - `worldPosZ` (float) — world Z coordinate (game space).
+- `racingNumber` (int, optional) — race number of the car from Participants packet (packetId=4).
+- `driverLabel` (string, optional) — driver/participant name from Participants packet; used for map legend.
 
 Same data is pushed via WebSocket message type **POSITIONS** on `/topic/live/{sessionId}` at 10 Hz when subscribers exist. Plan: block-h Step 27–28.
 

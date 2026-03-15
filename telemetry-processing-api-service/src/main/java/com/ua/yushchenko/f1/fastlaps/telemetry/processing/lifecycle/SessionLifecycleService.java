@@ -6,7 +6,9 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1SessionType;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1Track;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionDriverRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.EndReason;
@@ -35,6 +37,7 @@ public class SessionLifecycleService {
     private final SessionStateManager stateManager;
     private final SessionRepository sessionRepository;
     private final SessionFinishingPositionRepository finishingPositionRepository;
+    private final SessionDriverRepository sessionDriverRepository;
     private final SessionPersistenceService sessionPersistenceService;
     private final LapAggregator lapAggregator;
     private final LiveDataBroadcaster liveDataBroadcaster;
@@ -46,6 +49,8 @@ public class SessionLifecycleService {
     private static final DateTimeFormatter DISPLAY_NAME_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
             .withZone(ZoneOffset.UTC);
     private static final int SESSION_DISPLAY_NAME_MAX_LENGTH = 64;
+    /** session_drivers.driver_label max length. */
+    private static final int DRIVER_LABEL_MAX_LENGTH = 16;
 
     /**
      * Build session display name from track and start time.
@@ -165,6 +170,8 @@ public class SessionLifecycleService {
                     finishingPositionRepository.save(fp);
                     log.info("Saved finishing position: sessionUID={}, carIndex={}, position={}", sessionUID, carIndex, lastPosition);
                 }
+                // Persist participant names from Participants packet (packetId=4) for leaderboard/session detail after restart
+                persistParticipantsFromState(sessionUID, state);
             });
 
             // Notify WebSocket subscribers
@@ -176,6 +183,33 @@ public class SessionLifecycleService {
         } else {
             log.warn("Received SEND for session in state {}, ignoring (sessionUID={})",
                     state.getState(), sessionUID);
+        }
+    }
+
+    /**
+     * Persist participant names from runtime state to session_drivers so leaderboard and session detail show driver names after restart.
+     * Truncates to DRIVER_LABEL_MAX_LENGTH to fit column.
+     */
+    private void persistParticipantsFromState(long sessionUID, SessionRuntimeState state) {
+        Instant now = Instant.now();
+        for (int carIndex = 0; carIndex < 22; carIndex++) {
+            String name = state.getParticipantName(carIndex);
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            String label = name.length() > DRIVER_LABEL_MAX_LENGTH
+                    ? name.substring(0, DRIVER_LABEL_MAX_LENGTH)
+                    : name.trim();
+            SessionDriver sd = sessionDriverRepository.findBySessionUidAndCarIndex(sessionUID, (short) carIndex)
+                    .orElse(SessionDriver.builder()
+                            .sessionUid(sessionUID)
+                            .carIndex((short) carIndex)
+                            .createdAt(now)
+                            .updatedAt(now)
+                            .build());
+            sd.setDriverLabel(label);
+            sd.setUpdatedAt(now);
+            sessionDriverRepository.save(sd);
         }
     }
 

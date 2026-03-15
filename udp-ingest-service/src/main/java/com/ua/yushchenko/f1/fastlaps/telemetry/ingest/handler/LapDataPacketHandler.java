@@ -17,7 +17,8 @@ import java.nio.ByteBuffer;
 
 /**
  * Handles Lap Data packets (packetId=2).
- * Parses lap times, sectors, and validity and publishes to telemetry.lap topic.
+ * Parses lap times, sectors, and validity for all 22 cars and publishes to telemetry.lap topic.
+ * Enables full leaderboard on Live Overview (positions and lap times for all cars).
  */
 @Slf4j
 @Component
@@ -29,6 +30,8 @@ public class LapDataPacketHandler {
     private static final String TOPIC = "telemetry.lap";
     /** LapData size in bytes. From docs: (1285 - 29 header - 2 timeTrial bytes) / 22 cars = 57. */
     private static final int LAP_DATA_SIZE = 57;
+    /** F1 25: 22 cars in lap data packet. */
+    private static final int NUM_CARS = 22;
 
     private final TelemetryPublisher publisher;
     private final LapDataPacketParser lapDataPacketParser;
@@ -38,32 +41,26 @@ public class LapDataPacketHandler {
         log.debug("Processing lap data packet: sessionUID={}, frame={}",
                 header.getSessionUID(), header.getFrameIdentifier());
 
+        int requiredBytes = NUM_CARS * LAP_DATA_SIZE;
+        if (payload.remaining() < requiredBytes) {
+            log.warn("Lap data payload too short: need {} bytes, have {}", requiredBytes, payload.remaining());
+            return;
+        }
+
+        int startPosition = payload.position();
         try {
-            if (!seekToPlayerCar(payload, header.getPlayerCarIndex(), LAP_DATA_SIZE, "lap data")) {
-                return;
+            for (int carIndex = 0; carIndex < NUM_CARS; carIndex++) {
+                payload.position(startPosition + carIndex * LAP_DATA_SIZE);
+                LapDto lapData = lapDataPacketParser.parse(payload);
+                LapDataEvent event = LapDataEventBuilder.build(header, lapData, carIndex);
+                String key = header.getSessionUID() + "-" + carIndex;
+                publisher.publish(TOPIC, key, event);
             }
-
-            LapDto lapData = lapDataPacketParser.parse(payload);
-            LapDataEvent event = LapDataEventBuilder.build(header, lapData);
-            String key = header.getSessionUID() + "-" + header.getPlayerCarIndex();
-
-            publisher.publish(TOPIC, key, event);
-
-            log.debug("Published lap data: lap={}, time={}ms, invalid={}",
-                    lapData.getLapNumber(), lapData.getCurrentLapTimeMs(), lapData.isInvalid());
+            log.trace("Published lap data for {} cars: sessionUID={}, frame={}", NUM_CARS,
+                    header.getSessionUID(), header.getFrameIdentifier());
         } catch (Exception e) {
             log.error("Failed to parse lap data packet: sessionUID={}, frame={}",
                     header.getSessionUID(), header.getFrameIdentifier(), e);
         }
-    }
-
-    private boolean seekToPlayerCar(ByteBuffer payload, int playerCarIndex, int dataSizePerCar, String packetType) {
-        int offset = playerCarIndex * dataSizePerCar;
-        if (payload.position() + offset + dataSizePerCar > payload.limit()) {
-            log.warn("{} payload too short for car index {}: need {} bytes", packetType, playerCarIndex, offset + dataSizePerCar);
-            return false;
-        }
-        payload.position(payload.position() + offset);
-        return true;
     }
 }

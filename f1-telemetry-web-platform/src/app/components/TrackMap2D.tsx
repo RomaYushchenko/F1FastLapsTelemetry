@@ -1,17 +1,19 @@
-import type { CarPositionDto, TrackLayoutResponseDto, TrackPoint3D } from '@/api/types'
+import type { CarPositionDto, TrackLayoutResponseDto } from '@/api/types'
 import {
   CanvasConfig,
   SECTOR_COLORS,
   computeBounds,
   normalize2D,
-  pointsToSmoothOpenSvgPath,
   pointsToSmoothSvgPath,
-  splitIntoSectors,
 } from '@/utils/trackNormalization'
 
 const SVG_W = 600
 const SVG_H = 400
 const CANVAS: CanvasConfig = { width: SVG_W, height: SVG_H, padding: 24 }
+
+/** Track stroke colour to match 3D view (grey). */
+const TRACK_STROKE = '#6B7280'
+const TRACK_OUTLINE = '#1F2937'
 
 interface Props {
   layout: TrackLayoutResponseDto
@@ -21,36 +23,7 @@ interface Props {
 export function TrackMap2D({ layout, cars }: Props) {
   const bounds = layout.bounds ?? computeBounds(layout.points)
   const sectors = layout.sectorBoundaries ?? []
-  const pointsInLapOrder = layout.source === 'RECORDED'
-  const [s1pts, s2pts, s3pts] = splitIntoSectors(layout.points, sectors, { pointsInLapOrder })
-  const useSectorSegments = sectors.length > 0 && s2pts.length > 0 && s3pts.length > 0
   const trackPath = pointsToSmoothSvgPath(layout.points, bounds, CANVAS)
-
-  const renderSegment = (pts: TrackPoint3D[], color: string) => {
-    if (pts.length < 2) return null
-    const d = pointsToSmoothOpenSvgPath(pts, bounds, CANVAS)
-    return (
-      <>
-        <path
-          d={d}
-          fill="none"
-          stroke="#1F2937"
-          strokeWidth={10}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d={d}
-          fill="none"
-          stroke={color}
-          strokeWidth={4}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeOpacity={0.85}
-        />
-      </>
-    )
-  }
 
   return (
     <svg
@@ -59,63 +32,63 @@ export function TrackMap2D({ layout, cars }: Props) {
       viewBox={`0 0 ${SVG_W} ${SVG_H}`}
       className="w-full h-auto"
     >
-      {!useSectorSegments && (
-        <>
-          <path
-            d={trackPath}
-            fill="none"
-            stroke="#1F2937"
-            strokeWidth={10}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d={trackPath}
-            fill="none"
-            stroke="#6B7280"
-            strokeWidth={4}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </>
-      )}
+      {/* Single grey track line (same style as 3D) */}
+      <path
+        d={trackPath}
+        fill="none"
+        stroke={TRACK_OUTLINE}
+        strokeWidth={10}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d={trackPath}
+        fill="none"
+        stroke={TRACK_STROKE}
+        strokeWidth={4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
-      {useSectorSegments && (
-        <>
-          {renderSegment(s1pts, SECTOR_COLORS[1])}
-          {renderSegment(s2pts, SECTOR_COLORS[2])}
-          {/* Sector 3: no Z close — we already end at points[0] (S/F); Z would draw back to S3 boundary and create a loop */}
-          {renderSegment(s3pts, SECTOR_COLORS[3])}
-        </>
-      )}
-
+      {/* S2 / S3: circles with label on dark background (match 3D) */}
       {sectors.map(b => {
         if (b.sector === 1) return null
         const z = b.z ?? b.y
         const { nx, ny } = normalize2D(b.x, z, bounds, CANVAS)
         const color = SECTOR_COLORS[b.sector as 2 | 3]
+        const label = `S${b.sector}`
         return (
           <g key={`sector-${b.sector}`}>
-            <polygon
-              points={`${nx},${ny - 10} ${nx + 7},${ny} ${nx},${ny + 10} ${nx - 7},${ny}`}
+            <circle
+              cx={nx}
+              cy={ny}
+              r={8}
               fill={color}
               stroke="#111827"
               strokeWidth={1.5}
             />
+            <rect
+              x={nx + 10}
+              y={ny - 8}
+              width={label.length * 7 + 8}
+              height={16}
+              rx={3}
+              fill="rgba(0,0,0,0.6)"
+            />
             <text
-              x={nx + 11}
+              x={nx + 14}
               y={ny + 4}
               fill={color}
-              fontSize={11}
+              fontSize={12}
               fontWeight="bold"
             >
-              S{b.sector}
+              {label}
             </text>
           </g>
         )
       })}
 
-      {/* S/F at start of sector 1 (green): points[0] is always the first point of the S1 segment */}
+      {/* S/F at points[0]: white bar + label on dark background (match 3D) */}
       {layout.points.length > 0 && (() => {
         const start = layout.points[0]
         const z = start.z ?? start.y ?? 0
@@ -132,11 +105,19 @@ export function TrackMap2D({ layout, cars }: Props) {
               strokeWidth={1.5}
               rx={1}
             />
-            <text
+            <rect
               x={nx + 8}
+              y={ny - 8}
+              width={28}
+              height={16}
+              rx={3}
+              fill="rgba(0,0,0,0.6)"
+            />
+            <text
+              x={nx + 12}
               y={ny + 4}
               fill="#FFFFFF"
-              fontSize={10}
+              fontSize={11}
               fontWeight="bold"
             >
               S/F
@@ -147,8 +128,11 @@ export function TrackMap2D({ layout, cars }: Props) {
 
       {cars.map(car => {
         const { nx, ny } = normalize2D(car.worldPosX, car.worldPosZ, bounds, CANVAS)
+        const label = car.driverLabel ?? `Car ${car.carIndex}`
+        const title = `#${car.racingNumber ?? car.carIndex} ${label}`
         return (
           <g key={car.carIndex}>
+            <title>{title}</title>
             <circle cx={nx} cy={ny} r={7} fill={car.color} />
             <text
               x={nx + 9}

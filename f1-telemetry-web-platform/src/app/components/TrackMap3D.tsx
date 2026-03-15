@@ -6,6 +6,7 @@ import {
   SECTOR_COLORS,
   computeBounds,
   computeThreeTransform,
+  getTrackElevationAt,
   trackPointToWorld3D,
   worldToThree,
 } from '@/utils/trackNormalization'
@@ -108,12 +109,15 @@ export function TrackMap3D({ layout, cars }: Props) {
         })()}
 
         {cars.map(car => {
-          const pos = worldToThree(
-            car.worldPosX,
-            car.worldPosY ?? bounds.minElev ?? 0,
-            car.worldPosZ,
-            transform,
-          )
+          const elev =
+            car.worldPosY ??
+            getTrackElevationAt(
+              car.worldPosX,
+              car.worldPosZ,
+              layout.points,
+              bounds.minElev ?? 0,
+            )
+          const pos = worldToThree(car.worldPosX, elev, car.worldPosZ, transform)
           const carColor = (car as { color?: string }).color ?? '#9CA3AF'
           return (
             <mesh key={car.carIndex} position={pos}>

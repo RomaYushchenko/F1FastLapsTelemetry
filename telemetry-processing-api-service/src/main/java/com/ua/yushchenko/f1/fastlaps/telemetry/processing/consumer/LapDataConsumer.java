@@ -50,7 +50,7 @@ public class LapDataConsumer {
             short carIndex = (short) event.getCarIndex();
 
             lifecycleService.ensureSessionActive(sessionUid);
-            lifecycleService.setPlayerCarIndex(sessionUid, carIndex);
+            lifecycleService.setPlayerCarIndex(sessionUid, (short) event.getPlayerCarIndex());
             if (!lifecycleService.shouldProcessPacket(sessionUid)) {
                 log.debug("Skipping lap data packet: sessionUid={}, frame={}, reason=shouldNotProcess", sessionUid, frameId);
                 acknowledgment.acknowledge();
