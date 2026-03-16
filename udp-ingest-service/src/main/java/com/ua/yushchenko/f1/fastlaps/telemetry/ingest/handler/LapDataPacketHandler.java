@@ -46,27 +46,28 @@ public class LapDataPacketHandler {
         int requiredBytes = NUM_CARS * LAP_DATA_SIZE;
         if (payload.remaining() < requiredBytes) {
             log.warn("Lap data payload too short: need {} bytes, have {}", requiredBytes, payload.remaining());
-            packetLossMetricsRecorder.recordExpectedFrame(header.getSessionUID());
-            packetLossMetricsRecorder.recordLostFrame(header.getSessionUID());
+            packetLossMetricsRecorder.recordLostFrameWithSequence(header.getSessionUID(), (int) header.getFrameIdentifier());
             return;
         }
 
         int startPosition = payload.position();
+        long sessionUid = header.getSessionUID();
+        int frameId = (int) header.getFrameIdentifier();
         try {
-            packetLossMetricsRecorder.recordExpectedFrame(header.getSessionUID());
             for (int carIndex = 0; carIndex < NUM_CARS; carIndex++) {
                 payload.position(startPosition + carIndex * LAP_DATA_SIZE);
                 LapDto lapData = lapDataPacketParser.parse(payload);
                 LapDataEvent event = LapDataEventBuilder.build(header, lapData, carIndex);
-                String key = header.getSessionUID() + "-" + carIndex;
+                String key = sessionUid + "-" + carIndex;
                 publisher.publish(TOPIC, key, event);
             }
-            packetLossMetricsRecorder.recordReceivedFrame(header.getSessionUID());
+            packetLossMetricsRecorder.recordReceivedFrameWithSequence(sessionUid, frameId);
             log.trace("Published lap data for {} cars: sessionUID={}, frame={}", NUM_CARS,
-                    header.getSessionUID(), header.getFrameIdentifier());
+                    sessionUid, header.getFrameIdentifier());
         } catch (Exception e) {
             log.error("Failed to parse lap data packet: sessionUID={}, frame={}",
-                    header.getSessionUID(), header.getFrameIdentifier(), e);
+                    sessionUid, header.getFrameIdentifier(), e);
+            packetLossMetricsRecorder.recordLostFrameWithSequence(sessionUid, frameId);
         }
     }
 }

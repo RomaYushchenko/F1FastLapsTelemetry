@@ -13,6 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Records packet loss statistics per session and exposes them as Micrometer gauges.
+ * Expected frames are inferred from frame identifier sequence gaps so that packets
+ * dropped in transit (never reaching the handler) are counted as expected-but-lost.
  */
 @Slf4j
 @Component
@@ -26,6 +28,8 @@ public class PacketLossMetricsRecorder {
     private final Clock clock;
 
     private final Map<Long, RollingWindowStats> statsBySession = new ConcurrentHashMap<>();
+    /** Last seen frame identifier per session for gap detection. */
+    private final Map<Long, Integer> lastFrameIdBySession = new ConcurrentHashMap<>();
 
     /**
      * Records that a frame was expected for the given session.
@@ -46,6 +50,35 @@ public class PacketLossMetricsRecorder {
      */
     public void recordLostFrame(long sessionUid) {
         updateStats(sessionUid, 1, 0);
+    }
+
+    /**
+     * Records a received frame and infers expected count from frame sequence.
+     * When frameId jumps (e.g. 100 then 105), the gap (101–105) is counted as expected,
+     * with only the current frame as received, so packet_loss_ratio reflects real UDP loss.
+     */
+    public void recordReceivedFrameWithSequence(long sessionUid, int frameId) {
+        Integer last = lastFrameIdBySession.get(sessionUid);
+        long expectedDelta;
+        long receivedDelta = 1L;
+        if (last == null) {
+            expectedDelta = 1L;
+        } else if (frameId > last) {
+            expectedDelta = (long) (frameId - last);
+        } else {
+            expectedDelta = 0L;
+        }
+        updateStats(sessionUid, expectedDelta, receivedDelta);
+        lastFrameIdBySession.put(sessionUid, frameId);
+    }
+
+    /**
+     * Records a frame that was received but not usable (e.g. parse error).
+     * Advances last frame id so the next packet's sequence gap is correct.
+     */
+    public void recordLostFrameWithSequence(long sessionUid, int frameId) {
+        updateStats(sessionUid, 1L, 0L);
+        lastFrameIdBySession.put(sessionUid, frameId);
     }
 
     private void updateStats(long sessionUid, long expectedDelta, long receivedDelta) {

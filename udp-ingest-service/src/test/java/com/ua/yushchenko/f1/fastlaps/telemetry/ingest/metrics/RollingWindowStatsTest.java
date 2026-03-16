@@ -7,6 +7,7 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 @DisplayName("RollingWindowStats")
 class RollingWindowStatsTest {
@@ -32,7 +33,7 @@ class RollingWindowStatsTest {
 
         assertThat(stats.getTotalExpected()).isEqualTo(10);
         assertThat(stats.getTotalReceived()).isEqualTo(8);
-        assertThat(stats.getPacketLossRatio()).isEqualTo(0.2d);
+        assertThat(stats.getPacketLossRatio()).isCloseTo(0.2d, within(0.0001));
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.ingest.handler;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDataEvent;
+import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.metrics.PacketLossMetricsRecorder;
 import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.parser.LapDataPacketParser;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.publisher.TelemetryPublisher;
@@ -27,6 +28,8 @@ class LapDataPacketHandlerTest {
 
     @Mock
     private TelemetryPublisher publisher;
+    @Mock
+    private PacketLossMetricsRecorder packetLossMetricsRecorder;
     @Spy
     private LapDataPacketParser lapDataPacketParser = new LapDataPacketParser();
     @InjectMocks
