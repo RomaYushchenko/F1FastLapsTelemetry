@@ -184,23 +184,75 @@ export function TrackMap2D({ layout, cars }: Props) {
         )
       })()}
 
+      {/* Cars – 2D styling to visually match 3D (glow-like ring, main body with number, short label) */}
       {cars.map(car => {
         const { nx, ny } = normalize2D(car.worldPosX, car.worldPosZ, bounds, CANVAS)
-        const label = car.driverLabel ?? `Car ${car.carIndex}`
-        const title = `#${car.racingNumber ?? car.carIndex} ${label}`
+        const driverLabel = car.driverLabel ?? `Car ${car.carIndex}`
+        const title = `#${car.racingNumber ?? car.carIndex} ${driverLabel}`
+        const shortLabel =
+          driverLabel.length > 6 ? `${driverLabel.slice(0, 5)}…` : driverLabel
+        const numberText = String(car.racingNumber ?? car.carIndex)
         return (
           <g key={car.carIndex}>
             <title>{title}</title>
-            <circle cx={nx} cy={ny} r={7} fill={car.color} />
-            <text
-              x={nx + 9}
-              y={ny + 4}
+            {/* Glow ring */}
+            <circle
+              cx={nx}
+              cy={ny}
+              r={14}
               fill={car.color}
-              fontSize={11}
+              fillOpacity={0.25}
+            />
+            {/* Main car body */}
+            <circle
+              cx={nx}
+              cy={ny}
+              r={8}
+              fill="rgba(11, 15, 20, 0.95)"
+              stroke={car.color}
+              strokeWidth={1.5}
+            />
+            {/* Number disk */}
+            <circle
+              cx={nx}
+              cy={ny}
+              r={6}
+              fill={car.color}
+            />
+            <text
+              x={nx}
+              y={ny + 0.5}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill="#0B0F14"
+              fontSize={9}
               fontWeight="bold"
             >
-              {car.racingNumber ?? car.carIndex}
+              {numberText}
             </text>
+            {/* Driver short label pill */}
+            <g transform={`translate(${nx + 14}, ${ny - 10})`}>
+              <rect
+                x={-18}
+                y={-6}
+                width={36}
+                height={14}
+                rx={4}
+                fill="rgba(11, 15, 20, 0.95)"
+                stroke={car.color}
+                strokeWidth={1}
+              />
+              <text
+                x={0}
+                y={3}
+                textAnchor="middle"
+                fill={car.color}
+                fontSize={9}
+                fontWeight="bold"
+              >
+                {shortLabel}
+              </text>
+            </g>
           </g>
         )
       })}
