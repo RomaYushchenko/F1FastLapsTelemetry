@@ -383,47 +383,101 @@ export default function LiveTrackMap() {
                   </div>
                 )}
 
-                {!isLoadingLayout && layout && viewMode === '2d' && (
-                  <TrackMap2D layout={layout} cars={carsForMap} />
-                )}
-                {!isLoadingLayout && layout && viewMode === '3d' && (
-                  <LiveTrackMap3DErrorBoundary>
-                    <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center bg-secondary/50 rounded-lg text-text-secondary">Loading 3D…</div>}>
-                      <TrackMap3D layout={layout} cars={carsForMap} />
-                    </Suspense>
-                  </LiveTrackMap3DErrorBoundary>
-                )}
-
-                {/* Legend overlaid on the track map */}
-                {layout && (
-                  <div className="absolute bottom-4 left-4 right-4 flex justify-end pointer-events-none">
-                    <div className="pointer-events-auto rounded-lg border border-border/50 bg-background/90 backdrop-blur-sm px-3 py-2 shadow-lg max-h-48 overflow-y-auto">
-                      <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-1.5">Cars on track</div>
-                      <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                {!isLoadingLayout && layout && (
+                  <div className="absolute inset-0 flex flex-col bg-gradient-to-br from-secondary/40 via-secondary/20 to-secondary/40">
+                    {viewMode === '2d' ? (
+                      <TrackMap2D layout={layout} cars={carsForMap} />
+                    ) : (
+                      <LiveTrackMap3DErrorBoundary>
+                        <TrackMap3D
+                          layout={layout}
+                          cars={carsForMap}
+                          selectedCarIndex={session?.playerCarIndex ?? null}
+                          leaderCarIndex={leaderboard[0]?.carIndex ?? null}
+                        />
+                      </LiveTrackMap3DErrorBoundary>
+                    )}
+                    {/* Track info overlay (2D and 3D) */}
+                    <div className="absolute top-4 right-4 bg-card/60 backdrop-blur-md border border-border/40 rounded-lg p-3 min-w-[180px]">
+                      <div className="text-xs text-text-secondary uppercase mb-3 font-bold">Track Info</div>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Length:</span>
+                          <span className="font-mono font-bold">
+                            {layout.points.length > 1
+                              ? `${(layout.points.reduce((acc, p, i) => {
+                                  const next = layout.points[(i + 1) % layout.points.length]
+                                  const ax = p.x
+                                  const az = p.z ?? p.y ?? 0
+                                  const bx = next.x
+                                  const bz = next.z ?? next.y ?? 0
+                                  return acc + Math.hypot(bx - ax, bz - az)
+                                }, 0) / 1000).toFixed(2)} km`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Elevation:</span>
+                          <span className="font-mono font-bold">
+                            {layout.bounds?.minElev != null && layout.bounds?.maxElev != null
+                              ? `${(layout.bounds.maxElev - layout.bounds.minElev).toFixed(0)} m`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Points:</span>
+                          <span className="font-mono font-bold">{layout.points.length}</span>
+                        </div>
+                        <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                          <div className="w-3 h-3 bg-[#00E5FF]/30 border border-[#00E5FF] rounded-sm" />
+                          <span className="text-text-secondary">DRS Zone</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-[#E10600]/30 border border-[#E10600] rounded-sm" />
+                          <span className="text-text-secondary">Brake Zone</span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Positions overlay (2D and 3D) */}
+                    <div className="absolute bottom-4 left-4 bg-card/60 backdrop-blur-md border border-border/40 rounded-lg p-3 min-w-[160px]">
+                      <div className="text-xs text-text-secondary uppercase mb-3 font-bold flex items-center justify-between">
+                        <span>Positions</span>
+                        <span className="text-[10px] text-text-secondary/60 normal-case font-normal">
+                          Lap {snapshot?.currentLap ?? "—"}/{session?.totalLaps ?? "—"}
+                        </span>
+                      </div>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
                         {carsForMap.length === 0 && (
-                          <li className="text-sm text-text-secondary py-0.5">No position data yet</li>
+                          <div className="text-sm text-text-secondary py-1">No position data yet</div>
                         )}
                         {[...carsForMap]
-                          .sort((a, b) => a.carIndex - b.carIndex)
-                          .map((car) => (
-                            <li
-                              key={car.carIndex}
-                              className="flex items-center gap-1.5 text-sm"
-                            >
-                              <span
-                                className="shrink-0 w-2.5 h-2.5 rounded-full border border-white/20"
-                                style={{ backgroundColor: car.color }}
-                                aria-hidden
-                              />
-                              <span className="font-medium tabular-nums">
-                                #{car.racingNumber ?? car.carIndex}
-                              </span>
-                              <span className="text-text-secondary truncate max-w-[5rem]" title={car.driverLabel ?? undefined}>
-                                {car.driverLabel ?? `Car ${car.carIndex}`}
-                              </span>
-                            </li>
-                          ))}
-                      </ul>
+                          .sort((a, b) => (leaderboard.find(e => e.carIndex === a.carIndex)?.position ?? 99) - (leaderboard.find(e => e.carIndex === b.carIndex)?.position ?? 99))
+                          .map(car => {
+                            const entry = leaderboard.find(e => e.carIndex === car.carIndex)
+                            const pos = entry?.position ?? car.carIndex
+                            const isPlayer = car.carIndex === session?.playerCarIndex
+                            return (
+                              <div
+                                key={car.carIndex}
+                                className={`flex items-center gap-2 p-1.5 rounded transition-all ${
+                                  isPlayer ? "bg-secondary/60 border border-border/50" : ""
+                                }`}
+                              >
+                                <div className="w-5 text-xs font-bold text-text-primary">{pos}</div>
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full ring-2 ring-offset-2 ring-offset-card shrink-0"
+                                  style={{ backgroundColor: car.color, ringColor: `${car.color}40` }}
+                                />
+                                <div className="text-sm font-bold flex-1 truncate">
+                                  {car.driverLabel ?? `#${car.racingNumber ?? car.carIndex}`}
+                                </div>
+                                {isPlayer && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse shrink-0" />
+                                )}
+                              </div>
+                            )
+                          })}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -434,20 +488,26 @@ export default function LiveTrackMap() {
           <div className="space-y-6">
             <DataCard title="Selected Driver">
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg border border-border/30">
                   <div
-                    className="w-12 h-12 rounded-lg flex items-center justify-center"
+                    className="w-14 h-14 rounded-lg flex items-center justify-center relative overflow-hidden"
                     style={{ backgroundColor: `${playerCarOnMap?.color ?? colorForCarIndex(session?.playerCarIndex ?? 0)}20` }}
                   >
+                    <div
+                      className="absolute inset-0 opacity-20"
+                      style={{
+                        background: `radial-gradient(circle at center, ${playerCarOnMap?.color ?? colorForCarIndex(session?.playerCarIndex ?? 0)} 0%, transparent 70%)`,
+                      }}
+                    />
                     <span
-                      className="text-2xl font-bold"
+                      className="text-3xl font-bold relative z-10"
                       style={{ color: playerCarOnMap?.color ?? colorForCarIndex(session?.playerCarIndex ?? 0) }}
                     >
                       {playerCarOnMap?.racingNumber ?? session?.playerCarIndex ?? "—"}
                     </span>
                   </div>
-                  <div>
-                    <div className="text-xl font-bold">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xl font-bold truncate">
                       {playerLeaderboardEntry?.driverLabel ?? playerCarOnMap?.driverLabel ?? "—"}
                     </div>
                     <div className="text-sm text-text-secondary">You</div>
@@ -493,25 +553,34 @@ export default function LiveTrackMap() {
 
             <DataCard title="Sector Times">
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-2 bg-secondary/30 rounded">
-                  <div className="text-sm text-text-secondary">Sector 1</div>
+                <div className="flex items-center justify-between p-2.5 bg-gradient-to-r from-[#A855F7]/10 to-transparent rounded border border-[#A855F7]/20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#A855F7]" />
+                    <div className="text-sm text-text-secondary">Sector 1</div>
+                  </div>
                   <div className="text-sm font-mono font-bold text-[#A855F7]">
                     {formatSector(playerLeaderboardEntry?.sector1Ms)}
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-2 bg-secondary/30 rounded">
-                  <div className="text-sm text-text-secondary">Sector 2</div>
+                <div className="flex items-center justify-between p-2.5 bg-gradient-to-r from-[#00FF85]/10 to-transparent rounded border border-[#00FF85]/20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#00FF85]" />
+                    <div className="text-sm text-text-secondary">Sector 2</div>
+                  </div>
                   <div className="text-sm font-mono font-bold text-[#00FF85]">
                     {formatSector(playerLeaderboardEntry?.sector2Ms)}
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-2 bg-secondary/30 rounded">
-                  <div className="text-sm text-text-secondary">Sector 3</div>
+                <div className="flex items-center justify-between p-2.5 bg-gradient-to-r from-[#FACC15]/10 to-transparent rounded border border-[#FACC15]/20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#FACC15]" />
+                    <div className="text-sm text-text-secondary">Sector 3</div>
+                  </div>
                   <div className="text-sm font-mono font-bold text-[#FACC15]">
                     {formatSector(playerLeaderboardEntry?.sector3Ms)}
                   </div>
                 </div>
-                <div className="pt-3 border-t border-border/50 flex items-center justify-between">
+                <div className="pt-3 border-t border-border/50 flex items-center justify-between p-2 bg-[#00E5FF]/5 rounded-lg">
                   <div className="text-xs text-text-secondary uppercase">Last Lap</div>
                   <div className="text-lg font-mono font-bold text-[#00E5FF]">
                     {formatLapTime(playerLeaderboardEntry?.lastLapTimeMs ?? snapshot?.bestLapTimeMs)}
@@ -527,6 +596,14 @@ export default function LiveTrackMap() {
                   <span className="font-medium">{status === "live" ? "Connected" : "Disconnected"}</span>
                 </div>
                 <p>Receiving live telemetry data from F1 25</p>
+                <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between text-xs">
+                  <span>Packet loss:</span>
+                  <span className="font-mono text-foreground font-bold">—</span>
+                </div>
+                <div className="flex items-center justify-between text-xs mt-1">
+                  <span>Update rate:</span>
+                  <span className="font-mono text-foreground font-bold">—</span>
+                </div>
               </div>
             </DataCard>
           </div>

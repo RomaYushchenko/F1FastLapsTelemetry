@@ -1,4 +1,5 @@
 import type { CarPositionDto, TrackLayoutResponseDto } from '@/api/types'
+import { getDrsPointIndices, getBrakePointIndices } from '@/constants/trackZones'
 import {
   CanvasConfig,
   SECTOR_COLORS,
@@ -11,9 +12,21 @@ const SVG_W = 600
 const SVG_H = 400
 const CANVAS: CanvasConfig = { width: SVG_W, height: SVG_H, padding: 24 }
 
-/** Track stroke colour to match 3D view (grey). */
-const TRACK_STROKE = '#6B7280'
-const TRACK_OUTLINE = '#1F2937'
+/** Track colours and widths to match 3D view: dark base (shadow), light surface, dashed center line. */
+const TRACK_BASE = 'rgba(11, 15, 20, 0.8)'
+const TRACK_SURFACE = 'rgba(249, 250, 251, 0.2)'
+const TRACK_CENTER_LINE = 'rgba(249, 250, 251, 0.4)'
+const TRACK_BASE_WIDTH = 24
+const TRACK_SURFACE_WIDTH = 20
+const TRACK_CENTER_WIDTH = 2
+const TRACK_CENTER_DASH = '8, 4'
+
+/** DRS zone circle – same as reference: rgba(0, 229, 255, 0.3), radius 9 in SVG (proportional to 3D 18). */
+const DRS_FILL = 'rgba(0, 229, 255, 0.3)'
+const DRS_R = 9
+/** Brake zone circle – same as reference: rgba(225, 6, 0, 0.4), radius 8 in SVG (proportional to 3D 15). */
+const BRAKE_FILL = 'rgba(225, 6, 0, 0.4)'
+const BRAKE_R = 8
 
 interface Props {
   layout: TrackLayoutResponseDto
@@ -32,23 +45,68 @@ export function TrackMap2D({ layout, cars }: Props) {
       viewBox={`0 0 ${SVG_W} ${SVG_H}`}
       className="w-full h-auto"
     >
-      {/* Single grey track line (same style as 3D) */}
+      {/* Track base (shadow) – same as 3D */}
       <path
         d={trackPath}
         fill="none"
-        stroke={TRACK_OUTLINE}
-        strokeWidth={10}
+        stroke={TRACK_BASE}
+        strokeWidth={TRACK_BASE_WIDTH}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      {/* Track surface – light semi-transparent like 3D */}
       <path
         d={trackPath}
         fill="none"
-        stroke={TRACK_STROKE}
-        strokeWidth={4}
+        stroke={TRACK_SURFACE}
+        strokeWidth={TRACK_SURFACE_WIDTH}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      {/* Center line – dashed, same as 3D */}
+      <path
+        d={trackPath}
+        fill="none"
+        stroke={TRACK_CENTER_LINE}
+        strokeWidth={TRACK_CENTER_WIDTH}
+        strokeDasharray={TRACK_CENTER_DASH}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      {/* DRS zones – same style as reference, placed using layout.point.drs or static config per trackId */}
+      {getDrsPointIndices(layout.trackId, layout.points).map(i => {
+        if (i >= layout.points.length) return null
+        const pt = layout.points[i]
+        const z = pt.z ?? pt.y ?? 0
+        const { nx, ny } = normalize2D(pt.x, z, bounds, CANVAS)
+        return (
+          <circle
+            key={`drs-${i}`}
+            cx={nx}
+            cy={ny}
+            r={DRS_R}
+            fill={DRS_FILL}
+          />
+        )
+      })}
+
+      {/* Brake zones – same style as reference, placed using layout.point.brake or static config per trackId */}
+      {getBrakePointIndices(layout.trackId, layout.points).map(i => {
+        if (i >= layout.points.length) return null
+        const pt = layout.points[i]
+        const z = pt.z ?? pt.y ?? 0
+        const { nx, ny } = normalize2D(pt.x, z, bounds, CANVAS)
+        return (
+          <circle
+            key={`brake-${i}`}
+            cx={nx}
+            cy={ny}
+            r={BRAKE_R}
+            fill={BRAKE_FILL}
+          />
+        )
+      })}
 
       {/* S2 / S3: circles with label on dark background (match 3D) */}
       {sectors.map(b => {

@@ -198,6 +198,10 @@ export interface TrackPoint3D {
   x: number   // worldPositionX (horizontal)
   y: number   // worldPositionY (elevation; may be null for static tracks)
   z?: number | null  // worldPositionZ (horizontal depth; null for old static layouts before migration)
+  /** When true, this point is inside a DRS zone (for 2D/3D map overlay). Optional; from static config or import. */
+  drs?: boolean | null
+  /** When true, this point is a heavy brake zone (for 2D/3D map overlay). Optional; from static config or import. */
+  brake?: boolean | null
 }
 
 export interface TrackBounds {
