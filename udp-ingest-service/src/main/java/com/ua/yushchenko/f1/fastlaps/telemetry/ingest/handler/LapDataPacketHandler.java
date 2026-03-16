@@ -3,6 +3,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.ingest.handler;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDataEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.builder.LapDataEventBuilder;
+import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.metrics.PacketLossMetricsRecorder;
 import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.parser.LapDataPacketParser;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.annotation.F1PacketHandler;
@@ -35,6 +36,7 @@ public class LapDataPacketHandler {
 
     private final TelemetryPublisher publisher;
     private final LapDataPacketParser lapDataPacketParser;
+    private final PacketLossMetricsRecorder packetLossMetricsRecorder;
 
     @F1PacketHandler(packetId = 2)
     public void handleLapDataPacket(PacketHeader header, ByteBuffer payload) {
@@ -44,11 +46,14 @@ public class LapDataPacketHandler {
         int requiredBytes = NUM_CARS * LAP_DATA_SIZE;
         if (payload.remaining() < requiredBytes) {
             log.warn("Lap data payload too short: need {} bytes, have {}", requiredBytes, payload.remaining());
+            packetLossMetricsRecorder.recordExpectedFrame(header.getSessionUID());
+            packetLossMetricsRecorder.recordLostFrame(header.getSessionUID());
             return;
         }
 
         int startPosition = payload.position();
         try {
+            packetLossMetricsRecorder.recordExpectedFrame(header.getSessionUID());
             for (int carIndex = 0; carIndex < NUM_CARS; carIndex++) {
                 payload.position(startPosition + carIndex * LAP_DATA_SIZE);
                 LapDto lapData = lapDataPacketParser.parse(payload);
@@ -56,6 +61,7 @@ public class LapDataPacketHandler {
                 String key = header.getSessionUID() + "-" + carIndex;
                 publisher.publish(TOPIC, key, event);
             }
+            packetLossMetricsRecorder.recordReceivedFrame(header.getSessionUID());
             log.trace("Published lap data for {} cars: sessionUID={}, frame={}", NUM_CARS,
                     header.getSessionUID(), header.getFrameIdentifier());
         } catch (Exception e) {

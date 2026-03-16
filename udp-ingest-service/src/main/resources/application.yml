@@ -13,6 +13,9 @@ f1:
       enabled: true
       host: 0.0.0.0
       port: 20777
+    packet-health:
+      # How often to publish packet loss ratio to Kafka (ms). Processing uses it for diagnostics API.
+      publish-interval-ms: 5000
     kafka:
       enabled: true
       retry:

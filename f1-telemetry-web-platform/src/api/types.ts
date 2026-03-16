@@ -26,6 +26,16 @@ export interface Session {
   participants?: SessionParticipantDto[] | null
 }
 
+export type PacketHealthBand = 'GOOD' | 'OK' | 'POOR' | 'UNKNOWN'
+
+/** GET /api/sessions/{id}/diagnostics — session-level diagnostics including packet health. */
+export interface SessionDiagnosticsDto {
+  sessionPublicId: string
+  packetLossRatio?: number | null
+  packetHealthBand: PacketHealthBand
+  packetHealthPercent?: number | null
+}
+
 /** Session participant for Driver A/B dropdowns (GET /api/sessions/{id}.participants). */
 export interface SessionParticipantDto {
   carIndex: number

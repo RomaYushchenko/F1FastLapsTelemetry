@@ -48,3 +48,13 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+
+packet-health:
+  threshold:
+    # GOOD: almost no packet loss (<5%) — live UI should feel solid.
+    good-min-percent: 95
+    # OK: moderate packet loss (5–20%); below this value is treated as POOR.
+    ok-min-percent: 80
+  store:
+    # Max age (ms) for cached ratio; after this, value is treated as stale and not returned.
+    max-age-ms: 120000

@@ -42,4 +42,16 @@ public class SessionDto {
     private Integer finishingPosition;
     /** Participants (car indices with data) for Driver Comparison. Included in GET /api/sessions/{id}; may be omitted in list. */
     private List<SessionParticipantDto> participants;
+
+    /**
+     * Best lap time in milliseconds for the player car.
+     * Filled from SessionSummary for carIndex = playerCarIndex when available; null otherwise.
+     */
+    private Integer bestLapTimeMs;
+
+    /**
+     * Total session time in milliseconds.
+     * For FINISHED sessions computed as endedAt - startedAt; null when timestamps are missing or session is ACTIVE.
+     */
+    private Long totalTimeMs;
 }

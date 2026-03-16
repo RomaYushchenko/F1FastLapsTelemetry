@@ -4,7 +4,7 @@
 
 import { notify } from '@/notify'
 import { API_BASE_URL } from './config'
-import { HttpError } from './types'
+import { HttpError, type SessionDiagnosticsDto } from './types'
 import type {
   ApiErrorBody,
   ComparisonResponseDto,
@@ -389,6 +389,15 @@ export async function getSessionEvents(
   const q = Object.keys(query).length ? buildQuery(query) : ''
   return requestJson<SessionEventDto[]>(
     `/api/sessions/${encodeURIComponent(sessionId)}/events${q}`
+  )
+}
+
+/** GET /api/sessions/{id}/diagnostics — session-level diagnostics including packet health. */
+export async function getSessionDiagnostics(
+  sessionId: string | undefined
+): Promise<SessionDiagnosticsDto> {
+  return requestJson<SessionDiagnosticsDto>(
+    `/api/sessions/${encodeURIComponent(sessionId!)}/diagnostics`
   )
 }
 
