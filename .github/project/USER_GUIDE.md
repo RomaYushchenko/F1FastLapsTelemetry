@@ -142,9 +142,9 @@ mvn spring-boot:run
 
 ### Step 5: Start the Frontend (React UI)
 
-**Terminal 3:**
+**Terminal 3 (new UI in `f1-telemetry-web-platform/`):**
 ```powershell
-cd C:\Users\<YourUsername>\Work\F1FastLapsTelemetry\ui
+cd C:\Users\<YourUsername>\Work\F1FastLapsTelemetry\f1-telemetry-web-platform
 
 # Install dependencies (first time only)
 npm install
@@ -166,7 +166,7 @@ npm run dev
 
 **Optional — override API/WebSocket URLs** (if your backend runs on a different host/port):
 
-Create a `.env` file in the `ui/` directory:
+Create a `.env` file in the `f1-telemetry-web-platform/` directory:
 ```env
 # Backend REST API base URL (default: http://localhost:8080)
 VITE_API_BASE_URL=http://localhost:8080
@@ -451,7 +451,7 @@ docker-compose down -v
 
 - **Windows:** Install the LTS build (20.x or 22.x) from [nodejs.org](https://nodejs.org/).
 
-Then in the project root: `node -v` (should show v20.19+ or v22.12+), then run `npm run dev` again in `ui/`.
+Then in the project root: `node -v` (should show v20.19+ or v22.12+), then run `npm run dev` again in `f1-telemetry-web-platform/`.
 
 ---
 
@@ -595,7 +595,7 @@ docker-compose restart postgres
    - Health checks: `http://localhost:8080/actuator/health`
 
 2. **Run React UI locally**
-   - From `ui/`: `npm install` then `npm run dev`
+   - From `f1-telemetry-web-platform/`: `npm install` then `npm run dev`
    - Open http://localhost:5173 for Session list, Live dashboard, and lap analysis
 
 3. **Production Deployment**
@@ -630,7 +630,7 @@ docker-compose restart postgres
 
 | Path | Purpose |
 |------|---------|
-| `ui/` | React frontend (Vite + TypeScript) |
+| `f1-telemetry-web-platform/` | React frontend (Vite + TypeScript, Tailwind, Shadcn UI) |
 | `infra/` | Docker Compose, init SQL scripts |
 | `udp-ingest-service/` | UDP listener service |
 | `telemetry-processing-api-service/` | Main backend API |
@@ -653,7 +653,7 @@ docker-compose restart postgres
 - ✅ Infrastructure running (Kafka + PostgreSQL)
 - ✅ UDP Ingest Service listening on port 20777
 - ✅ Processing Service running on port 8080
-- ✅ Frontend running at http://localhost:5173 (optional; run `npm run dev` in `ui/`)
+- ✅ Frontend running at http://localhost:5173 (optional; run `npm run dev` in `f1-telemetry-web-platform/`)
 - ✅ F1 game sending telemetry data
 - ✅ Data flowing: Game → UDP → Kafka → Processing → Database
 - ✅ REST API accessible at http://localhost:8080/api
