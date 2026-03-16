@@ -8,7 +8,7 @@ import { TrackMap3D } from "../components/TrackMap3D";
 import { useLiveTelemetry } from "@/ws";
 import { formatLapTime, formatSector } from "@/api/format";
 import { getTrackName } from "@/constants/tracks";
-import { exportAllTrackLayouts, exportTrackLayout, getActivePositions, getTrackLayout, getTrackLayoutStatus, importAllTrackLayouts, importTrackLayout } from "@/api/client";
+import { exportAllTrackLayouts, exportTrackLayout, getActivePositions, getSessionDiagnostics, getTrackLayout, getTrackLayoutStatus, importAllTrackLayouts, importTrackLayout } from "@/api/client";
 import type { TrackLayoutResponseDto, TrackLayoutStatusDto, CarPositionDto, TrackLayoutExportDto, TrackLayoutBulkExportDto } from "@/api/types";
 import { toast } from "sonner";
 
@@ -64,6 +64,60 @@ export default function LiveTrackMap() {
   const [polledPositions, setPolledPositions] = useState<CarPositionDto[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const trackContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const [packetHealthPercent, setPacketHealthPercent] = useState<number | null>(null);
+  const [updateRateHz, setUpdateRateHz] = useState<number | null>(null);
+  const updateTimestampsRef = useRef<number[]>([]);
+  const UPDATE_RATE_WINDOW_MS = 5000;
+
+  useEffect(() => {
+    if (status !== "live" || !session?.id) {
+      setPacketHealthPercent(null);
+      return;
+    }
+    let cancelled = false;
+    async function fetchDiagnostics() {
+      try {
+        const d = await getSessionDiagnostics(session!.id!);
+        if (cancelled) return;
+        setPacketHealthPercent(d.packetHealthPercent ?? null);
+      } catch {
+        if (!cancelled) setPacketHealthPercent(null);
+      }
+    }
+    fetchDiagnostics();
+    const intervalId = window.setInterval(fetchDiagnostics, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [session?.id, status]);
+
+  useEffect(() => {
+    if (status !== "live") {
+      setUpdateRateHz(null);
+      updateTimestampsRef.current = [];
+      return;
+    }
+    const now = Date.now();
+    updateTimestampsRef.current.push(now);
+    const cutoff = now - UPDATE_RATE_WINDOW_MS;
+    updateTimestampsRef.current = updateTimestampsRef.current.filter(t => t >= cutoff);
+  }, [snapshot, positions, status]);
+
+  useEffect(() => {
+    if (status !== "live") return;
+    const intervalId = window.setInterval(() => {
+      const ts = updateTimestampsRef.current;
+      const now = Date.now();
+      const cutoff = now - UPDATE_RATE_WINDOW_MS;
+      const recent = ts.filter(t => t >= cutoff);
+      updateTimestampsRef.current = recent;
+      const rate = recent.length / (UPDATE_RATE_WINDOW_MS / 1000);
+      setUpdateRateHz(rate);
+    }, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [status]);
 
   useEffect(() => {
     const onChange = () => {
@@ -629,11 +683,15 @@ export default function LiveTrackMap() {
                 <p>Receiving live telemetry data from F1 25</p>
                 <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between text-xs">
                   <span>Packet loss:</span>
-                  <span className="font-mono text-foreground font-bold">—</span>
+                  <span className="font-mono text-foreground font-bold">
+                    {packetHealthPercent != null ? `${(100 - packetHealthPercent).toFixed(0)}%` : "—"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-xs mt-1">
                   <span>Update rate:</span>
-                  <span className="font-mono text-foreground font-bold">—</span>
+                  <span className="font-mono text-foreground font-bold">
+                    {updateRateHz != null ? `${updateRateHz.toFixed(1)} Hz` : "—"}
+                  </span>
                 </div>
               </div>
             </DataCard>

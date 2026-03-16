@@ -21,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -91,6 +92,48 @@ public class SessionQueryService {
     }
 
     /**
+     * Populate bestLapTimeMs and totalTimeMs on DTO from session summary and timestamps.
+     * bestLapTimeMs is taken from SessionSummary for the player car when available.
+     * totalTimeMs is computed as endedAt - startedAt for finished sessions.
+     */
+    private void applyBestLapAndTotalTime(Session session, SessionDto dto) {
+        if (dto == null || session.getSessionUid() == null) {
+            return;
+        }
+
+        // Best lap: from SessionSummary for player car (or inferred car index)
+        Short carIndex = session.getPlayerCarIndex();
+        if (carIndex == null) {
+            Integer inferred = inferPlayerCarIndexFromData(session.getSessionUid());
+            if (inferred != null) {
+                carIndex = inferred.shortValue();
+            }
+        }
+        if (carIndex != null) {
+            sessionSummaryRepository.findBySessionUidAndCarIndex(session.getSessionUid(), carIndex)
+                    .ifPresent(summary -> dto.setBestLapTimeMs(summary.getBestLapTimeMs()));
+            // Fallback: when summary has no best lap (e.g. only invalid laps aggregated), derive from laps table
+            if (dto.getBestLapTimeMs() == null) {
+                lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(session.getSessionUid(), carIndex)
+                        .stream()
+                        .filter(lap -> lap.getLapTimeMs() != null && Boolean.FALSE.equals(lap.getIsInvalid()))
+                        .map(Lap::getLapTimeMs)
+                        .mapToInt(Integer::intValue)
+                        .min()
+                        .ifPresent(dto::setBestLapTimeMs);
+            }
+        }
+
+        // Total time: simple duration between startedAt and endedAt for finished sessions
+        if (session.getStartedAt() != null && session.getEndedAt() != null) {
+            long millis = Duration.between(session.getStartedAt(), session.getEndedAt()).toMillis();
+            if (millis > 0) {
+                dto.setTotalTimeMs(millis);
+            }
+        }
+    }
+
+    /**
      * List sessions with pagination (most recent first). Delegates to {@link #listSessions(SessionListFilter)}.
      */
     public List<SessionDto> listSessions(int offset, int limit) {
@@ -136,6 +179,7 @@ public class SessionQueryService {
                     SessionDto dto = sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
                     applyInferredPlayerCarIndex(s, dto);
                     applyFinishingPosition(s, dto);
+                    applyBestLapAndTotalTime(s, dto);
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -161,6 +205,7 @@ public class SessionQueryService {
         SessionDto dto = sessionMapper.toDto(session, stateManager.get(session.getSessionUid()));
         applyInferredPlayerCarIndex(session, dto);
         applyFinishingPosition(session, dto);
+        applyBestLapAndTotalTime(session, dto);
         dto.setParticipants(loadParticipants(session.getSessionUid()));
         log.debug("getSession: resolved id={}", SessionMapper.toPublicIdString(session));
         return dto;
@@ -183,6 +228,7 @@ public class SessionQueryService {
                     SessionDto dto = sessionMapper.toDto(s, stateManager.get(s.getSessionUid()));
                     applyInferredPlayerCarIndex(s, dto);
                     applyFinishingPosition(s, dto);
+                    applyBestLapAndTotalTime(s, dto);
                     return dto;
                 });
         log.debug("getActiveSession: {}", result.isPresent() ? "present" : "empty");

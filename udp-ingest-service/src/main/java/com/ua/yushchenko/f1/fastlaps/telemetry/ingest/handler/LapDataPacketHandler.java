@@ -3,6 +3,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.ingest.handler;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDataEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.builder.LapDataEventBuilder;
+import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.metrics.PacketLossMetricsRecorder;
 import com.ua.yushchenko.f1.fastlaps.telemetry.ingest.parser.LapDataPacketParser;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.core.packet.PacketHeader;
 import com.ua.yushchenko.f1.fastlaps.telemetry.udp.spring.annotation.F1PacketHandler;
@@ -35,6 +36,7 @@ public class LapDataPacketHandler {
 
     private final TelemetryPublisher publisher;
     private final LapDataPacketParser lapDataPacketParser;
+    private final PacketLossMetricsRecorder packetLossMetricsRecorder;
 
     @F1PacketHandler(packetId = 2)
     public void handleLapDataPacket(PacketHeader header, ByteBuffer payload) {
@@ -44,23 +46,28 @@ public class LapDataPacketHandler {
         int requiredBytes = NUM_CARS * LAP_DATA_SIZE;
         if (payload.remaining() < requiredBytes) {
             log.warn("Lap data payload too short: need {} bytes, have {}", requiredBytes, payload.remaining());
+            packetLossMetricsRecorder.recordLostFrameWithSequence(header.getSessionUID(), (int) header.getFrameIdentifier());
             return;
         }
 
         int startPosition = payload.position();
+        long sessionUid = header.getSessionUID();
+        int frameId = (int) header.getFrameIdentifier();
         try {
             for (int carIndex = 0; carIndex < NUM_CARS; carIndex++) {
                 payload.position(startPosition + carIndex * LAP_DATA_SIZE);
                 LapDto lapData = lapDataPacketParser.parse(payload);
                 LapDataEvent event = LapDataEventBuilder.build(header, lapData, carIndex);
-                String key = header.getSessionUID() + "-" + carIndex;
+                String key = sessionUid + "-" + carIndex;
                 publisher.publish(TOPIC, key, event);
             }
+            packetLossMetricsRecorder.recordReceivedFrameWithSequence(sessionUid, frameId);
             log.trace("Published lap data for {} cars: sessionUID={}, frame={}", NUM_CARS,
-                    header.getSessionUID(), header.getFrameIdentifier());
+                    sessionUid, header.getFrameIdentifier());
         } catch (Exception e) {
             log.error("Failed to parse lap data packet: sessionUID={}, frame={}",
-                    header.getSessionUID(), header.getFrameIdentifier(), e);
+                    sessionUid, header.getFrameIdentifier(), e);
+            packetLossMetricsRecorder.recordLostFrameWithSequence(sessionUid, frameId);
         }
     }
 }
