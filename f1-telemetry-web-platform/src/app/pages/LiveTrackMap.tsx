@@ -62,6 +62,27 @@ export default function LiveTrackMap() {
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [polledPositions, setPolledPositions] = useState<CarPositionDto[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const trackContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const onChange = () => {
+      const currentlyFullscreen = document.fullscreenElement != null;
+      setIsFullscreen(currentlyFullscreen);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const handleToggleFullscreen = useCallback(() => {
+    const el = trackContainerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      void el.requestFullscreen?.();
+    } else {
+      void document.exitFullscreen?.();
+    }
+  }, []);
 
   const fetchLayout = useCallback(async (id: number) => {
     setIsLoadingLayout(true);
@@ -270,6 +291,13 @@ export default function LiveTrackMap() {
         >
           Export All
         </button>
+        <button
+          type="button"
+          onClick={handleToggleFullscreen}
+          className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-surface-secondary transition-colors cursor-pointer"
+        >
+          {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+        </button>
         <div className="flex gap-1 rounded-lg bg-surface-secondary p-1">
           {(['2d', '3d'] as ViewMode[]).map(mode => (
             <button
@@ -320,7 +348,10 @@ export default function LiveTrackMap() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <DataCard title={trackTitle} variant="live" noPadding actions={headerActions}>
-              <div className="aspect-[4/3] bg-secondary/30 relative p-8">
+              <div
+                ref={trackContainerRef}
+                className="aspect-[4/3] bg-secondary/30 relative p-8"
+              >
                 {isLoadingLayout && (
                   <div className="absolute inset-0 flex items-center justify-center bg-secondary/50 rounded-lg">
                     <div className="animate-pulse text-text-secondary">Loading track layout…</div>
