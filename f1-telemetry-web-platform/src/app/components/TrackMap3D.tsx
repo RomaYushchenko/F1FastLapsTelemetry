@@ -40,6 +40,7 @@ const ZOOM_DEFAULT = 1
 
 export function TrackMap3D({ layout, cars, selectedCarIndex, leaderCarIndex }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const [cameraAngle, setCameraAngle] = useState(45)
   const [zoom, setZoom] = useState(ZOOM_DEFAULT)
   const [, setTick] = useState(0)
@@ -59,6 +60,34 @@ export function TrackMap3D({ layout, cars, selectedCarIndex, leaderCarIndex }: P
     }
     canvas.addEventListener('wheel', onWheel, { passive: false })
     return () => canvas.removeEventListener('wheel', onWheel)
+  }, [])
+
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current
+    const canvas = canvasRef.current
+    if (!wrapper || !canvas) return
+
+    const dpr = window.devicePixelRatio || 1
+
+    const updateSize = () => {
+      const rect = wrapper.getBoundingClientRect()
+      const w = Math.max(1, rect.width)
+      const h = Math.max(1, rect.height)
+      canvas.width = w * dpr
+      canvas.height = h * dpr
+      canvas.style.width = `${w}px`
+      canvas.style.height = `${h}px`
+    }
+
+    updateSize()
+
+    const observer = new ResizeObserver(() => {
+      updateSize()
+    })
+    observer.observe(wrapper)
+
+    return () => observer.disconnect()
   }, [])
 
 
@@ -227,7 +256,7 @@ export function TrackMap3D({ layout, cars, selectedCarIndex, leaderCarIndex }: P
     ctx.stroke()
     ctx.setLineDash([])
 
-    // Sector markers (S2, S3; S1 = start)
+    // Sector markers (S2, S3; S1 = start) – circles лежать прямо на поверхні треку
     sectors
       .filter(b => b.sector !== 1)
       .forEach(b => {
@@ -236,7 +265,7 @@ export function TrackMap3D({ layout, cars, selectedCarIndex, leaderCarIndex }: P
         const sx = (b.x - centerX) * scaleWorld
         const sz = (worldZ - centerZ) * scaleWorld
         const sy = (worldY - minElev) * ELEV_EXAGGERATION
-        const p = scr(project3D(sx, -sy * 2 - 20, sz, cameraAngle))
+        const p = scr(project3D(sx, -sy * 2, sz, cameraAngle))
         const color = SECTOR_COLORS[b.sector as 2 | 3]
         ctx.fillStyle = color
         ctx.beginPath()
@@ -272,7 +301,7 @@ export function TrackMap3D({ layout, cars, selectedCarIndex, leaderCarIndex }: P
       const sx = (car.worldPosX - centerX) * scaleWorld
       const sz = (car.worldPosZ - centerZ) * scaleWorld
       const sy = (elev - minElev) * ELEV_EXAGGERATION
-      const projected = scr(project3D(sx, -sy * 2 - 10, sz, cameraAngle))
+      const projected = scr(project3D(sx, -sy * 2, sz, cameraAngle))
       const isSelected = car.carIndex === selectedCarIndex
       const isLeader = car.carIndex === leaderCarIndex
 
@@ -374,7 +403,7 @@ export function TrackMap3D({ layout, cars, selectedCarIndex, leaderCarIndex }: P
   }, [cameraAngle, zoom, layout, cars, trackPoints, selectedCarIndex, leaderCarIndex, bounds, sectors, centerX, centerZ, minElev])
 
   return (
-    <div className="relative w-full h-full flex flex-col">
+    <div ref={wrapperRef} className="relative w-full h-full flex flex-col">
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3 bg-card/60 backdrop-blur-md border border-border/40 rounded-lg p-3">
         <div>
           <div className="text-xs text-text-secondary uppercase mb-2 font-bold">Camera Angle</div>
