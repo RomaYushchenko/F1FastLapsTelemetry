@@ -1,0 +1,281 @@
+package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
+
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.Point3D;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.SectorBoundary;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TrackLayoutRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.PointXYZD;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState.Status.ABORTED;
+import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState.Status.DONE;
+import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState.Status.IDLE;
+import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState.Status.RECORDING;
+import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState.Status.SAVING;
+import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState.Status.WAITING_FOR_LAP_START;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class TrackLayoutRecordingService {
+
+    /** Minimum points when saving after lap complete (avoids saving empty buffer; lap completion is the only criterion). */
+    private static final int MIN_POINTS_WHEN_LAP_COMPLETE = 10;
+
+    private final TrackLayoutRepository trackLayoutRepository;
+    private final SessionStateManager sessionStateManager;
+
+    public void onSessionStart(long sessionUid, short trackId) {
+        boolean exists = trackLayoutRepository.existsById(trackId);
+        TrackRecordingState state = getRecState(sessionUid);
+        state.setTrackId(trackId);
+        state.setStatus(exists ? IDLE : WAITING_FOR_LAP_START);
+        log.info("[TrackRec] trackId={} exists={} → {}", trackId, exists, state.getStatus());
+    }
+
+    /**
+     * Set or correct trackId for recording from full PacketSessionData (authoritative).
+     * When not yet recording (IDLE/WAITING_FOR_LAP_START): sets trackId and status.
+     * When already RECORDING or SAVING: still updates trackId so that the saved layout uses the
+     * correct id (SSTA can send wrong trackId on some builds; SessionData is authoritative).
+     */
+    public void setTrackIdFromSessionData(long sessionUid, short trackId) {
+        SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
+        if (sessionState == null) {
+            return;
+        }
+        TrackRecordingState state = sessionState.getTrackRecordingState();
+        short previous = state.getTrackId();
+        if (trackId < 0) {
+            return;
+        }
+        state.setTrackId(trackId);
+
+        TrackRecordingState.Status status = state.getStatus();
+        if (status == RECORDING || status == SAVING) {
+            if (previous != trackId) {
+                log.info("[TrackRec] trackId corrected {} → {} from SessionData (during {}), save will use {}", previous, trackId, status, trackId);
+            }
+            return;
+        }
+
+        boolean exists = trackLayoutRepository.existsById(trackId);
+        state.setStatus(exists ? IDLE : WAITING_FOR_LAP_START);
+        if (previous == -1) {
+            log.info("[TrackRec] trackId={} from SessionData (was unset), exists={} → {}", trackId, exists, state.getStatus());
+        } else if (previous != trackId) {
+            log.info("[TrackRec] trackId corrected {} → {} from SessionData, exists={} → {}", previous, trackId, exists, state.getStatus());
+        }
+    }
+
+    /**
+     * @param carIndex   car index from packet header; recording is gated to player car only
+     * @param worldX     worldPositionX (horizontal)
+     * @param worldY     worldPositionY (elevation)
+     * @param worldZ     worldPositionZ (horizontal depth)
+     * @param lapDistance lap distance from LapData (metres), used for sector boundaries
+     */
+    public void onMotionFrame(long sessionUid,
+                              int carIndex,
+                              float worldX,
+                              float worldY,
+                              float worldZ,
+                              float lapDistance) {
+        SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
+        if (sessionState == null) {
+            return;
+        }
+        Integer playerCarIndex = sessionState.getPlayerCarIndex();
+        if (playerCarIndex == null || carIndex != playerCarIndex.intValue()) {
+            return;
+        }
+
+        TrackRecordingState state = sessionState.getTrackRecordingState();
+
+        if (state.getStatus() == WAITING_FOR_LAP_START) {
+            // Start recording only when first lap has started (from S/F line), to avoid formation lap
+            // and pre-lap data that cause looping sectors on the map.
+            Integer currentLap = null;
+            SessionRuntimeState.CarSnapshot snapshot = sessionState.getSnapshot(carIndex);
+            if (snapshot != null && snapshot.getCurrentLap() != null) {
+                currentLap = snapshot.getCurrentLap();
+            }
+            if (currentLap != null && currentLap == 1 && lapDistance > 0) {
+                state.setStatus(RECORDING);
+                log.info("[TrackRec] Lap 1 started (lapDistance>0), trackId={}", state.getTrackId());
+            }
+        }
+
+        if (state.getStatus() == RECORDING && state.shouldSample()) {
+            state.addPoint(worldX, worldY, worldZ, lapDistance);
+            int size = state.getBuffer().size();
+            // Lap complete may be processed before motion (different Kafka topics); save when we have minimum points
+            if (state.isPendingLapComplete() && size >= MIN_POINTS_WHEN_LAP_COMPLETE) {
+                state.setPendingLapComplete(false);
+                boolean invalid = state.isPendingLapInvalid();
+                state.setPendingLapInvalid(false);
+                state.setStatus(SAVING);
+                if (invalid) {
+                    log.info("[TrackRec] Saving track from deferred lap complete (lap invalid, points={})", size);
+                }
+                saveTrackLayout(sessionUid, state);
+            }
+        }
+    }
+
+    public void onLapComplete(long sessionUid, int carIndex, boolean lapInvalid) {
+        SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
+        if (sessionState == null) {
+            return;
+        }
+        Integer playerCarIndex = sessionState.getPlayerCarIndex();
+        if (playerCarIndex == null || carIndex != playerCarIndex.intValue()) {
+            return;
+        }
+
+        TrackRecordingState state = sessionState.getTrackRecordingState();
+        if (state.getStatus() != RECORDING) {
+            return;
+        }
+
+        int count = state.getBuffer().size();
+        if (count < MIN_POINTS_WHEN_LAP_COMPLETE) {
+            // Lap complete often arrives before motion (different Kafka topics); defer save until we have enough points
+            boolean wasAlreadyPending = state.isPendingLapComplete();
+            state.setPendingLapComplete(true);
+            state.setPendingLapInvalid(lapInvalid);
+            if (!wasAlreadyPending) {
+                log.info("[TrackRec] Lap complete deferred: invalid={}, points={} (waiting for motion to reach {} pts)",
+                        lapInvalid, count, MIN_POINTS_WHEN_LAP_COMPLETE);
+            }
+            return;
+        }
+        // Have enough points: save track even if lap invalid (layout geometry is still valid)
+        if (lapInvalid) {
+            log.info("[TrackRec] Saving track from lap complete (lap invalid, points={})", count);
+        }
+
+        state.setStatus(SAVING);
+        saveTrackLayout(sessionUid, state);
+    }
+
+    public void onSessionFinished(long sessionUid) {
+        SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
+        if (sessionState == null) {
+            return;
+        }
+        TrackRecordingState state = sessionState.getTrackRecordingState();
+        if (state.getStatus() == RECORDING || state.getStatus() == WAITING_FOR_LAP_START) {
+            state.reset();
+            state.setStatus(ABORTED);
+            log.info("[TrackRec] Session finished — recording aborted");
+        }
+    }
+
+    private void saveTrackLayout(long sessionUid, TrackRecordingState recState) {
+        // Order by lap distance so the path follows the lap (Kafka can deliver motion out of order)
+        List<PointXYZD> pts = new ArrayList<>(recState.getBuffer());
+        pts.sort(Comparator.comparingDouble(PointXYZD::lapDistance));
+        short trackId = recState.getTrackId();
+        SessionRuntimeState sessionState = sessionStateManager.get(sessionUid);
+
+        double minX = pts.stream().mapToDouble(PointXYZD::x).min().orElse(0);
+        double maxX = pts.stream().mapToDouble(PointXYZD::x).max().orElse(0);
+        double minZ = pts.stream().mapToDouble(PointXYZD::z).min().orElse(0);
+        double maxZ = pts.stream().mapToDouble(PointXYZD::z).max().orElse(0);
+
+        double minElev = pts.stream().mapToDouble(PointXYZD::y).min().orElse(0);
+        double maxElev = pts.stream().mapToDouble(PointXYZD::y).max().orElse(0);
+
+        List<Point3D> pointList = pts.stream()
+                .map(p -> new Point3D(p.x(), p.y(), p.z()))
+                .toList();
+
+        List<SectorBoundary> sectorBoundaries = buildSectorBoundaries(
+                pts,
+                sessionState != null ? sessionState.getSector2LapDistanceStart() : -1f,
+                sessionState != null ? sessionState.getSector3LapDistanceStart() : -1f
+        );
+
+        TrackLayout entity = TrackLayout.builder()
+                .trackId(trackId)
+                .points(pointList)
+                .version((short) 1)
+                .minX(minX)
+                .minY(minZ)
+                .maxX(maxX)
+                .maxY(maxZ)
+                .minElev(minElev)
+                .maxElev(maxElev)
+                .source("RECORDED")
+                .recordedAt(Instant.now())
+                .sessionUid(sessionUid)
+                .sectorBoundaries(sectorBoundaries.isEmpty() ? null : sectorBoundaries)
+                .build();
+
+        try {
+            trackLayoutRepository.save(entity);
+            recState.setStatus(DONE);
+            log.info("[TrackRec] Saved trackId={}: {} pts, elev=[{}..{}]m",
+                    trackId, pts.size(), minElev, maxElev);
+        } catch (Exception e) {
+            log.error("[TrackRec] Save failed for trackId={}: {}", trackId, e.getMessage(), e);
+            recState.setStatus(ABORTED);
+        }
+    }
+
+    /**
+     * Build sector boundaries (S/F at 0, S2 start, S3 start) from points sorted by lap distance.
+     * Ensures S2 boundary index is always less than S3 so the frontend can assume lap order 0 → S2 → S3 → 0.
+     * Some tracks/game builds send sector3LapDistanceStart &lt; sector2LapDistanceStart; we normalize so
+     * the boundary with the smaller lap distance is emitted as S2 and the other as S3.
+     */
+    private List<SectorBoundary> buildSectorBoundaries(List<PointXYZD> pts, float s2Dist, float s3Dist) {
+        if (pts.isEmpty() || s2Dist < 0 || s3Dist < 0) {
+            return List.of();
+        }
+
+        PointXYZD s1 = pts.get(0);
+
+        PointXYZD s2 = pts.stream()
+                .min(Comparator.comparingDouble(p -> Math.abs(p.lapDistance() - s2Dist)))
+                .orElse(pts.get(pts.size() / 2));
+        int s2Idx = pts.indexOf(s2);
+
+        PointXYZD s3 = pts.stream()
+                .min(Comparator.comparingDouble(p -> Math.abs(p.lapDistance() - s3Dist)))
+                .orElse(pts.get(pts.size() * 2 / 3));
+        int s3Idx = pts.indexOf(s3);
+
+        // Ensure S2 comes before S3 along the lap (by index); some tracks send distances in reverse order
+        if (s3Idx < s2Idx) {
+            PointXYZD tmp = s2;
+            s2 = s3;
+            s3 = tmp;
+            int tmpIdx = s2Idx;
+            s2Idx = s3Idx;
+            s3Idx = tmpIdx;
+        }
+
+        return List.of(
+                new SectorBoundary(1, s1.x(), s1.y(), s1.z(), 0),
+                new SectorBoundary(2, s2.x(), s2.y(), s2.z(), s2Idx),
+                new SectorBoundary(3, s3.x(), s3.y(), s3.z(), s3Idx)
+        );
+    }
+
+    private TrackRecordingState getRecState(long sessionUid) {
+        return sessionStateManager.get(sessionUid).getTrackRecordingState();
+    }
+}
+

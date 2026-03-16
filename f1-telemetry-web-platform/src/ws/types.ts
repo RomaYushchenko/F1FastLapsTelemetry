@@ -3,7 +3,7 @@
  * See: rest_web_socket_api_contracts_f_1_telemetry.md § 4.5.
  */
 
-import type { LeaderboardEntry, SessionEventDto } from '@/api/types'
+import type { CarPositionDto, LeaderboardEntry, SessionEventDto } from '@/api/types'
 
 /** Live snapshot (10 Hz). Order for tyresSurfaceTempC: RL, RR, FL, FR. */
 export interface WsSnapshotMessage {
@@ -57,11 +57,18 @@ export interface WsSessionEventMessage {
   event: SessionEventDto;
 }
 
+/** Live car positions for all cars on track (B9). */
+export interface WsPositionsMessage {
+  type: "POSITIONS";
+  positions: CarPositionDto[];
+}
+
 export type WsServerMessage =
   | WsSnapshotMessage
   | WsSessionEndedMessage
   | WsLeaderboardMessage
   | WsSessionEventMessage
+  | WsPositionsMessage
   | WsErrorMessage;
 
 /** Tyre position labels; index order matches tyresSurfaceTempC: RL, RR, FL, FR. */

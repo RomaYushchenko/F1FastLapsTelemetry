@@ -33,7 +33,7 @@ class LapDataPacketHandlerTest {
     private LapDataPacketHandler handler;
 
     @Test
-    @DisplayName("should parse and publish lap data")
+    @DisplayName("should parse and publish lap data for all 22 cars")
     void shouldParseAndPublishLapData() {
         // Arrange
         PacketHeader header = PacketHeader.builder()
@@ -51,23 +51,25 @@ class LapDataPacketHandlerTest {
                 .secondaryPlayerCarIndex((short) 0)
                 .build();
 
-        ByteBuffer payload = createLapDataPayload();
+        ByteBuffer payload = createFullLapDataPayload22Cars();
 
         // Act
         handler.handleLapDataPacket(header, payload);
 
-        // Assert
+        // Assert: 22 events published (one per car)
         ArgumentCaptor<LapDataEvent> eventCaptor = ArgumentCaptor.forClass(LapDataEvent.class);
-        verify(publisher).publish(eq("telemetry.lap"), anyString(), eventCaptor.capture());
+        verify(publisher, org.mockito.Mockito.times(22)).publish(eq("telemetry.lap"), anyString(), eventCaptor.capture());
 
-        LapDataEvent event = eventCaptor.getValue();
-        assertThat(event.getSessionUID()).isEqualTo(123456789L);
-        assertThat(event.getPayload().getLapNumber()).isEqualTo(5);
-        assertThat(event.getPayload().getLastLapTimeMs()).isEqualTo(84500);
-        assertThat(event.getPayload().getCurrentLapTimeMs()).isEqualTo(85500);
-        assertThat(event.getPayload().getSector1TimeMs()).isEqualTo(28500);
-        assertThat(event.getPayload().getSector2TimeMs()).isEqualTo(30000);
-        assertThat(event.getPayload().isInvalid()).isFalse();
+        LapDataEvent eventCar0 = eventCaptor.getAllValues().get(0);
+        assertThat(eventCar0.getSessionUID()).isEqualTo(123456789L);
+        assertThat(eventCar0.getCarIndex()).isEqualTo(0);
+        assertThat(eventCar0.getPlayerCarIndex()).isEqualTo(0);
+        assertThat(eventCar0.getPayload().getLapNumber()).isEqualTo(5);
+        assertThat(eventCar0.getPayload().getLastLapTimeMs()).isEqualTo(84500);
+        assertThat(eventCar0.getPayload().getCurrentLapTimeMs()).isEqualTo(85500);
+        assertThat(eventCar0.getPayload().getSector1TimeMs()).isEqualTo(28500);
+        assertThat(eventCar0.getPayload().getSector2TimeMs()).isEqualTo(30000);
+        assertThat(eventCar0.getPayload().isInvalid()).isFalse();
     }
 
     @Test
@@ -89,19 +91,18 @@ class LapDataPacketHandlerTest {
                 .secondaryPlayerCarIndex((short) 0)
                 .build();
 
-        ByteBuffer payload = createInvalidLapDataPayload();
+        ByteBuffer payload = createFullInvalidLapDataPayload22Cars();
 
         // Act
         handler.handleLapDataPacket(header, payload);
 
-        // Assert
+        // Assert: car 0 event has invalid lap
         ArgumentCaptor<LapDataEvent> eventCaptor = ArgumentCaptor.forClass(LapDataEvent.class);
-        verify(publisher).publish(eq("telemetry.lap"), anyString(), eventCaptor.capture());
-
-        LapDataEvent event = eventCaptor.getValue();
-        assertThat(event.getPayload().isInvalid()).isTrue();
+        verify(publisher, org.mockito.Mockito.times(22)).publish(eq("telemetry.lap"), anyString(), eventCaptor.capture());
+        assertThat(eventCaptor.getAllValues().get(0).getPayload().isInvalid()).isTrue();
     }
 
+    /** One car's lap data (57 bytes). */
     private ByteBuffer createLapDataPayload() {
         // Full 57 bytes of LapData (F1 25) per LapDataPacketParser.LAP_DATA_SIZE_BYTES
         ByteBuffer buffer = ByteBuffer.allocate(LapDataPacketParser.LAP_DATA_SIZE_BYTES)
@@ -143,6 +144,16 @@ class LapDataPacketHandlerTest {
         return buffer;
     }
 
+    /** Full payload: 22 cars × 57 bytes (car 0 = valid lap data, rest = same). */
+    private ByteBuffer createFullLapDataPayload22Cars() {
+        ByteBuffer full = ByteBuffer.allocate(22 * LapDataPacketParser.LAP_DATA_SIZE_BYTES);
+        for (int i = 0; i < 22; i++) {
+            full.put(createLapDataPayload().duplicate());
+        }
+        full.flip();
+        return full;
+    }
+
     private ByteBuffer createInvalidLapDataPayload() {
         ByteBuffer buffer = ByteBuffer.allocate(LapDataPacketParser.LAP_DATA_SIZE_BYTES)
                 .order(ByteOrder.LITTLE_ENDIAN);
@@ -181,5 +192,16 @@ class LapDataPacketHandlerTest {
         buffer.put((byte) 255);
         buffer.flip();
         return buffer;
+    }
+
+    /** Full payload: 22 cars × 57 bytes (car 0 = invalid lap, rest = zeros). */
+    private ByteBuffer createFullInvalidLapDataPayload22Cars() {
+        ByteBuffer full = ByteBuffer.allocate(22 * LapDataPacketParser.LAP_DATA_SIZE_BYTES);
+        full.put(createInvalidLapDataPayload().duplicate());
+        for (int i = 1; i < 22; i++) {
+            full.put(createLapDataPayload().duplicate());
+        }
+        full.flip();
+        return full;
     }
 }

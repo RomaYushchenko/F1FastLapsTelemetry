@@ -5,7 +5,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.config.TraceIdFilter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle.SessionLifecycleService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.MotionRawWriter;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +28,7 @@ public class MotionConsumer {
     private final SessionLifecycleService lifecycleService;
     private final MotionRawWriter motionRawWriter;
     private final SessionStateManager sessionStateManager;
+    private final TrackLayoutRecordingService trackLayoutRecordingService;
 
     @KafkaListener(
             topics = "telemetry.motion",
@@ -78,9 +79,18 @@ public class MotionConsumer {
                         payload.getWorldPositionZ()
                 );
                 // Update live positions for B9 (Live Track Map)
-                SessionRuntimeState state = sessionStateManager.get(sessionUid);
+                var state = sessionStateManager.get(sessionUid);
                 if (state != null) {
                     state.updatePosition(carIndex, payload.getWorldPositionX(), payload.getWorldPositionZ());
+                    float lapDistance = state.getLatestLapDistance(carIndex);
+                    trackLayoutRecordingService.onMotionFrame(
+                            sessionUid,
+                            carIndex,
+                            payload.getWorldPositionX(),
+                            payload.getWorldPositionY(),
+                            payload.getWorldPositionZ(),
+                            lapDistance
+                    );
                 }
             }
 

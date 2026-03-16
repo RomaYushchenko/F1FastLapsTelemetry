@@ -1,19 +1,35 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.BulkImportResultDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SectorBoundaryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutBoundsDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutBoundsExportDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutBulkExportDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutExportDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutResponseDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutStatusDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.Point3D;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.model.SectorBoundary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.TrackLayout;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.TrackLayoutRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.TrackRecordingState;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Serves 2D track layout (points + optional bounds) for Live Track Map. Block F — B8.
@@ -24,7 +40,8 @@ import java.util.Optional;
 public class TrackLayoutService {
 
     private final TrackLayoutRepository trackLayoutRepository;
-    private final ObjectMapper objectMapper;
+    private final SessionStateManager sessionStateManager;
+    private final SessionRepository sessionRepository;
 
     /**
      * Returns layout for the given track, or empty if not found or trackId is null.
@@ -39,33 +56,261 @@ public class TrackLayoutService {
                 .map(this::toDto);
     }
 
-    private TrackLayoutResponseDto toDto(TrackLayout entity) {
-        List<TrackLayoutPointDto> points = parsePoints(entity.getPointsJson());
-        TrackLayoutBoundsDto bounds = null;
-        if (entity.getMinX() != null && entity.getMinY() != null && entity.getMaxX() != null && entity.getMaxY() != null) {
-            bounds = TrackLayoutBoundsDto.builder()
-                    .minX(entity.getMinX())
-                    .minY(entity.getMinY())
-                    .maxX(entity.getMaxX())
-                    .maxY(entity.getMaxY())
+    /**
+     * Returns recording/availability status for track layout.
+     */
+    public TrackLayoutStatusDto getLayoutStatus(short trackId) {
+        log.debug("getLayoutStatus: trackId={}", trackId);
+        Optional<TrackLayout> layoutOpt = trackLayoutRepository.findById(trackId);
+
+        if (layoutOpt.isPresent()) {
+            TrackLayout entity = layoutOpt.get();
+            int pointsCount = entity.getPoints() != null ? entity.getPoints().size() : 0;
+            String source = entity.getSource();
+            return new TrackLayoutStatusDto(
+                    trackId,
+                    "READY",
+                    pointsCount,
+                    source
+            );
+        }
+
+        int pointsCount = 0;
+        String status = "NOT_AVAILABLE";
+        String source = null;
+
+        Map<Long, SessionRuntimeState> activeStates = sessionStateManager.getAllActive();
+        if (!activeStates.isEmpty()) {
+            List<Session> sessions = sessionRepository.findAllById(activeStates.keySet());
+            for (Session session : sessions) {
+                Short sessionTrackId = session.getTrackId();
+                if (sessionTrackId == null || sessionTrackId.shortValue() != trackId) {
+                    continue;
+                }
+                SessionRuntimeState runtimeState = activeStates.get(session.getSessionUid());
+                if (runtimeState == null) {
+                    continue;
+                }
+                TrackRecordingState recState = runtimeState.getTrackRecordingState();
+                if (recState == null) {
+                    continue;
+                }
+                TrackRecordingState.Status recStatus = recState.getStatus();
+                if (recStatus == TrackRecordingState.Status.RECORDING
+                        || recStatus == TrackRecordingState.Status.SAVING) {
+                    pointsCount = recState.getBuffer().size();
+                    status = "RECORDING";
+                    break;
+                }
+            }
+        }
+
+        return new TrackLayoutStatusDto(trackId, status, pointsCount, source);
+    }
+
+    /**
+     * Exports single track layout for given trackId.
+     */
+    public Optional<TrackLayoutExportDto> exportLayout(Short trackId) {
+        log.debug("exportLayout: trackId={}", trackId);
+        if (trackId == null) {
+            log.warn("exportLayout: trackId is null");
+            return Optional.empty();
+        }
+        return trackLayoutRepository.findById(trackId)
+                .map(this::toExportDto);
+    }
+
+    /**
+     * Exports all available track layouts in one bundle.
+     */
+    public TrackLayoutBulkExportDto exportAllLayouts() {
+        log.debug("exportAllLayouts");
+        List<TrackLayout> entities = trackLayoutRepository.findAll();
+        List<TrackLayoutExportDto> tracks = entities.stream()
+                .map(this::toExportDto)
+                .sorted(Comparator.comparingInt(TrackLayoutExportDto::getTrackId))
+                .toList();
+        log.info("exportAllLayouts: exporting {} tracks", tracks.size());
+        return TrackLayoutBulkExportDto.builder()
+                .exportVersion(1)
+                .exportedAt(Instant.now().toString())
+                .count(tracks.size())
+                .tracks(tracks)
+                .build();
+    }
+
+    /**
+     * Imports or updates a single track layout (upsert by trackId).
+     */
+    public TrackLayoutResponseDto importLayout(TrackLayoutExportDto dto) {
+        log.info("importLayout: trackId={}, source={}, points={}",
+                dto.getTrackId(), dto.getSource(), dto.getPoints() != null ? dto.getPoints().size() : 0);
+        if (dto.getTrackId() <= 0) {
+            throw new IllegalArgumentException("trackId must be positive");
+        }
+        if (dto.getPoints() == null || dto.getPoints().isEmpty()) {
+            throw new IllegalArgumentException("points must not be empty");
+        }
+
+        TrackLayoutBoundsExportDto boundsDto = dto.getBounds();
+
+        TrackLayout entity = TrackLayout.builder()
+                .trackId((short) dto.getTrackId())
+                .points(dtoPointsToPoints(dto.getPoints()))
+                .version((short) (dto.getVersion() > 0 ? dto.getVersion() : 1))
+                .minX(boundsDto != null ? boundsDto.getMinX() : null)
+                .minY(boundsDto != null ? boundsDto.getMinZ() : null)
+                .maxX(boundsDto != null ? boundsDto.getMaxX() : null)
+                .maxY(boundsDto != null ? boundsDto.getMaxZ() : null)
+                .minElev(boundsDto != null ? boundsDto.getMinElev() : null)
+                .maxElev(boundsDto != null ? boundsDto.getMaxElev() : null)
+                .sectorBoundaries(dtoSectorBoundariesToSectorBoundaries(dto.getSectorBoundaries()))
+                .source(dto.getSource() != null ? dto.getSource() : "STATIC")
+                .recordedAt(null)
+                .sessionUid(null)
+                .build();
+
+        TrackLayout saved = trackLayoutRepository.save(entity);
+        log.info("importLayout: saved trackId={} ({} points)", saved.getTrackId(),
+                dto.getPoints().size());
+        return toDto(saved);
+    }
+
+    /**
+     * Bulk import of multiple track layouts. One invalid track does not stop others.
+     */
+    public BulkImportResultDto importAllLayouts(TrackLayoutBulkExportDto dto) {
+        log.info("importAllLayouts: {} tracks", dto.getTracks() != null ? dto.getTracks().size() : 0);
+        if (dto.getTracks() == null || dto.getTracks().isEmpty()) {
+            return BulkImportResultDto.builder()
+                    .imported(0)
+                    .skipped(0)
+                    .errors(List.of())
                     .build();
         }
+
+        int imported = 0;
+        List<String> errors = new ArrayList<>();
+
+        for (TrackLayoutExportDto track : dto.getTracks()) {
+            try {
+                if (track.getTrackId() <= 0 || track.getPoints() == null || track.getPoints().isEmpty()) {
+                    errors.add("Track " + track.getTrackId() + ": invalid data (no points)");
+                    continue;
+                }
+                importLayout(track);
+                imported++;
+            } catch (Exception e) {
+                log.warn("importAllLayouts: failed for trackId={}: {}", track.getTrackId(), e.getMessage());
+                errors.add("Track " + track.getTrackId() + ": " + e.getMessage());
+            }
+        }
+
+        log.info("importAllLayouts: imported={}, errors={}", imported, errors.size());
+        return BulkImportResultDto.builder()
+                .imported(imported)
+                .skipped(errors.size())
+                .errors(errors)
+                .build();
+    }
+
+    private TrackLayoutResponseDto toDto(TrackLayout entity) {
+        List<TrackLayoutPointDto> points = pointsToDto(entity.getPoints());
+        TrackLayoutBoundsDto bounds = null;
+        if (entity.getMinX() != null
+                && entity.getMinY() != null
+                && entity.getMaxX() != null
+                && entity.getMaxY() != null) {
+            bounds = TrackLayoutBoundsDto.builder()
+                    .minX(entity.getMinX())
+                    .maxX(entity.getMaxX())
+                    .minZ(entity.getMinY())
+                    .maxZ(entity.getMaxY())
+                    .minElev(entity.getMinElev())
+                    .maxElev(entity.getMaxElev())
+                    .build();
+        }
+        List<SectorBoundaryDto> sectorBoundaries = sectorBoundariesToDto(entity.getSectorBoundaries());
         return TrackLayoutResponseDto.builder()
                 .trackId(entity.getTrackId() != null ? entity.getTrackId().intValue() : null)
                 .points(points)
                 .bounds(bounds)
+                .source(entity.getSource())
+                .sectorBoundaries(sectorBoundaries)
                 .build();
     }
 
-    private List<TrackLayoutPointDto> parsePoints(String pointsJson) {
-        if (pointsJson == null || pointsJson.isBlank()) {
+    private TrackLayoutExportDto toExportDto(TrackLayout entity) {
+        List<TrackLayoutPointDto> points = pointsToDto(entity.getPoints());
+        TrackLayoutBoundsExportDto bounds = null;
+        if (entity.getMinX() != null
+                && entity.getMinY() != null
+                && entity.getMaxX() != null
+                && entity.getMaxY() != null
+        ) {
+            bounds = TrackLayoutBoundsExportDto.builder()
+                    .minX(entity.getMinX())
+                    .maxX(entity.getMaxX())
+                    .minZ(entity.getMinY())
+                    .maxZ(entity.getMaxY())
+                    .minElev(entity.getMinElev() != null ? entity.getMinElev() : 0.0)
+                    .maxElev(entity.getMaxElev() != null ? entity.getMaxElev() : 0.0)
+                    .build();
+        }
+        return TrackLayoutExportDto.builder()
+                .exportVersion(1)
+                .exportedAt(Instant.now().toString())
+                .trackId(entity.getTrackId() != null ? entity.getTrackId() : 0)
+                .trackName(null)
+                .version(entity.getVersion() != null ? entity.getVersion() : 1)
+                .source(entity.getSource())
+                .points(points)
+                .bounds(bounds)
+                .sectorBoundaries(sectorBoundariesToDto(entity.getSectorBoundaries()))
+                .build();
+    }
+
+    private static List<TrackLayoutPointDto> pointsToDto(List<Point3D> points) {
+        if (points == null || points.isEmpty()) {
             return Collections.emptyList();
         }
-        try {
-            return objectMapper.readValue(pointsJson, new TypeReference<>() {});
-        } catch (Exception e) {
-            log.warn("getLayout: failed to parse points JSON for track, returning empty list: {}", e.getMessage());
+        return points.stream()
+                .map(p -> TrackLayoutPointDto.builder()
+                        .x(p.x())
+                        .y(p.y())
+                        .z(p.z())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    private static List<SectorBoundaryDto> sectorBoundariesToDto(List<SectorBoundary> boundaries) {
+        if (boundaries == null || boundaries.isEmpty()) {
             return Collections.emptyList();
         }
+        return boundaries.stream()
+                .map(sb -> new SectorBoundaryDto(sb.sector(), sb.x(), sb.y(), sb.z(), sb.pointIndex()))
+                .collect(Collectors.toList());
+    }
+
+    private static List<Point3D> dtoPointsToPoints(List<TrackLayoutPointDto> points) {
+        if (points == null || points.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return points.stream()
+                .map(p -> new Point3D(
+                        p.getX() != null ? p.getX() : 0.0,
+                        p.getY() != null ? p.getY() : 0.0,
+                        p.getZ() != null ? p.getZ() : 0.0))
+                .collect(Collectors.toList());
+    }
+
+    private static List<SectorBoundary> dtoSectorBoundariesToSectorBoundaries(List<SectorBoundaryDto> boundaries) {
+        if (boundaries == null || boundaries.isEmpty()) {
+            return null;
+        }
+        return boundaries.stream()
+                .map(sb -> new SectorBoundary(sb.sector(), sb.x(), sb.y(), sb.z(), sb.pointIndex()))
+                .collect(Collectors.toList());
     }
 }

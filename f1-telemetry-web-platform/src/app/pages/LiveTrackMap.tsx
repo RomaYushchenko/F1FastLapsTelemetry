@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, Component, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { DataCard } from "../components/DataCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { TelemetryStat } from "../components/TelemetryStat";
+import { TrackMap2D } from "../components/TrackMap2D";
+import { TrackMap3D } from "../components/TrackMap3D";
 import { useLiveTelemetry } from "@/ws";
+import { formatLapTime, formatSector } from "@/api/format";
 import { getTrackName } from "@/constants/tracks";
-import { getTrackLayout, getActivePositions } from "@/api/client";
-import type { TrackLayoutResponseDto, CarPositionDto } from "@/api/types";
+import { exportAllTrackLayouts, exportTrackLayout, getActivePositions, getTrackLayout, getTrackLayoutStatus, importAllTrackLayouts, importTrackLayout } from "@/api/client";
+import type { TrackLayoutResponseDto, TrackLayoutStatusDto, CarPositionDto, TrackLayoutExportDto, TrackLayoutBulkExportDto } from "@/api/types";
 import { toast } from "sonner";
-
-const POSITIONS_POLL_INTERVAL_MS = 2000;
 
 /** Color palette for car indices (B9 positions). */
 const CAR_COLORS = ["#00E5FF", "#00FF85", "#E10600", "#FACC15", "#A855F7", "#EC4899", "#14B8A6", "#F97316", "#8B5CF6", "#22C55E", "#EF4444", "#3B82F6", "#EAB308", "#06B6D4", "#84CC16", "#F43F5E", "#6366F1", "#0EA5E9", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899"];
@@ -17,124 +18,303 @@ function colorForCarIndex(carIndex: number): string {
   return CAR_COLORS[carIndex % CAR_COLORS.length] ?? "#9CA3AF";
 }
 
-/** Build SVG path d from points (polyline). */
-function pointsToPath(points: { x: number; y: number }[]): string {
-  if (points.length === 0) return "";
-  const [first, ...rest] = points;
-  let d = `M ${first.x} ${first.y}`;
-  for (const p of rest) {
-    d += ` L ${p.x} ${p.y}`;
-  }
-  return d;
-}
+type ViewMode = '2d' | '3d';
 
-/** Compute bounding box from points. */
-function boundsFromPoints(points: { x: number; y: number }[]): { minX: number; minY: number; maxX: number; maxY: number } | null {
-  if (points.length === 0) return null;
-  let minX = points[0].x;
-  let minY = points[0].y;
-  let maxX = points[0].x;
-  let maxY = points[0].y;
-  for (const p of points) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
+/** Catches errors in 3D view so the page does not crash; shows fallback and error message. */
+class LiveTrackMap3DErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  state = { hasError: false, error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
   }
-  return { minX, minY, maxX, maxY };
+
+  render() {
+    if (this.state.hasError && this.state.error) {
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-secondary/50 rounded-lg p-6 text-center">
+          <p className="text-text-primary font-medium">3D view failed to load</p>
+          <p className="text-sm text-text-secondary max-w-md">{this.state.error.message}</p>
+          <button
+            type="button"
+            className="text-xs text-accent hover:underline"
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export default function LiveTrackMap() {
-  const { session, status, snapshot } = useLiveTelemetry();
+  const { session, status, snapshot, positions, leaderboard } = useLiveTelemetry();
   const noActiveSession = status === "no-data" || session == null;
   const trackId = session?.trackId ?? null;
 
-  const [layout, setLayout] = useState<TrackLayoutResponseDto | null | undefined>(undefined);
-  const [layoutError, setLayoutError] = useState<string | null>(null);
+  const [layout, setLayout] = useState<TrackLayoutResponseDto | null>(null);
+  const [layoutStatus, setLayoutStatus] = useState<TrackLayoutStatusDto | null>(null);
+  const [isLoadingLayout, setIsLoadingLayout] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('2d');
+  const [polledPositions, setPolledPositions] = useState<CarPositionDto[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const trackContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchLayout = useCallback(async (id: number) => {
-    setLayoutError(null);
-    try {
-      const data = await getTrackLayout(id);
-      setLayout(data ?? null);
-      if (data == null) {
-        setLayoutError("Track layout not available for this track");
-      }
-    } catch (e) {
-      setLayout(null);
-      setLayoutError(e instanceof Error ? e.message : "Failed to load track layout");
-      toast.error("Failed to load track layout");
+  useEffect(() => {
+    const onChange = () => {
+      const currentlyFullscreen = document.fullscreenElement != null;
+      setIsFullscreen(currentlyFullscreen);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const handleToggleFullscreen = useCallback(() => {
+    const el = trackContainerRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      void el.requestFullscreen?.();
+    } else {
+      void document.exitFullscreen?.();
     }
   }, []);
 
+  const fetchLayout = useCallback(async (id: number) => {
+    setIsLoadingLayout(true);
+    try {
+      const data = await getTrackLayout(id);
+      setLayout(data ?? null);
+    } catch (e) {
+      setLayout(null);
+      const msg = e instanceof Error ? e.message : "Failed to load track layout";
+      toast.error(msg);
+    }
+    setIsLoadingLayout(false);
+  }, []);
+
+  const handleExport = useCallback(async () => {
+    if (!trackId) return;
+    try {
+      await exportTrackLayout(trackId);
+    } catch {
+      // error toast already handled in client
+    }
+  }, [trackId]);
+
+  const handleExportAll = useCallback(async () => {
+    try {
+      await exportAllTrackLayouts();
+    } catch {
+      // error toast already handled in client
+    }
+  }, []);
+
+  const handleImport = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text) as TrackLayoutExportDto | TrackLayoutBulkExportDto;
+
+        // Bulk file contains tracks array
+        if (Array.isArray((data as TrackLayoutBulkExportDto).tracks)) {
+          const bulk = data as TrackLayoutBulkExportDto;
+          const result = await importAllTrackLayouts(bulk);
+          if (result.errors.length > 0) {
+            toast.warning(
+              `Imported ${result.imported} tracks. ${result.skipped} failed: ${result.errors[0]}`,
+            );
+          } else {
+            toast.success(`Imported ${result.imported} track layouts`);
+          }
+          if (trackId && bulk.tracks?.some(t => t.trackId === trackId)) {
+            const layoutDto = await getTrackLayout(trackId);
+            if (layoutDto) setLayout(layoutDto);
+          }
+          return;
+        }
+
+        const single = data as TrackLayoutExportDto;
+        if (!single.trackId || !single.points || single.points.length === 0) {
+          toast.error("Invalid track layout file");
+          return;
+        }
+
+        if (trackId && single.trackId !== trackId) {
+          toast.warning(
+            `Importing track ${single.trackId} but current session is on track ${trackId}`,
+          );
+        }
+
+        await importTrackLayout(single);
+        toast.success(`Track layout imported for track ${single.trackId}`);
+
+        if (trackId && single.trackId === trackId) {
+          const layoutDto = await getTrackLayout(trackId);
+          if (layoutDto) setLayout(layoutDto);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Import failed";
+        toast.error(msg);
+      }
+    },
+    [trackId],
+  );
+
   useEffect(() => {
     if (trackId != null && typeof trackId === "number") {
-      setLayout(undefined);
-      fetchLayout(trackId);
+      setLayout(null);
+      setLayoutStatus(null);
+      setIsLoadingLayout(false);
+      if (pollRef.current) {
+        clearTimeout(pollRef.current);
+        pollRef.current = null;
+      }
+      fetchLayout(trackId).catch(() => {
+        // layout may not exist yet — status polling will handle it
+      });
     } else {
       setLayout(null);
-      setLayoutError(null);
+      setLayoutStatus(null);
+      setIsLoadingLayout(false);
     }
   }, [trackId, fetchLayout]);
 
-  const layoutLoading = trackId != null && layout === undefined;
-  const points = layout?.points ?? [];
-  const bounds = useMemo(() => {
-    if (layout?.bounds) return layout.bounds;
-    return boundsFromPoints(points);
-  }, [layout?.bounds, points]);
-  const viewBox = bounds
-    ? `${bounds.minX} ${bounds.minY} ${bounds.maxX - bounds.minX} ${bounds.maxY - bounds.minY}`
-    : "0 0 800 600";
-  const pathD = pointsToPath(points);
-
-  const [positions, setPositions] = useState<CarPositionDto[]>([]);
-  const positionsPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
-    if (noActiveSession) {
-      setPositions([]);
-      if (positionsPollRef.current) {
-        clearInterval(positionsPollRef.current);
-        positionsPollRef.current = null;
-      }
+    if (!trackId || layout) {
       return;
     }
-    const poll = () => {
-      getActivePositions()
-        .then(setPositions)
-        .catch(() => setPositions([]));
-    };
-    poll();
-    positionsPollRef.current = setInterval(poll, POSITIONS_POLL_INTERVAL_MS);
-    return () => {
-      if (positionsPollRef.current) {
-        clearInterval(positionsPollRef.current);
-        positionsPollRef.current = null;
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled || !trackId || layout) return;
+      try {
+        const st = await getTrackLayoutStatus(trackId);
+        if (cancelled) return;
+        setLayoutStatus(st);
+        if (st.status === "READY") {
+          const data = await getTrackLayout(trackId);
+          if (!cancelled && data) {
+            setLayout(data);
+          }
+          return;
+        }
+        const interval = st.status === "RECORDING" ? 2000 : 4000;
+        pollRef.current = setTimeout(poll, interval);
+      } catch {
+        const interval = 4000;
+        pollRef.current = setTimeout(poll, interval);
       }
     };
-  }, [noActiveSession]);
+    poll();
+    return () => {
+      cancelled = true;
+      if (pollRef.current) {
+        clearTimeout(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [trackId, layout]);
 
-  const useRealPositions = positions.length > 0;
-  const driversForMap = useRealPositions
-    ? positions.map((p) => ({
-        id: p.carIndex,
-        name: `Car ${p.carIndex}`,
-        pos: p.carIndex + 1,
-        color: colorForCarIndex(p.carIndex),
-        x: p.worldPosX,
-        y: p.worldPosZ,
-      }))
-    : [
-        { id: 1, name: "VER", pos: 1, color: "#00E5FF", x: 0, y: 0 },
-        { id: 2, name: "HAM", pos: 2, color: "#00FF85", x: 0, y: 0 },
-        { id: 3, name: "LEC", pos: 3, color: "#E10600", x: 0, y: 0 },
-        { id: 4, name: "NOR", pos: 4, color: "#FACC15", x: 0, y: 0 },
-        { id: 5, name: "PIA", pos: 5, color: "#A855F7", x: 0, y: 0 },
-      ];
+  useEffect(() => {
+    if (noActiveSession || !layout) {
+      setPolledPositions([]);
+      return;
+    }
+    const poll = async () => {
+      try {
+        const list = await getActivePositions();
+        setPolledPositions(list);
+      } catch {
+        setPolledPositions([]);
+      }
+    };
+    poll();
+    const interval = setInterval(poll, 1000);
+    return () => clearInterval(interval);
+  }, [noActiveSession, layout]);
+
+  const playerLeaderboardEntry = useMemo(
+    () =>
+      session?.playerCarIndex != null
+        ? leaderboard.find((e) => e.carIndex === session.playerCarIndex) ?? null
+        : null,
+    [session?.playerCarIndex, leaderboard],
+  );
+
+  const positionsForMap = positions.length > 0 ? positions : polledPositions;
+  const useRealPositions = positionsForMap.length > 0;
+  const carsForMap: (CarPositionDto & { color: string })[] = useMemo(
+    () =>
+      positionsForMap.map((p) => {
+        const entry = leaderboard.find((e) => e.carIndex === p.carIndex);
+        return {
+          ...p,
+          color: colorForCarIndex(p.carIndex),
+          // Prefer driver name from positions (Participants packet), then leaderboard
+          driverLabel: p.driverLabel ?? entry?.driverLabel ?? null,
+        };
+      }),
+    [positionsForMap, leaderboard],
+  );
+
+  /** Player car from map data for correct number/label in Selected Driver panel. */
+  const playerCarOnMap = useMemo(
+    () =>
+      session?.playerCarIndex != null
+        ? carsForMap.find((c) => c.carIndex === session.playerCarIndex)
+        : null,
+    [session?.playerCarIndex, carsForMap],
+  );
 
   const trackTitle =
     session?.trackDisplayName ?? (trackId != null ? getTrackName(trackId) : null) ?? "Track Map";
+
+  const headerActions =
+    layout != null ? (
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={!trackId}
+          className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-surface-secondary transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Export
+        </button>
+        <button
+          type="button"
+          onClick={handleExportAll}
+          className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-surface-secondary transition-colors cursor-pointer"
+        >
+          Export All
+        </button>
+        <button
+          type="button"
+          onClick={handleToggleFullscreen}
+          className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary hover:bg-surface-secondary transition-colors cursor-pointer"
+        >
+          {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+        </button>
+        <div className="flex gap-1 rounded-lg bg-surface-secondary p-1">
+          {(['2d', '3d'] as ViewMode[]).map(mode => (
+            <button
+              key={mode}
+              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                viewMode === mode
+                  ? 'bg-accent text-black'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+              onClick={() => setViewMode(mode)}
+            >
+              {mode.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : null;
 
   return (
     <div className="space-y-6">
@@ -167,110 +347,171 @@ export default function LiveTrackMap() {
       {!noActiveSession && (
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <DataCard title={trackTitle} variant="live" noPadding>
-              <div className="aspect-[4/3] bg-secondary/30 relative p-8">
-                {layoutLoading && (
+            <DataCard title={trackTitle} variant="live" noPadding actions={headerActions}>
+              <div
+                ref={trackContainerRef}
+                className="aspect-[4/3] bg-secondary/30 relative p-8"
+              >
+                {isLoadingLayout && (
                   <div className="absolute inset-0 flex items-center justify-center bg-secondary/50 rounded-lg">
                     <div className="animate-pulse text-text-secondary">Loading track layout…</div>
                   </div>
                 )}
-                {!layoutLoading && layoutError && (
-                  <div className="absolute inset-0 flex items-center justify-center p-4">
-                    <p className="text-text-secondary text-center">{layoutError}</p>
-                  </div>
-                )}
-                {!layoutLoading && points.length > 0 && (
-                  <svg viewBox={viewBox} className="w-full h-full min-h-[280px]" preserveAspectRatio="xMidYMid meet">
-                    <path
-                      d={pathD}
-                      fill="none"
-                      stroke="rgba(249,250,251,0.1)"
-                      strokeWidth="40"
-                    />
-                    <path
-                      d={pathD}
-                      fill="none"
-                      stroke="rgba(249,250,251,0.3)"
-                      strokeWidth="4"
-                    />
-                    {/* Static sector markers (Option B) */}
-                    {points.length >= 3 && (
-                      <>
-                        <circle cx={points[0]?.x} cy={points[0]?.y} r="8" fill="#A855F7" opacity="0.5" />
-                        <circle cx={points[Math.floor(points.length / 3)]?.x} cy={points[Math.floor(points.length / 3)]?.y} r="8" fill="#00FF85" opacity="0.5" />
-                        <circle cx={points[Math.floor((2 * points.length) / 3)]?.x} cy={points[Math.floor((2 * points.length) / 3)]?.y} r="8" fill="#FACC15" opacity="0.5" />
-                      </>
-                    )}
-                    {points.length > 0 && (
-                      <>
-                        <rect x={(points[0]?.x ?? 0) - 5} y={(points[0]?.y ?? 0) - 15} width="10" height="30" fill="#F9FAFB" opacity="0.8" />
-                        <text x={(points[0]?.x ?? 0) + 10} y={(points[0]?.y ?? 0) + 5} fill="#F9FAFB" fontSize="12" fontWeight="bold">START</text>
-                      </>
-                    )}
-                    {/* Driver positions: real (B9) when available, else mock */}
-                    {driversForMap.map((driver, idx) => {
-                      const pos = useRealPositions
-                        ? { x: driver.x, y: driver.y }
-                        : points.length >= 5
-                          ? points[Math.floor((idx / Math.max(1, driversForMap.length)) * points.length) % points.length]
-                          : [{ x: 120, y: 300 }, { x: 180, y: 220 }, { x: 350, y: 105 }, { x: 620, y: 120 }, { x: 700, y: 280 }][idx];
-                      if (!pos) return null;
-                      return (
-                        <g key={driver.id}>
-                          <circle
-                            cx={pos.x}
-                            cy={pos.y}
-                            r="12"
-                            fill={driver.color}
-                            opacity="0.3"
-                            className={useRealPositions ? "" : "animate-pulse"}
-                          />
-                          <circle cx={pos.x} cy={pos.y} r="8" fill={driver.color} />
-                          {session?.playerCarIndex === driver.id && (
-                            <circle
-                              cx={pos.x}
-                              cy={pos.y}
-                              r="14"
-                              fill="none"
-                              stroke={driver.color}
-                              strokeWidth="2"
-                            />
-                          )}
-                          <text
-                            x={pos.x}
-                            y={pos.y + 4}
-                            fill="#0B0F14"
-                            fontSize="10"
-                            fontWeight="bold"
-                            textAnchor="middle"
-                          >
-                            {driver.pos}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                )}
-                {!layoutLoading && !layoutError && points.length === 0 && trackId != null && (
-                  <div className="absolute inset-0 flex items-center justify-center p-4">
-                    <p className="text-text-secondary text-center">Track layout not available for this track</p>
+
+                {!isLoadingLayout && layoutStatus?.status === "RECORDING" && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 py-8">
+                    <div className="relative flex items-center justify-center">
+                      <div className="w-16 h-16 rounded-full bg-red-500/10 animate-ping absolute" />
+                      <div className="w-8 h-8 rounded-full bg-red-500/30 animate-ping absolute" />
+                      <div className="w-4 h-4 rounded-full bg-red-500" />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-text-primary font-medium">Recording track layout...</p>
+                      <p className="text-text-secondary text-sm mt-1">
+                        Drive one full lap to generate the track map
+                      </p>
+                    </div>
+                    <div className="w-64">
+                      <div className="flex justify-between text-xs text-text-secondary mb-1">
+                        <span>Progress</span>
+                        <span>{layoutStatus.pointsCollected} pts</span>
+                      </div>
+                      <div className="h-2 bg-surface-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-yellow-400 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, (layoutStatus.pointsCollected / 10) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-secondary">
+                      Track map will appear automatically when the lap is complete
+                    </p>
                   </div>
                 )}
 
-                <div className="absolute top-4 left-4 bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 min-w-[150px]">
-                  <div className="text-xs text-text-secondary uppercase mb-2">
-                    Positions {useRealPositions ? "(live)" : "(mock)"}
+                {!isLoadingLayout && !layout && layoutStatus?.status === "NOT_AVAILABLE" && trackId != null && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 gap-4">
+                    <p className="text-text-secondary text-center">
+                      Track layout not yet available. Drive a lap to record it automatically.
+                    </p>
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleImport(file);
+                          }
+                          e.target.value = "";
+                        }}
+                      />
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-surface-border text-xs text-text-secondary hover:text-text-primary hover:border-accent transition-colors">
+                        Import track JSON
+                      </span>
+                    </label>
                   </div>
-                  <div className="space-y-2">
-                    {driversForMap.map((driver) => (
-                      <div key={driver.id} className="flex items-center gap-2">
-                        <div className="w-4 text-xs font-bold text-text-secondary">{driver.pos}</div>
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: driver.color }} />
-                        <div className="text-sm font-bold">{driver.name}</div>
+                )}
+
+                {!isLoadingLayout && layout && (
+                  <div className="absolute inset-0 flex flex-col bg-gradient-to-br from-secondary/40 via-secondary/20 to-secondary/40">
+                    {viewMode === '2d' ? (
+                      <TrackMap2D layout={layout} cars={carsForMap} />
+                    ) : (
+                      <LiveTrackMap3DErrorBoundary>
+                        <TrackMap3D
+                          layout={layout}
+                          cars={carsForMap}
+                          selectedCarIndex={session?.playerCarIndex ?? null}
+                          leaderCarIndex={leaderboard[0]?.carIndex ?? null}
+                        />
+                      </LiveTrackMap3DErrorBoundary>
+                    )}
+                    {/* Track info overlay (2D and 3D) */}
+                    <div className="absolute top-4 right-4 bg-card/60 backdrop-blur-md border border-border/40 rounded-lg p-3 min-w-[180px]">
+                      <div className="text-xs text-text-secondary uppercase mb-3 font-bold">Track Info</div>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Length:</span>
+                          <span className="font-mono font-bold">
+                            {layout.points.length > 1
+                              ? `${(layout.points.reduce((acc, p, i) => {
+                                  const next = layout.points[(i + 1) % layout.points.length]
+                                  const ax = p.x
+                                  const az = p.z ?? p.y ?? 0
+                                  const bx = next.x
+                                  const bz = next.z ?? next.y ?? 0
+                                  return acc + Math.hypot(bx - ax, bz - az)
+                                }, 0) / 1000).toFixed(2)} km`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Elevation:</span>
+                          <span className="font-mono font-bold">
+                            {layout.bounds?.minElev != null && layout.bounds?.maxElev != null
+                              ? `${(layout.bounds.maxElev - layout.bounds.minElev).toFixed(0)} m`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Points:</span>
+                          <span className="font-mono font-bold">{layout.points.length}</span>
+                        </div>
+                        <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                          <div className="w-3 h-3 bg-[#00E5FF]/30 border border-[#00E5FF] rounded-sm" />
+                          <span className="text-text-secondary">DRS Zone</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-[#E10600]/30 border border-[#E10600] rounded-sm" />
+                          <span className="text-text-secondary">Brake Zone</span>
+                        </div>
                       </div>
-                    ))}
+                    </div>
+                    {/* Positions overlay (2D and 3D) */}
+                    <div className="absolute bottom-4 left-4 bg-card/60 backdrop-blur-md border border-border/40 rounded-lg p-3 min-w-[160px]">
+                      <div className="text-xs text-text-secondary uppercase mb-3 font-bold flex items-center justify-between">
+                        <span>Positions</span>
+                        <span className="text-[10px] text-text-secondary/60 normal-case font-normal">
+                          Lap {snapshot?.currentLap ?? "—"}/{session?.totalLaps ?? "—"}
+                        </span>
+                      </div>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {carsForMap.length === 0 && (
+                          <div className="text-sm text-text-secondary py-1">No position data yet</div>
+                        )}
+                        {[...carsForMap]
+                          .sort((a, b) => (leaderboard.find(e => e.carIndex === a.carIndex)?.position ?? 99) - (leaderboard.find(e => e.carIndex === b.carIndex)?.position ?? 99))
+                          .map(car => {
+                            const entry = leaderboard.find(e => e.carIndex === car.carIndex)
+                            const pos = entry?.position ?? car.carIndex
+                            const isPlayer = car.carIndex === session?.playerCarIndex
+                            return (
+                              <div
+                                key={car.carIndex}
+                                className={`flex items-center gap-2 p-1.5 rounded transition-all ${
+                                  isPlayer ? "bg-secondary/60 border border-border/50" : ""
+                                }`}
+                              >
+                                <div className="w-5 text-xs font-bold text-text-primary">{pos}</div>
+                                <div
+                                  className="w-2.5 h-2.5 rounded-full ring-2 ring-offset-2 ring-offset-card shrink-0"
+                                  style={{ backgroundColor: car.color, ringColor: `${car.color}40` }}
+                                />
+                                <div className="text-sm font-bold flex-1 truncate">
+                                  {car.driverLabel ?? `#${car.racingNumber ?? car.carIndex}`}
+                                </div>
+                                {isPlayer && (
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[#00E5FF] animate-pulse shrink-0" />
+                                )}
+                              </div>
+                            )
+                          })}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </DataCard>
           </div>
@@ -278,12 +519,28 @@ export default function LiveTrackMap() {
           <div className="space-y-6">
             <DataCard title="Selected Driver">
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-[#00E5FF]/20 flex items-center justify-center">
-                    <span className="text-2xl font-bold text-[#00E5FF]">1</span>
+                <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-lg border border-border/30">
+                  <div
+                    className="w-14 h-14 rounded-lg flex items-center justify-center relative overflow-hidden"
+                    style={{ backgroundColor: `${playerCarOnMap?.color ?? colorForCarIndex(session?.playerCarIndex ?? 0)}20` }}
+                  >
+                    <div
+                      className="absolute inset-0 opacity-20"
+                      style={{
+                        background: `radial-gradient(circle at center, ${playerCarOnMap?.color ?? colorForCarIndex(session?.playerCarIndex ?? 0)} 0%, transparent 70%)`,
+                      }}
+                    />
+                    <span
+                      className="text-3xl font-bold relative z-10"
+                      style={{ color: playerCarOnMap?.color ?? colorForCarIndex(session?.playerCarIndex ?? 0) }}
+                    >
+                      {playerCarOnMap?.racingNumber ?? session?.playerCarIndex ?? "—"}
+                    </span>
                   </div>
-                  <div>
-                    <div className="text-xl font-bold">VER</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xl font-bold truncate">
+                      {playerLeaderboardEntry?.driverLabel ?? playerCarOnMap?.driverLabel ?? "—"}
+                    </div>
                     <div className="text-sm text-text-secondary">You</div>
                   </div>
                 </div>
@@ -327,22 +584,37 @@ export default function LiveTrackMap() {
 
             <DataCard title="Sector Times">
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-2 bg-secondary/30 rounded">
-                  <div className="text-sm text-text-secondary">Sector 1</div>
-                  <div className="text-sm font-mono font-bold text-[#A855F7]">—</div>
+                <div className="flex items-center justify-between p-2.5 bg-gradient-to-r from-[#A855F7]/10 to-transparent rounded border border-[#A855F7]/20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#A855F7]" />
+                    <div className="text-sm text-text-secondary">Sector 1</div>
+                  </div>
+                  <div className="text-sm font-mono font-bold text-[#A855F7]">
+                    {formatSector(playerLeaderboardEntry?.sector1Ms)}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between p-2 bg-secondary/30 rounded">
-                  <div className="text-sm text-text-secondary">Sector 2</div>
-                  <div className="text-sm font-mono font-bold text-[#00FF85]">—</div>
+                <div className="flex items-center justify-between p-2.5 bg-gradient-to-r from-[#00FF85]/10 to-transparent rounded border border-[#00FF85]/20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#00FF85]" />
+                    <div className="text-sm text-text-secondary">Sector 2</div>
+                  </div>
+                  <div className="text-sm font-mono font-bold text-[#00FF85]">
+                    {formatSector(playerLeaderboardEntry?.sector2Ms)}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between p-2 bg-secondary/30 rounded">
-                  <div className="text-sm text-text-secondary">Sector 3</div>
-                  <div className="text-sm font-mono font-bold text-[#FACC15]">—</div>
+                <div className="flex items-center justify-between p-2.5 bg-gradient-to-r from-[#FACC15]/10 to-transparent rounded border border-[#FACC15]/20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#FACC15]" />
+                    <div className="text-sm text-text-secondary">Sector 3</div>
+                  </div>
+                  <div className="text-sm font-mono font-bold text-[#FACC15]">
+                    {formatSector(playerLeaderboardEntry?.sector3Ms)}
+                  </div>
                 </div>
-                <div className="pt-3 border-t border-border/50 flex items-center justify-between">
+                <div className="pt-3 border-t border-border/50 flex items-center justify-between p-2 bg-[#00E5FF]/5 rounded-lg">
                   <div className="text-xs text-text-secondary uppercase">Last Lap</div>
                   <div className="text-lg font-mono font-bold text-[#00E5FF]">
-                    {snapshot?.bestLapTimeMs != null ? `${(snapshot.bestLapTimeMs / 1000).toFixed(3)}` : "—"}
+                    {formatLapTime(playerLeaderboardEntry?.lastLapTimeMs ?? snapshot?.bestLapTimeMs)}
                   </div>
                 </div>
               </div>
@@ -355,6 +627,14 @@ export default function LiveTrackMap() {
                   <span className="font-medium">{status === "live" ? "Connected" : "Disconnected"}</span>
                 </div>
                 <p>Receiving live telemetry data from F1 25</p>
+                <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between text-xs">
+                  <span>Packet loss:</span>
+                  <span className="font-mono text-foreground font-bold">—</span>
+                </div>
+                <div className="flex items-center justify-between text-xs mt-1">
+                  <span>Update rate:</span>
+                  <span className="font-mono text-foreground font-bold">—</span>
+                </div>
               </div>
             </DataCard>
           </div>

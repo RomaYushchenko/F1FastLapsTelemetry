@@ -1,5 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.state;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.ParticipantDataDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.CarPositionDto;
 import lombok.Data;
 
@@ -33,6 +34,13 @@ public class SessionRuntimeState {
     private volatile Instant endedAt;
     private volatile Instant lastSeenAt;
 
+    // Track layout recording state (Motion-based, single instance per session).
+    private final TrackRecordingState trackRecordingState = new TrackRecordingState();
+
+    // Lap distance at which each sector starts (metres from start/finish), from SessionDataDto.
+    private float sector2LapDistanceStart = -1f;
+    private float sector3LapDistanceStart = -1f;
+
     /**
      * Watermarks per packet type and carIndex, to allow out-of-order arrival across Kafka topics.
      * Each topic (lap data, car telemetry, car status) can advance independently.
@@ -49,6 +57,11 @@ public class SessionRuntimeState {
 
     /** Latest world position (x, z) per car from Motion (B9). Index 0 = worldPosX, 1 = worldPosZ. */
     private final Map<Integer, float[]> latestWorldPositionByCarIndex = new ConcurrentHashMap<>();
+
+    /** Race number per car from Participants packet (packetId=4). Used for Live Track Map. */
+    private final Map<Integer, Integer> participantRaceNumberByCarIndex = new ConcurrentHashMap<>();
+    /** Driver name per car from Participants packet (packetId=4). Used for Live Track Map legend. */
+    private final Map<Integer, String> participantNameByCarIndex = new ConcurrentHashMap<>();
 
     // Snapshot for WebSocket (per carIndex)
     private final Map<Integer, CarSnapshot> snapshots = new ConcurrentHashMap<>();
@@ -183,16 +196,64 @@ public class SessionRuntimeState {
     }
 
     /**
+     * Update participant info (race number, name) for all cars from Participants packet (packetId=4).
+     * Replaces previous participant data for this session.
+     */
+    public void setParticipants(List<ParticipantDataDto> participants) {
+        if (participants == null) {
+            return;
+        }
+        for (var p : participants) {
+            if (p.getRaceNumber() != null) {
+                participantRaceNumberByCarIndex.put(p.getCarIndex(), p.getRaceNumber());
+            }
+            if (p.getName() != null && !p.getName().isBlank()) {
+                participantNameByCarIndex.put(p.getCarIndex(), p.getName().trim());
+            }
+        }
+        this.lastSeenAt = Instant.now();
+    }
+
+    /** Get driver name for car from Participants packet; null if not set. */
+    public String getParticipantName(int carIndex) {
+        return participantNameByCarIndex.get(carIndex);
+    }
+
+    /** Get race number for car from Participants packet; null if not set. */
+    public Integer getParticipantRaceNumber(int carIndex) {
+        return participantRaceNumberByCarIndex.get(carIndex);
+    }
+
+    /**
+     * Get latest lap distance in metres for the given car, if available.
+     * Uses snapshots updated from LapData (lapDistanceM field).
+     *
+     * @return latest lap distance for carIndex, or -1f if unknown
+     */
+    public float getLatestLapDistance(int carIndex) {
+        CarSnapshot snapshot = snapshots.get(carIndex);
+        Float lapDistanceM = snapshot != null ? snapshot.getLapDistanceM() : null;
+        return lapDistanceM != null ? lapDistanceM : -1f;
+    }
+
+    /**
      * Get latest positions for all cars (B9 Live Track Map). Returns list ordered by carIndex.
+     * Enriches with racingNumber and driverLabel from Participants packet when available.
      */
     public List<CarPositionDto> getLatestPositions() {
         return latestWorldPositionByCarIndex.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
-                .map(e -> CarPositionDto.builder()
-                        .carIndex(e.getKey())
-                        .worldPosX(e.getValue()[0])
-                        .worldPosZ(e.getValue()[1])
-                        .build())
+                .map(e -> {
+                    int carIndex = e.getKey();
+                    float[] pos = e.getValue();
+                    return CarPositionDto.builder()
+                            .carIndex(carIndex)
+                            .worldPosX(pos[0])
+                            .worldPosZ(pos[1])
+                            .racingNumber(participantRaceNumberByCarIndex.get(carIndex))
+                            .driverLabel(participantNameByCarIndex.get(carIndex))
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 

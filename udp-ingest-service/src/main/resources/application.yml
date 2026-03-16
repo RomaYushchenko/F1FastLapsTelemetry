@@ -21,8 +21,8 @@ f1:
         initial-backoff-ms: 100
       throttle:
         enabled: true
-        # Higher rate reduces lag; F1 can send 20–60 packets/s per packet type across multiple types.
-        permits-per-second: 250
+        # Must allow ~22*60 = 1320 msg/s for motion alone (1 packet = 22 cars). Higher = less UI lag.
+        permits-per-second: 2000
 
 logging:
   level:

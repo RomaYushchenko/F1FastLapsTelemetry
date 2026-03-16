@@ -1,9 +1,13 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.state;
 
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.ParticipantDataDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.ws.WsSnapshotMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -157,4 +161,154 @@ class SessionRuntimeStateTest {
         assertThat(state.isTerminal()).isTrue();
         assertThat(state.isActive()).isFalse();
     }
+
+    @Test
+    @DisplayName("setParticipants оновлює карти імена та номери пілотів")
+    void setParticipants_updatesMaps() {
+        // Arrange
+        ParticipantDataDto p0 = new ParticipantDataDto();
+        p0.setCarIndex(0);
+        p0.setRaceNumber(1);
+        p0.setName(" VER ");
+
+        ParticipantDataDto p1 = new ParticipantDataDto();
+        p1.setCarIndex(1);
+        p1.setRaceNumber(11);
+        p1.setName("PER");
+
+        // Act
+        state.setParticipants(List.of(p0, p1));
+
+        // Assert
+        assertThat(state.getParticipantRaceNumber(0)).isEqualTo(1);
+        assertThat(state.getParticipantName(0)).isEqualTo("VER");
+        assertThat(state.getParticipantRaceNumber(1)).isEqualTo(11);
+        assertThat(state.getParticipantName(1)).isEqualTo("PER");
+    }
+
+    @Test
+    @DisplayName("setParticipants ігнорує null список")
+    void setParticipants_ignoresNullList() {
+        // Act
+        state.setParticipants(null);
+
+        // Assert
+        assertThat(state.getParticipantRaceNumber(0)).isNull();
+        assertThat(state.getParticipantName(0)).isNull();
+    }
+
+    @Test
+    @DisplayName("getLatestPositions повертає позиції впорядковані за carIndex та збагачені учасниками")
+    void getLatestPositions_returnsOrderedAndEnriched() {
+        // Arrange
+        state.updatePosition(1, 10.0f, 20.0f);
+        state.updatePosition(0, 5.0f, 15.0f);
+
+        ParticipantDataDto p0 = new ParticipantDataDto();
+        p0.setCarIndex(0);
+        p0.setRaceNumber(33);
+        p0.setName("VER");
+
+        ParticipantDataDto p1 = new ParticipantDataDto();
+        p1.setCarIndex(1);
+        p1.setRaceNumber(11);
+        p1.setName("PER");
+
+        state.setParticipants(List.of(p0, p1));
+
+        // Act
+        var positions = state.getLatestPositions();
+
+        // Assert
+        assertThat(positions).hasSize(2);
+        assertThat(positions.get(0).getCarIndex()).isEqualTo(0);
+        assertThat(positions.get(0).getWorldPosX()).isEqualTo(5.0f);
+        assertThat(positions.get(0).getWorldPosZ()).isEqualTo(15.0f);
+        assertThat(positions.get(0).getRacingNumber()).isEqualTo(33);
+        assertThat(positions.get(0).getDriverLabel()).isEqualTo("VER");
+
+        assertThat(positions.get(1).getCarIndex()).isEqualTo(1);
+        assertThat(positions.get(1).getRacingNumber()).isEqualTo(11);
+        assertThat(positions.get(1).getDriverLabel()).isEqualTo("PER");
+    }
+
+    @Test
+    @DisplayName("getLatestLapDistance повертає -1 коли snapshot відсутній")
+    void getLatestLapDistance_returnsMinusOne_whenSnapshotMissing() {
+        // Act
+        float result = state.getLatestLapDistance(0);
+
+        // Assert
+        assertThat(result).isEqualTo(-1f);
+    }
+
+    @Test
+    @DisplayName("getLatestLapDistance повертає lapDistanceM із snapshot")
+    void getLatestLapDistance_returnsValueFromSnapshot() {
+        // Arrange
+        SessionRuntimeState.CarSnapshot snapshot = carSnapshot();
+        snapshot.setLapDistanceM(123.45f);
+        state.updateSnapshot(0, snapshot);
+
+        // Act
+        float result = state.getLatestLapDistance(0);
+
+        // Assert
+        assertThat(result).isEqualTo(123.45f);
+    }
+
+    @Test
+    @DisplayName("getLatestCarSnapshotWithCarIndex повертає null коли немає snapshot-ів")
+    void getLatestCarSnapshotWithCarIndex_returnsNull_whenEmpty() {
+        // Act
+        Map.Entry<Integer, SessionRuntimeState.CarSnapshot> result = state.getLatestCarSnapshotWithCarIndex();
+
+        // Assert
+        assertThat(result).isNull();
+    }
+
+    @Test
+    @DisplayName("getLatestCarSnapshotWithCarIndex повертає snapshot гравця коли playerCarIndex заданий")
+    void getLatestCarSnapshotWithCarIndex_returnsPlayerSnapshot_whenPlayerSet() {
+        // Arrange
+        SessionRuntimeState.CarSnapshot snapshot0 = carSnapshot();
+        snapshot0.setTimestamp(RAW_TS.minusSeconds(10));
+        state.updateSnapshot(0, snapshot0);
+
+        SessionRuntimeState.CarSnapshot playerSnapshot = carSnapshot();
+        playerSnapshot.setTimestamp(RAW_TS);
+        state.updateSnapshot(5, playerSnapshot);
+
+        state.setPlayerCarIndex(5);
+
+        // Act
+        Map.Entry<Integer, SessionRuntimeState.CarSnapshot> result = state.getLatestCarSnapshotWithCarIndex();
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getKey()).isEqualTo(5);
+        assertThat(result.getValue()).isSameAs(playerSnapshot);
+    }
+
+    @Test
+    @DisplayName("getLatestCarSnapshotWithCarIndex повертає snapshot з найбільшим timestamp коли playerCarIndex відсутній")
+    void getLatestCarSnapshotWithCarIndex_returnsLatestByTimestamp_whenPlayerNotSet() {
+        // Arrange
+        SessionRuntimeState.CarSnapshot older = carSnapshot();
+        older.setTimestamp(RAW_TS.minusSeconds(5));
+        state.updateSnapshot(0, older);
+
+        SessionRuntimeState.CarSnapshot newer = carSnapshot();
+        newer.setTimestamp(RAW_TS);
+        state.updateSnapshot(1, newer);
+
+        // Act
+        Map.Entry<Integer, SessionRuntimeState.CarSnapshot> result = state.getLatestCarSnapshotWithCarIndex();
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getKey()).isEqualTo(1);
+        assertThat(result.getValue()).isSameAs(newer);
+    }
 }
+

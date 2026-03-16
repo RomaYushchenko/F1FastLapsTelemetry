@@ -2,6 +2,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class LapDataProcessor {
 
     private final SessionStateManager stateManager;
     private final LapAggregator lapAggregator;
+    private final TrackLayoutRecordingService trackLayoutRecordingService;
 
     /**
      * Process lap data packet. Updates watermark, runs sector/lap logic, updates WebSocket snapshot.
@@ -40,11 +42,19 @@ public class LapDataProcessor {
 
         lapAggregator.processLapData(sessionUid, carIndex, lap);
 
+        SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
+        if (lap.getLastLapTimeMs() != null) {
+            trackLayoutRecordingService.onLapComplete(sessionUid, carIndex, lap.isInvalid());
+        } else if (snapshot != null && snapshot.getCurrentLap() != null
+                && lap.getLapNumber() > 1 && lap.getLapNumber() > snapshot.getCurrentLap()) {
+            // First packet of new lap without lastLapTimeMs (game may not send it); still signal lap complete for track recording
+            trackLayoutRecordingService.onLapComplete(sessionUid, carIndex, false);
+        }
+
         if (lap.getCarPosition() != null && lap.getCarPosition() > 0) {
             state.setLastCarPosition(carIndex, lap.getCarPosition());
         }
 
-        SessionRuntimeState.CarSnapshot snapshot = state.getSnapshot(carIndex);
         if (snapshot == null) {
             snapshot = new SessionRuntimeState.CarSnapshot();
             state.updateSnapshot(carIndex, snapshot);

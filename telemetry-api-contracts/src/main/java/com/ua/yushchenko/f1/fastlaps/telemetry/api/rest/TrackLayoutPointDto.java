@@ -6,7 +6,11 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * One 2D point in a track layout (for GET /api/tracks/{trackId}/layout).
+ * One 3D point in a track layout (for GET /api/tracks/{trackId}/layout).
+ *
+ * x = worldPositionX (horizontal)
+ * y = worldPositionY (elevation)
+ * z = worldPositionZ (horizontal depth)
  */
 @Data
 @NoArgsConstructor
@@ -16,4 +20,5 @@ public class TrackLayoutPointDto {
 
     private Double x;
     private Double y;
+    private Double z;
 }

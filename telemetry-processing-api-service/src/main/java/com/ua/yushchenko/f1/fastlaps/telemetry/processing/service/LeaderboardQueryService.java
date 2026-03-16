@@ -105,7 +105,11 @@ public class LeaderboardQueryService {
             }
             String gap = formatGap(position, leaderLastLapMs, lastLap);
             String compound = compoundFromSnapshot(state.getSnapshot(carIndex));
-            String driverLabel = driverLabelByCar.getOrDefault(carIndex, null);
+            // Prefer driver name from Participants packet (game), then session_drivers (DB), then fallback
+            String driverLabel = state.getParticipantName(carIndex);
+            if (driverLabel == null || driverLabel.isBlank()) {
+                driverLabel = driverLabelByCar.getOrDefault(carIndex, null);
+            }
             if (driverLabel == null || driverLabel.isBlank()) {
                 driverLabel = "Car " + carIndex;
             }

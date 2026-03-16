@@ -67,7 +67,9 @@ class SessionPacketHandlerTest {
         SessionLifecycleEvent event = eventCaptor.getValue();
         assertThat(event.getSessionUID()).isEqualTo(123456789L);
         assertThat(event.getPayload().getEventCode()).isEqualTo(EventCode.SSTA);
-        assertThat(event.getPayload().getSessionTypeId()).isNotNull();
+        assertThat(event.getPayload().getSessionTypeId()).isEqualTo(10);
+        assertThat(event.getPayload().getTrackId()).isEqualTo(5);
+        assertThat(event.getPayload().getTotalLaps()).isEqualTo(50);
     }
 
     @Test
@@ -133,9 +135,9 @@ class SessionPacketHandlerTest {
     private ByteBuffer createSessionStartPayload() {
         ByteBuffer buffer = ByteBuffer.allocate(100).order(ByteOrder.LITTLE_ENDIAN);
         buffer.put("SSTA".getBytes());  // Event code
-        buffer.position(24);             // Skip to session fields
+        buffer.position(24);             // Skip to session fields (order: sessionType, trackId, totalLaps)
         buffer.put((byte) 10);           // Session type = RACE
-        buffer.put((byte) 5);            // Track ID = 5
+        buffer.put((byte) 5);            // Track ID = 5 (Monaco)
         buffer.put((byte) 50);           // Total laps = 50
         buffer.rewind();
         return buffer;

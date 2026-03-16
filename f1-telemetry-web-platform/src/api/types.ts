@@ -193,28 +193,79 @@ export interface SessionEventDto {
   createdAt: string
 }
 
-/** GET /api/tracks/{trackId}/layout — 2D track map points and optional bounds */
-export interface TrackLayoutPoint {
-  x: number
-  y: number
+/** GET /api/tracks/{trackId}/layout — 3D track map points and optional bounds */
+export interface TrackPoint3D {
+  x: number   // worldPositionX (horizontal)
+  y: number   // worldPositionY (elevation; may be null for static tracks)
+  z?: number | null  // worldPositionZ (horizontal depth; null for old static layouts before migration)
+  /** When true, this point is inside a DRS zone (for 2D/3D map overlay). Optional; from static config or import. */
+  drs?: boolean | null
+  /** When true, this point is a heavy brake zone (for 2D/3D map overlay). Optional; from static config or import. */
+  brake?: boolean | null
 }
 
-export interface TrackLayoutBounds {
+export interface TrackBounds {
   minX: number
-  minY: number
   maxX: number
-  maxY: number
+  minZ: number
+  maxZ: number
+  minElev?: number | null
+  maxElev?: number | null
+}
+
+export interface SectorBoundary {
+  sector: 1 | 2 | 3
+  x: number
+  y: number
+  z: number
+  /** Index into layout points where this sector starts; when set, split uses this for correct 1→2→3→1 order */
+  pointIndex?: number | null
 }
 
 export interface TrackLayoutResponseDto {
   trackId: number
-  points: TrackLayoutPoint[]
-  bounds?: TrackLayoutBounds
+  points: TrackPoint3D[]
+  bounds?: TrackBounds
+  source?: 'STATIC' | 'RECORDED' | string
+  sectorBoundaries?: SectorBoundary[] | null
+}
+
+export interface TrackLayoutStatusDto {
+  trackId: number
+  status: 'READY' | 'RECORDING' | 'NOT_AVAILABLE'
+  pointsCollected: number
+  source?: 'STATIC' | 'RECORDED' | string | null
+}
+
+/** Single track layout export (GET export, or item in bulk export). */
+export interface TrackLayoutExportDto {
+  exportVersion: number
+  exportedAt: string
+  trackId: number
+  trackName?: string | null
+  version?: number
+  source?: string | null
+  points: TrackPoint3D[]
+  bounds?: TrackBounds | null
+  sectorBoundaries?: SectorBoundary[] | null
+}
+
+/** Bulk export: all track layouts (GET export-all). */
+export interface TrackLayoutBulkExportDto {
+  exportVersion?: number
+  exportedAt?: string
+  count?: number
+  tracks: TrackLayoutExportDto[]
 }
 
 /** GET /api/sessions/active/positions or WebSocket POSITIONS — one car's world position (B9). */
 export interface CarPositionDto {
   carIndex: number
   worldPosX: number
+  worldPosY?: number
   worldPosZ: number
+  /** Race number from game (Participants packet). */
+  racingNumber?: number | null
+  /** Driver name from game (Participants packet); for map legend. */
+  driverLabel?: string | null
 }

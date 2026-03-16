@@ -1,0 +1,29 @@
+# Profile for integration tests: real PostgreSQL (Testcontainers), Kafka disabled.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/telemetry
+    username: test
+    password: test
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        default_schema: telemetry
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/track-layout-integration-schema.sql
+      continue-on-error: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
+  kafka:
+    bootstrap-servers: localhost:9999
+
+logging:
+  level:
+    com.ua.yushchenko.f1.fastlaps.telemetry: INFO
+    org.hibernate.SQL: warn

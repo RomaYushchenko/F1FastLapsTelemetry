@@ -6,7 +6,9 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1SessionType;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1Track;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionDriverRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.EndReason;
@@ -35,9 +37,11 @@ public class SessionLifecycleService {
     private final SessionStateManager stateManager;
     private final SessionRepository sessionRepository;
     private final SessionFinishingPositionRepository finishingPositionRepository;
+    private final SessionDriverRepository sessionDriverRepository;
     private final SessionPersistenceService sessionPersistenceService;
     private final LapAggregator lapAggregator;
     private final LiveDataBroadcaster liveDataBroadcaster;
+    private final com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService trackLayoutRecordingService;
 
     /** Serializes session persist so only one consumer inserts; others see the row after commit. */
     private final Object sessionCreationLock = new Object();
@@ -45,6 +49,8 @@ public class SessionLifecycleService {
     private static final DateTimeFormatter DISPLAY_NAME_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
             .withZone(ZoneOffset.UTC);
     private static final int SESSION_DISPLAY_NAME_MAX_LENGTH = 64;
+    /** session_drivers.driver_label max length. */
+    private static final int DRIVER_LABEL_MAX_LENGTH = 16;
 
     /**
      * Build session display name from track and start time.
@@ -115,6 +121,9 @@ public class SessionLifecycleService {
                     .sessionDisplayName(displayName)
                     .build();
             persistSessionUnderLock(session);
+            if (trackIdShort != null) {
+                trackLayoutRecordingService.onSessionStart(sessionUID, trackIdShort);
+            }
         } else {
             log.warn("Received SSTA for session in state {}, ignoring (sessionUID={})",
                     state.getState(), sessionUID);
@@ -161,6 +170,8 @@ public class SessionLifecycleService {
                     finishingPositionRepository.save(fp);
                     log.info("Saved finishing position: sessionUID={}, carIndex={}, position={}", sessionUID, carIndex, lastPosition);
                 }
+                // Persist participant names from Participants packet (packetId=4) for leaderboard/session detail after restart
+                persistParticipantsFromState(sessionUID, state);
             });
 
             // Notify WebSocket subscribers
@@ -168,9 +179,37 @@ public class SessionLifecycleService {
 
             // After flush, transition to TERMINAL
             finalizeSession(sessionUID);
+            trackLayoutRecordingService.onSessionFinished(sessionUID);
         } else {
             log.warn("Received SEND for session in state {}, ignoring (sessionUID={})",
                     state.getState(), sessionUID);
+        }
+    }
+
+    /**
+     * Persist participant names from runtime state to session_drivers so leaderboard and session detail show driver names after restart.
+     * Truncates to DRIVER_LABEL_MAX_LENGTH to fit column.
+     */
+    private void persistParticipantsFromState(long sessionUID, SessionRuntimeState state) {
+        Instant now = Instant.now();
+        for (int carIndex = 0; carIndex < 22; carIndex++) {
+            String name = state.getParticipantName(carIndex);
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            String label = name.length() > DRIVER_LABEL_MAX_LENGTH
+                    ? name.substring(0, DRIVER_LABEL_MAX_LENGTH)
+                    : name.trim();
+            SessionDriver sd = sessionDriverRepository.findBySessionUidAndCarIndex(sessionUID, (short) carIndex)
+                    .orElse(SessionDriver.builder()
+                            .sessionUid(sessionUID)
+                            .carIndex((short) carIndex)
+                            .createdAt(now)
+                            .updatedAt(now)
+                            .build());
+            sd.setDriverLabel(label);
+            sd.setUpdatedAt(now);
+            sessionDriverRepository.save(sd);
         }
     }
 
@@ -198,7 +237,8 @@ public class SessionLifecycleService {
                 session.setSessionType(event.getSessionTypeId().shortValue());
                 updated = true;
             }
-            if (session.getTrackId() == null && event.getTrackId() != null) {
+            // SessionData/SessionInfo are authoritative for trackId (SSTA can send wrong id on some builds)
+            if (event.getTrackId() != null && event.getTrackId().intValue() >= 0) {
                 session.setTrackId(event.getTrackId().shortValue());
                 updated = true;
             }
@@ -213,6 +253,12 @@ public class SessionLifecycleService {
                 sessionRepository.save(session);
                 log.info("Updated session metadata: sessionUID={}, sessionType={}, trackId={}",
                         sessionUID, session.getSessionType(), session.getTrackId());
+            }
+            if (event.getTrackId() != null) {
+                short tid = event.getTrackId().shortValue();
+                if (tid >= 0) {
+                    trackLayoutRecordingService.setTrackIdFromSessionData(sessionUID, tid);
+                }
             }
         });
     }
@@ -242,6 +288,12 @@ public class SessionLifecycleService {
         SessionRuntimeState runtimeState = stateManager.get(sessionUID);
         if (runtimeState != null) {
             runtimeState.setLastSeenAt(Instant.now());
+            if (dto.getSector2LapDistanceStart() != null) {
+                runtimeState.setSector2LapDistanceStart(dto.getSector2LapDistanceStart());
+            }
+            if (dto.getSector3LapDistanceStart() != null) {
+                runtimeState.setSector3LapDistanceStart(dto.getSector3LapDistanceStart());
+            }
         }
         sessionRepository.findById(sessionUID).ifPresent(session -> {
             boolean updated = false;
@@ -250,9 +302,16 @@ public class SessionLifecycleService {
                 session.setSessionType(dto.getSessionType().shortValue());
                 updated = true;
             }
-            if (session.getTrackId() == null && dto.getTrackId() != null) {
+            // PacketSessionData is authoritative for trackId (SSTA can send wrong id on some builds)
+            if (dto.getTrackId() != null && dto.getTrackId().intValue() >= 0) {
                 session.setTrackId(dto.getTrackId().shortValue());
                 updated = true;
+            }
+            if (dto.getTrackId() != null) {
+                short tid = dto.getTrackId().shortValue();
+                if (tid >= 0) {
+                    trackLayoutRecordingService.setTrackIdFromSessionData(sessionUID, tid);
+                }
             }
             if (session.getTotalLaps() == null && dto.getTotalLaps() != null) {
                 session.setTotalLaps(dto.getTotalLaps().shortValue());

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
@@ -26,6 +27,7 @@ import java.util.Map;
  */
 @Configuration
 @EnableKafka
+@EnableAsync
 public class KafkaConsumerConfig {
 
     @Value("${spring.kafka.bootstrap-servers}")
@@ -33,6 +35,9 @@ public class KafkaConsumerConfig {
 
     @Value("${spring.kafka.consumer.group-id}")
     private String groupId;
+
+    @Value("${spring.kafka.consumer.max-poll-records:100}")
+    private Integer maxPollRecords;
 
     @Bean
     public ConsumerFactory<String, AbstractTelemetryEvent> consumerFactory() {
@@ -42,6 +47,9 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        if (maxPollRecords != null && maxPollRecords > 0) {
+            props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecords);
+        }
 
         JsonDeserializer<AbstractTelemetryEvent> jsonDeserializer =
                 new JsonDeserializer<>(AbstractTelemetryEvent.class, false)

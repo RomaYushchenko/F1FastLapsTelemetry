@@ -108,9 +108,10 @@ Follow [README § Frontend component reusability](README.md#frontend-component-r
 
 | Doc | Updates |
 |-----|--------|
-| [rest_web_socket_api_contracts_f_1_telemetry.md](../../../project/rest_web_socket_api_contracts_f_1_telemetry.md) | New § 3.5.4 (or equivalent) Track layout endpoint, request/response, 404. |
-| [BACKEND_FEATURES_FOR_NEW_UI.md](../../../BACKEND_FEATURES_FOR_NEW_UI.md) | Mark B8 implemented when done. |
-| [.github/project/telemetry_processing_api_service.md](../../../project/telemetry_processing_api_service.md) | If new TrackLayoutService: add to architecture. |
+| [rest_web_socket_api_contracts_f_1_telemetry.md](../../../project/rest_web_socket_api_contracts_f_1_telemetry.md) | Track layout § updated to 3D layout `{x,y,z}`, bounds with elevation, sectorBoundaries, source, plus layout status and export/import endpoints. |
+| [BACKEND_FEATURES_FOR_NEW_UI.md](../../../BACKEND_FEATURES_FOR_NEW_UI.md) | B8 marked implemented with auto-recording + 3D + export/import; B9 notes updated for full XYZ positions. |
+| [.github/project/telemetry_processing_api_service.md](../../../project/telemetry_processing_api_service.md) | TrackLayoutService and TrackLayoutRecordingService described in architecture (layout recording, status, export/import). |
+| [14-live-track-map-telemetry-recording.md](14-live-track-map-telemetry-recording.md) | Detailed v2 plan and algorithms for recording, sectors, 2D/3D rendering, export/import (this file references it for extensions beyond initial B8). |
 
 ---
 
@@ -143,17 +144,16 @@ Use this checklist to track progress. Mark `[ ]` as `[x]` when done.
 
 ### Step 23 — Documentation
 
-- [x] REST contract: Track layout § added
-- [x] BACKEND_FEATURES_FOR_NEW_UI.md: B8 marked implemented
+- [x] REST contract: Track layout and status/export/import § updated
+- [x] BACKEND_FEATURES_FOR_NEW_UI.md: B8 marked implemented with recording/3D/export/import
 
 ### Step 24 — Git Commit
-- [ ] Add git commit with understanding message
+- [ ] Add git commit with documentation updates for Block F / plan 14
 
 ---
 
-## Out of scope for Block F
+## Out of scope for Block F (original)
 
-- **B9 — Live positions of all cars:** Driver positions on map stay mock; B9 is in Block H (optional).
-- **Sector boundaries from API:** Corner-maps returns distance-based corners, not 2D; sector/start markers on map are kept as static UI elements (Option B).
-- **List of tracks with layout:** No GET /api/tracks that returns which trackIds have layout; 404 per trackId is sufficient for MVP.
-- **Editing or uploading layout from UI:** Backend only serves layout; data comes from files or DB import.
+- **Sector boundaries from API (v1):** originally out of scope; now provided by recording v2 via `sectorBoundaries` on layout. Static sector/start UI markers remain valid fallback when boundaries are absent.
+- **List of tracks with layout:** No GET /api/tracks that returns which trackIds have layout; 404 per trackId is sufficient, though export-all/import-all helps persist layouts between clean DBs.
+- **Editing or uploading layout from UI:** Backend only records and serves layout; JSON export/import are dev tools, not user-facing editors.
