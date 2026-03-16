@@ -75,8 +75,6 @@ class SessionQueryServiceTest {
         when(sessionRepository.count(any(Specification.class))).thenReturn(1L);
         when(stateManager.get(SESSION_UID)).thenReturn(state);
         when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
-        when(sessionSummaryRepository.findBySessionUidAndCarIndex(any(), any()))
-                .thenReturn(Optional.empty());
 
         // Act
         SessionListResult result = service.listSessions(SessionListFilter.builder().offset(0).limit(50).build());
@@ -118,8 +116,6 @@ class SessionQueryServiceTest {
         when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
         when(sessionSummaryRepository.findBySessionUid(SESSION_UID)).thenReturn(Collections.emptyList());
         when(finishingPositionRepository.findBySessionUidOrderByFinishingPositionAsc(SESSION_UID)).thenReturn(Collections.emptyList());
-        when(sessionSummaryRepository.findBySessionUidAndCarIndex(any(), any()))
-                .thenReturn(Optional.empty());
 
         // Act
         SessionDto dto = service.getSession(SESSION_PUBLIC_ID_STR);
@@ -171,8 +167,6 @@ class SessionQueryServiceTest {
         when(sessionRepository.findById(SESSION_UID)).thenReturn(Optional.of(session));
         when(stateManager.get(SESSION_UID)).thenReturn(state);
         when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
-        when(sessionSummaryRepository.findBySessionUidAndCarIndex(any(), any()))
-                .thenReturn(Optional.empty());
 
         // Act
         Optional<SessionDto> result = service.getActiveSession();
@@ -267,7 +261,6 @@ class SessionQueryServiceTest {
                 .thenReturn(new PageImpl<>(List.of(session), PageRequest.of(0, 50), 1L));
         when(sessionRepository.count(any(Specification.class))).thenReturn(1L);
         when(stateManager.get(SESSION_UID)).thenReturn(state);
-        when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(any())).thenReturn(Collections.emptyList());
         when(sessionSummaryRepository.findBySessionUidAndCarIndex(SESSION_UID, CAR_INDEX))
                 .thenReturn(Optional.of(sessionSummary()));
 
