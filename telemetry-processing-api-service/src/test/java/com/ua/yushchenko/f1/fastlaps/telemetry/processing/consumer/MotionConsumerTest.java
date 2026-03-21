@@ -5,7 +5,6 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.MotionEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.PacketId;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle.SessionLifecycleService;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.MotionRawWriter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
@@ -34,9 +33,6 @@ class MotionConsumerTest {
     private SessionLifecycleService lifecycleService;
 
     @Mock
-    private MotionRawWriter motionRawWriter;
-
-    @Mock
     private SessionStateManager sessionStateManager;
 
     @Mock
@@ -52,8 +48,8 @@ class MotionConsumerTest {
     private MotionConsumer consumer;
 
     @Test
-    @DisplayName("consume записує motion, оновлює позицію та викликає onMotionFrame при валідному payload")
-    void consume_writesMotionAndUpdatesState_whenPayloadValid() {
+    @DisplayName("consume оновлює позицію та викликає onMotionFrame при валідному payload")
+    void consume_updatesStateAndRecording_whenPayloadValid() {
         // Arrange
         MotionEvent event = new MotionEvent();
         event.setSessionUID(SESSION_UID);
@@ -79,8 +75,6 @@ class MotionConsumerTest {
 
         // Assert
         verify(lifecycleService).ensureSessionActive(SESSION_UID);
-        verify(motionRawWriter).write(any(), eq(SESSION_UID), eq(FRAME_ID), eq(CAR_INDEX),
-                eq(0.5f), eq(0.1f), eq(10.0f), eq(20.0f));
         verify(runtimeState).updatePosition(CAR_INDEX, 10.0f, 20.0f);
         verify(trackLayoutRecordingService).onMotionFrame(SESSION_UID, CAR_INDEX, 10.0f, 1.5f, 20.0f, 123.45f);
         verify(acknowledgment).acknowledge();
@@ -104,7 +98,6 @@ class MotionConsumerTest {
 
         // Assert
         verify(idempotencyService, never()).markAsProcessed(anyLong(), anyInt(), anyShort(), anyShort());
-        verify(motionRawWriter, never()).write(any(), anyLong(), anyInt(), anyShort(), anyFloat(), anyFloat(), anyFloat(), anyFloat());
         verify(acknowledgment).acknowledge();
     }
 
@@ -126,7 +119,6 @@ class MotionConsumerTest {
         consumer.consume(event, acknowledgment);
 
         // Assert
-        verify(motionRawWriter, never()).write(any(), anyLong(), anyInt(), anyShort(), anyFloat(), anyFloat(), anyFloat(), anyFloat());
         verify(trackLayoutRecordingService, never()).onMotionFrame(anyLong(), anyShort(), anyFloat(), anyFloat(), anyFloat(), anyFloat());
         verify(acknowledgment).acknowledge();
     }
@@ -139,7 +131,6 @@ class MotionConsumerTest {
 
         // Assert
         verify(acknowledgment).acknowledge();
-        verifyNoInteractions(idempotencyService, lifecycleService, motionRawWriter, sessionStateManager, trackLayoutRecordingService);
+        verifyNoInteractions(idempotencyService, lifecycleService, sessionStateManager, trackLayoutRecordingService);
     }
 }
-

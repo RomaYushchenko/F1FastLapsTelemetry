@@ -126,19 +126,6 @@ export interface SpeedTracePoint {
   speedKph: number
 }
 
-/** GET /api/sessions/{id}/laps/{lapNum}/corners */
-export interface LapCorner {
-  cornerIndex: number
-  startDistanceM: number
-  endDistanceM: number
-  apexDistanceM: number
-  entrySpeedKph: number
-  apexSpeedKph: number
-  exitSpeedKph: number
-  durationMs?: number | null
-  name?: string | null
-}
-
 /** GET /api/sessions/{id}/tyre-wear */
 export interface TyreWearPoint {
   lapNumber: number

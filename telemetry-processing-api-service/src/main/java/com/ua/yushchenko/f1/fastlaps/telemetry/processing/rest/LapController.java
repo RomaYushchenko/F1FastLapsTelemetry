@@ -3,7 +3,6 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsByLapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ErsPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.FuelByLapDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapCornerDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LapResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PacePointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.PitStopDto;
@@ -99,21 +98,6 @@ public class LapController {
         }
         List<TracePointDto> trace = lapQueryService.getLapTrace(id, lapNum, carIndex);
         return ResponseEntity.ok(trace);
-    }
-
-    @GetMapping("/laps/{lapNum}/corners")
-    public ResponseEntity<List<LapCornerDto>> getLapCorners(
-            @PathVariable("id") String id,
-            @PathVariable("lapNum") Integer lapNum,
-            @RequestParam(name = "carIndex", defaultValue = "0") Short carIndex
-    ) {
-        log.debug("getLapCorners: id={}, lapNum={}, carIndex={}", id, lapNum, carIndex);
-        if (lapNum == null) {
-            log.warn("lapNum is required");
-            throw new IllegalArgumentException("lapNum is required");
-        }
-        List<LapCornerDto> corners = lapQueryService.getCorners(id, lapNum, carIndex);
-        return ResponseEntity.ok(corners);
     }
 
     @GetMapping("/laps/{lapNum}/speed-trace")

@@ -4,7 +4,6 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.MotionEvent;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.config.TraceIdFilter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.IdempotencyService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.lifecycle.SessionLifecycleService;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.MotionRawWriter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -14,10 +13,8 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
-
 /**
- * Kafka consumer for telemetry.motion topic. Persists motion to motion_raw and updates live positions (B9).
+ * Kafka consumer for telemetry.motion topic. Updates live positions (B9) and track layout recording from motion payload.
  */
 @Slf4j
 @Component
@@ -26,7 +23,6 @@ public class MotionConsumer {
 
     private final IdempotencyService idempotencyService;
     private final SessionLifecycleService lifecycleService;
-    private final MotionRawWriter motionRawWriter;
     private final SessionStateManager sessionStateManager;
     private final TrackLayoutRecordingService trackLayoutRecordingService;
 
@@ -68,17 +64,6 @@ public class MotionConsumer {
 
             var payload = event.getPayload();
             if (payload != null) {
-                motionRawWriter.write(
-                        Instant.now(),
-                        sessionUid,
-                        frameId,
-                        carIndex,
-                        payload.getGForceLateral(),
-                        payload.getYaw(),
-                        payload.getWorldPositionX(),
-                        payload.getWorldPositionZ()
-                );
-                // Update live positions for B9 (Live Track Map)
                 var state = sessionStateManager.get(sessionUid);
                 if (state != null) {
                     state.updatePosition(carIndex, payload.getWorldPositionX(), payload.getWorldPositionZ());
