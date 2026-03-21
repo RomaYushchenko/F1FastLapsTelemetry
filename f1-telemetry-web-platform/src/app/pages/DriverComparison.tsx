@@ -534,21 +534,30 @@ export default function DriverComparison() {
                 ) : (
                   <div className="space-y-2">
                     {participants.map((p) => {
-                      const disabled = p.carIndex === carIndexB
                       const selected = p.carIndex === carIndexA
                       return (
                         <button
                           key={p.carIndex}
                           type="button"
-                          onClick={() =>
-                            !disabled && setCarIndexA(p.carIndex)
-                          }
+                          onClick={() => {
+                            if (
+                              carIndexB !== "" &&
+                              p.carIndex === carIndexB
+                            ) {
+                              if (carIndexA !== "") {
+                                setCarIndexA(carIndexB)
+                                setCarIndexB(carIndexA)
+                              }
+                              return
+                            }
+                            if (p.carIndex !== carIndexA) {
+                              setCarIndexA(p.carIndex)
+                            }
+                          }}
                           className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                             selected
                               ? "border-[#00E5FF] bg-[#00E5FF]/10"
-                              : disabled
-                                ? "opacity-50 cursor-not-allowed border-border/30 bg-secondary/20"
-                                : "border-border/50 bg-secondary/30 hover:border-border hover:bg-secondary/50"
+                              : "border-border/50 bg-secondary/30 hover:border-border hover:bg-secondary/50"
                           }`}
                         >
                           <div className="flex items-center justify-between">
@@ -583,21 +592,30 @@ export default function DriverComparison() {
                 ) : (
                   <div className="space-y-2">
                     {participants.map((p) => {
-                      const disabled = p.carIndex === carIndexA
                       const selected = p.carIndex === carIndexB
                       return (
                         <button
                           key={p.carIndex}
                           type="button"
-                          onClick={() =>
-                            !disabled && setCarIndexB(p.carIndex)
-                          }
+                          onClick={() => {
+                            if (
+                              carIndexA !== "" &&
+                              p.carIndex === carIndexA
+                            ) {
+                              if (carIndexB !== "") {
+                                setCarIndexB(carIndexA)
+                                setCarIndexA(carIndexB)
+                              }
+                              return
+                            }
+                            if (p.carIndex !== carIndexB) {
+                              setCarIndexB(p.carIndex)
+                            }
+                          }}
                           className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                             selected
                               ? "border-[#E10600] bg-[#E10600]/10"
-                              : disabled
-                                ? "opacity-50 cursor-not-allowed border-border/30 bg-secondary/20"
-                                : "border-border/50 bg-secondary/30 hover:border-border hover:bg-secondary/50"
+                              : "border-border/50 bg-secondary/30 hover:border-border hover:bg-secondary/50"
                           }`}
                         >
                           <div className="flex items-center justify-between">
