@@ -19,9 +19,10 @@ public class ProcessedPacketRetentionProperties {
 
     /**
      * Rows with {@code processed_at} older than {@code now() - retention} are deleted by the scheduled purge.
-     * Default: 2 minutes (dev-oriented; increase for production).
+     * Default: 24 hours — wide enough for typical consumer lag and broker redelivery/replay; tune down only in
+     * constrained dev environments. For production, still align with topic retention plus expected worst-case lag.
      */
-    private Duration retention = Duration.ofMinutes(2);
+    private Duration retention = Duration.ofDays(1);
 
     /**
      * Delay between purge runs ({@code @Scheduled fixedDelayString}), in milliseconds.

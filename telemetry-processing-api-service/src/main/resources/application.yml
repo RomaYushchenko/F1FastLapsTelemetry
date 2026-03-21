@@ -52,8 +52,8 @@ telemetry:
   idempotency:
     processed-packets:
       # Rows older than this duration are removed by the scheduled purge (see ProcessedPacketRetentionScheduler).
-      # Short values weaken Kafka idempotency if old messages are redelivered; increase in production.
-      retention: PT2M
+      # Must exceed typical Kafka lag/replay; short windows risk duplicate processing after purge.
+      retention: PT24H
       # Milliseconds between purge runs (@Scheduled fixedDelay).
       purge-interval-ms: 120000
 
