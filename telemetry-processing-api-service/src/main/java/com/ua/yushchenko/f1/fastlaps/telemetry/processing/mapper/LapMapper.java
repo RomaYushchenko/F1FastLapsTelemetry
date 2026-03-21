@@ -58,14 +58,27 @@ public class LapMapper {
 
     /**
      * Maps raw telemetry row to speed-trace point (distance, speed).
-     * Returns null if distance or speed is null (filtered out in service).
+     * Returns null if speed is missing. When lap distance is missing, uses a synthetic distance
+     * from {@code sequenceIndex} so charts still render (see {@link #toSpeedTracePointDto(CarTelemetryRaw, int)}).
      */
     public SpeedTracePointDto toSpeedTracePointDto(CarTelemetryRaw row) {
-        if (row == null || row.getLapDistanceM() == null || row.getSpeedKph() == null) {
+        return toSpeedTracePointDto(row, 0);
+    }
+
+    /**
+     * Maps raw telemetry row to speed-trace point. {@code sequenceIndex} is used only when
+     * {@code lapDistanceM} is null: distance is set to {@code sequenceIndex * 5f} metres (approximate sample spacing).
+     */
+    public SpeedTracePointDto toSpeedTracePointDto(CarTelemetryRaw row, int sequenceIndex) {
+        if (row == null || row.getSpeedKph() == null) {
             return null;
         }
+        Float distanceM = row.getLapDistanceM();
+        if (distanceM == null) {
+            distanceM = sequenceIndex * 5f;
+        }
         return SpeedTracePointDto.builder()
-                .distanceM(row.getLapDistanceM())
+                .distanceM(distanceM)
                 .speedKph(row.getSpeedKph().intValue())
                 .build();
     }

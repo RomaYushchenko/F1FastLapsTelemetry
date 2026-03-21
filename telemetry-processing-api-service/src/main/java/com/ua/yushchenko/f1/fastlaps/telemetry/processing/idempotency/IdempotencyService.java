@@ -25,6 +25,7 @@ public class IdempotencyService {
     /**
      * Check if packet was already processed and mark as processed if not.
      * Returns true if packet is new (should be processed), false if duplicate.
+     * For batched car telemetry one frame uses {@link CarTelemetryIdempotency#BATCH_FRAME_CAR_INDEX} as {@code carIndex}.
      */
     @Transactional
     public boolean markAsProcessed(long sessionUid, int frameIdentifier, short packetId, short carIndex) {

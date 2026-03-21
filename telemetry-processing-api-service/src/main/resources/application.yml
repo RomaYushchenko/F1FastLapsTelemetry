@@ -15,6 +15,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        # Batched car telemetry (up to 22 rows per frame): fewer JDBC round-trips with saveAll.
+        jdbc:
+          batch_size: 32
+        order_inserts: true
+        order_updates: true
     show-sql: false
 
   kafka:

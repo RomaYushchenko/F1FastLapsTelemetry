@@ -1,8 +1,10 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.processor;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarTelemetryDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarTelemetrySlotDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.DrsState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.RawTelemetryWriter;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.CarTelemetryRaw;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -10,14 +12,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Processes car telemetry: watermark update, merge snapshot (including DRS wing state), pedal trace (with lap attribution).
  * Snapshot DRS (wing open/closed) is set from telemetry m_drs (0=off, 1=on); DRS allowed (zone) is set from Car Status in CarStatusProcessor.
- * Called from CarTelemetryConsumer after ensureSession, shouldProcess, idempotency.
- * See: implementation_phases.md Phase 5.1, plan 12.
+ * Supports batched samples (all cars in one frame) with a single {@code saveAll} to reduce DB load.
+ * See: implementation_phases.md Phase 5.1, plan 12, plan 14.
  */
 @Slf4j
 @Component
@@ -37,13 +41,53 @@ public class CarTelemetryProcessor {
     }
 
     public void process(long sessionUid, short carIndex, int frameId, CarTelemetryDto telemetry, float sessionTime) {
-        log.debug("process: sessionUid={}, carIndex={}, frameId={}", sessionUid, carIndex, frameId);
+        Instant ts = Instant.now();
+        CarTelemetryRaw row = processOneSample(sessionUid, carIndex, frameId, telemetry, sessionTime, ts);
+        if (row != null) {
+            rawTelemetryWriter.save(row);
+        }
+    }
+
+    /**
+     * Process all cars from one {@link com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.CarTelemetryBatchEvent}.
+     * Uses one shared {@code Instant} for PK {@code ts} (unique per car via {@code car_index}).
+     */
+    public void processBatch(long sessionUid, int frameId, float sessionTime, List<CarTelemetrySlotDto> samples) {
+        if (samples == null || samples.isEmpty()) {
+            return;
+        }
+        Instant ts = Instant.now();
+        List<CarTelemetryRaw> rows = new ArrayList<>(samples.size());
+        for (CarTelemetrySlotDto slot : samples) {
+            if (slot == null || slot.getTelemetry() == null) {
+                continue;
+            }
+            short carIndex = (short) slot.getCarIndex();
+            CarTelemetryRaw row = processOneSample(sessionUid, carIndex, frameId, slot.getTelemetry(), sessionTime, ts);
+            if (row != null) {
+                rows.add(row);
+            }
+        }
+        if (!rows.isEmpty()) {
+            rawTelemetryWriter.saveAll(rows);
+        }
+    }
+
+    private CarTelemetryRaw processOneSample(
+            long sessionUid,
+            short carIndex,
+            int frameId,
+            CarTelemetryDto telemetry,
+            float sessionTime,
+            Instant ts
+    ) {
+        log.debug("processOneSample: sessionUid={}, carIndex={}, frameId={}", sessionUid, carIndex, frameId);
         SessionRuntimeState state = stateManager.getOrCreate(sessionUid);
         int currentWatermark = state.getTelemetryWatermark(carIndex);
         if (frameId < currentWatermark) {
             log.debug("Out-of-order telemetry packet ignored: sessionUid={}, frame={}, watermark={}",
                     sessionUid, frameId, currentWatermark);
-            return;
+            return null;
         }
         state.updateTelemetryWatermark(carIndex, frameId);
 
@@ -63,21 +107,22 @@ public class CarTelemetryProcessor {
         snapshot.setSessionTimeSeconds(sessionTime != 0 ? sessionTime : null);
         state.updateSnapshot(carIndex, snapshot);
 
-        if (state.isActive()) {
-            Short lapNum = resolveLapNumberForTrace(sessionUid, carIndex, snapshot);
-            rawTelemetryWriter.write(
-                    Instant.now(),
-                    sessionUid,
-                    frameId,
-                    carIndex,
-                    telemetry.getSpeedKph(),
-                    telemetry.getThrottle(),
-                    telemetry.getBrake(),
-                    sessionTime != 0 ? sessionTime : null,
-                    lapNum,
-                    snapshot.getLapDistanceM()
-            );
+        if (!state.isActive()) {
+            return null;
         }
+        Short lapNum = resolveLapNumberForTrace(sessionUid, carIndex, snapshot);
+        return rawTelemetryWriter.buildRow(
+                ts,
+                sessionUid,
+                frameId,
+                carIndex,
+                telemetry.getSpeedKph(),
+                telemetry.getThrottle(),
+                telemetry.getBrake(),
+                sessionTime != 0 ? sessionTime : null,
+                lapNum,
+                snapshot.getLapDistanceM()
+        );
     }
 
     /**
