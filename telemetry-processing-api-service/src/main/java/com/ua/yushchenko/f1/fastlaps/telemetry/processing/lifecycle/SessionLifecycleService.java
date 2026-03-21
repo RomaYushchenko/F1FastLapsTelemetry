@@ -5,6 +5,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.SessionEventDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1SessionType;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1Track;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation.LapAggregator;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.idempotency.ProcessedPacketRetentionService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
@@ -42,6 +43,7 @@ public class SessionLifecycleService {
     private final LapAggregator lapAggregator;
     private final LiveDataBroadcaster liveDataBroadcaster;
     private final com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService trackLayoutRecordingService;
+    private final ProcessedPacketRetentionService processedPacketRetentionService;
 
     /** Serializes session persist so only one consumer inserts; others see the row after commit. */
     private final Object sessionCreationLock = new Object();
@@ -179,6 +181,7 @@ public class SessionLifecycleService {
 
             // After flush, transition to TERMINAL
             finalizeSession(sessionUID);
+            purgeProcessedPacketsForSession(sessionUID);
             trackLayoutRecordingService.onSessionFinished(sessionUID);
         } else {
             log.warn("Received SEND for session in state {}, ignoring (sessionUID={})",
@@ -222,6 +225,19 @@ public class SessionLifecycleService {
         if (state != null && state.getState() == SessionState.ENDING) {
             log.info("Finalizing session sessionUID={}", sessionUID);
             stateManager.close(sessionUID); // Transitions to TERMINAL
+        }
+    }
+
+    /**
+     * Clears idempotency rows for a session after TERMINAL. Failures are logged but do not abort lifecycle
+     * (Kafka acknowledgment and session end side effects already completed).
+     */
+    private void purgeProcessedPacketsForSession(long sessionUID) {
+        try {
+            int removed = processedPacketRetentionService.deleteAllForSession(sessionUID);
+            log.debug("purgeProcessedPacketsForSession: sessionUID={}, removedRows={}", sessionUID, removed);
+        } catch (Exception e) {
+            log.error("purgeProcessedPacketsForSession: failed sessionUID={}", sessionUID, e);
         }
     }
 

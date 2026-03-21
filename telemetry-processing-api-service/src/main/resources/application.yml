@@ -48,6 +48,15 @@ management:
     health:
       show-details: when-authorized
 
+telemetry:
+  idempotency:
+    processed-packets:
+      # Rows older than this duration are removed by the scheduled purge (see ProcessedPacketRetentionScheduler).
+      # Short values weaken Kafka idempotency if old messages are redelivered; increase in production.
+      retention: PT2M
+      # Milliseconds between purge runs (@Scheduled fixedDelay).
+      purge-interval-ms: 120000
+
 packet-health:
   threshold:
     # GOOD: almost no packet loss (<5%) — live UI should feel solid.
