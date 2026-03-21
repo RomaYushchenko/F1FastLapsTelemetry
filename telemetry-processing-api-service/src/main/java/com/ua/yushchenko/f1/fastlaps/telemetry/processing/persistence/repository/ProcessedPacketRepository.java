@@ -18,13 +18,6 @@ import java.time.Instant;
 public interface ProcessedPacketRepository extends JpaRepository<ProcessedPacket, ProcessedPacketId> {
 
     /**
-     * Removes all idempotency rows for a session (after terminal lifecycle).
-     */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("delete from ProcessedPacket p where p.sessionUid = :sessionUid")
-    int deleteBySessionUid(@Param("sessionUid") long sessionUid);
-
-    /**
      * Removes rows older than the cutoff (time-based retention).
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)

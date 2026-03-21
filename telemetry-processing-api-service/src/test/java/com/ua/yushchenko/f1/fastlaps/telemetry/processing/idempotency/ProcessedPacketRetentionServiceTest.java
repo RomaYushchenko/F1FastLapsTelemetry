@@ -10,7 +10,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 
-import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.SESSION_UID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,19 +37,5 @@ class ProcessedPacketRetentionServiceTest {
         // Assert
         assertThat(deleted).isEqualTo(3);
         verify(processedPacketRepository).deleteByProcessedAtBefore(cutoff);
-    }
-
-    @Test
-    @DisplayName("deleteAllForSession делегує в репозиторій і повертає кількість видалених рядків")
-    void deleteAllForSession_delegatesToRepository() {
-        // Arrange
-        when(processedPacketRepository.deleteBySessionUid(SESSION_UID)).thenReturn(42);
-
-        // Act
-        int deleted = processedPacketRetentionService.deleteAllForSession(SESSION_UID);
-
-        // Assert
-        assertThat(deleted).isEqualTo(42);
-        verify(processedPacketRepository).deleteBySessionUid(SESSION_UID);
     }
 }

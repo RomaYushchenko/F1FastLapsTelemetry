@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 
 /**
- * Deletes idempotency rows by age or by session. Used by the scheduled purge and session lifecycle.
+ * Deletes idempotency rows by age. Used by the scheduled purge ({@link ProcessedPacketRetentionScheduler}).
  */
 @Slf4j
 @Service
@@ -27,18 +27,6 @@ public class ProcessedPacketRetentionService {
     public int deleteExpiredBefore(Instant cutoff) {
         int deleted = processedPacketRepository.deleteByProcessedAtBefore(cutoff);
         log.debug("deleteExpiredBefore: deletedRows={}, cutoff={}", deleted, cutoff);
-        return deleted;
-    }
-
-    /**
-     * Deletes all idempotency rows for one session (after the session reaches TERMINAL).
-     *
-     * @return number of rows removed
-     */
-    @Transactional
-    public int deleteAllForSession(long sessionUid) {
-        int deleted = processedPacketRepository.deleteBySessionUid(sessionUid);
-        log.debug("deleteAllForSession: deletedRows={}, sessionUid={}", deleted, sessionUid);
         return deleted;
     }
 }
