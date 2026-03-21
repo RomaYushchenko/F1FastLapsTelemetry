@@ -430,6 +430,17 @@ public final class TestData {
                 .build();
     }
 
+    /** Second car for multi-car participant / leaderboard tests. */
+    public static SessionDriver sessionDriverCar1() {
+        return SessionDriver.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex((short) 1)
+                .driverLabel("HAM")
+                .createdAt(STARTED_AT)
+                .updatedAt(ENDED_AT)
+                .build();
+    }
+
     // --- SessionEvent ---
     public static SessionEvent sessionEvent() {
         return SessionEvent.builder()
