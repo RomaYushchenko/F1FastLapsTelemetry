@@ -1,7 +1,6 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutResponseDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackCornerMapService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,8 +21,6 @@ import static org.mockito.Mockito.when;
 @DisplayName("TrackController")
 class TrackControllerTest {
 
-    @Mock
-    private TrackCornerMapService trackCornerMapService;
     @Mock
     private TrackLayoutService trackLayoutService;
 

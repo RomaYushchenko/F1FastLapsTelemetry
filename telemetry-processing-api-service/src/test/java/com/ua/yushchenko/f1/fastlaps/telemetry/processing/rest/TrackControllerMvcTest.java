@@ -6,7 +6,6 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutBoundsDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutPointDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutResponseDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.TrackLayoutStatusDto;
-import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackCornerMapService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,9 +35,6 @@ class TrackControllerMvcTest {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @MockBean
-    private TrackCornerMapService trackCornerMapService;
 
     @MockBean
     private TrackLayoutService trackLayoutService;

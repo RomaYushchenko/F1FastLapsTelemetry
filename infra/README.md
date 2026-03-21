@@ -46,8 +46,12 @@ docker-compose up -d
 - `15-session-finishing-positions.sql` — таблиця `session_finishing_positions`
 - `16-tyre-wear-per-lap-compound.sql` — колонка `compound` у `telemetry.tyre_wear_per_lap`
 - `17-laps-position-at-lap-start.sql` — колонка `position_at_lap_start` у `telemetry.laps`
-- `18-track-corner-maps-and-lap-metrics.sql` — таблиці `track_corner_maps`, `track_corners`, `lap_corner_metrics` (план 13 Phase 3)
-- `19-motion-raw.sql` — таблиця `motion_raw` (план 13 Phase 4)
+- `20-session-drivers.sql` — таблиця `session_drivers`
+- `21-session-events.sql` — таблиця `session_events`
+- `22-track-layout.sql` — таблиця `track_layout`
+- `23-track-layout-recording.sql` — колонки recording для `track_layout`
+- `24-migrate-all-static-tracks.sql` — міграція static track layouts
+- `25-drop-motion-and-corner-tables.sql` — **не для порожньої БД**: одноразове видалення legacy-таблиць `lap_corner_metrics`, `track_corners`, `track_corner_maps`, `motion_raw` на існуючих інстансах (раніше створювались скриптами 18/19, які прибрані з репозиторію)
 
 Документація DDL: [f_1_telemetry_project_architecture.md](../.github/project/f_1_telemetry_project_architecture.md) § 9.
 
@@ -62,8 +66,10 @@ Init scripts run **only on first Postgres start** (empty data dir). If the DB wa
 - `15-session-finishing-positions.sql` — table `telemetry.session_finishing_positions`
 - `16-tyre-wear-per-lap-compound.sql` — column `compound` on `telemetry.tyre_wear_per_lap`
 - `17-laps-position-at-lap-start.sql` — column `position_at_lap_start` on `telemetry.laps`
-- `18-track-corner-maps-and-lap-metrics.sql` — tables `track_corner_maps`, `track_corners`, `lap_corner_metrics`
-- `19-motion-raw.sql` — table `motion_raw` (Plan 13 Phase 4)
+
+**Dropping legacy corner / motion_raw tables (existing DBs only):**
+
+- `25-drop-motion-and-corner-tables.sql` — drops `lap_corner_metrics`, `track_corners`, `track_corner_maps`, `motion_raw` if present. Run once when upgrading from a DB that had scripts 18/19.
 
 **Docker (from project root) — run all migration scripts:**
 
@@ -75,8 +81,8 @@ docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init
 docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/15-session-finishing-positions.sql
 docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/16-tyre-wear-per-lap-compound.sql
 docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/17-laps-position-at-lap-start.sql
-docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/18-track-corner-maps-and-lap-metrics.sql
-docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/19-motion-raw.sql
+# If upgrading from a DB that had corner/motion_raw tables:
+# docker exec -i f1-telemetry-postgres psql -U telemetry -d telemetry < infra/init-db/25-drop-motion-and-corner-tables.sql
 ```
 
 **Local psql — run all migration scripts:**
@@ -89,6 +95,6 @@ psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/14-session-
 psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/15-session-finishing-positions.sql
 psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/16-tyre-wear-per-lap-compound.sql
 psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/17-laps-position-at-lap-start.sql
-psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/18-track-corner-maps-and-lap-metrics.sql
-psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/19-motion-raw.sql
+# If upgrading from a DB that had corner/motion_raw tables:
+# psql -h localhost -p 5432 -U telemetry -d telemetry -f infra/init-db/25-drop-motion-and-corner-tables.sql
 ```

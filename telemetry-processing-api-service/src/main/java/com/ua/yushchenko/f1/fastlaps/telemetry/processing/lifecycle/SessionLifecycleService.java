@@ -179,6 +179,7 @@ public class SessionLifecycleService {
 
             // After flush, transition to TERMINAL
             finalizeSession(sessionUID);
+            // Do not purge processed_packets here: Kafka may still redeliver; time-based retention removes rows.
             trackLayoutRecordingService.onSessionFinished(sessionUID);
         } else {
             log.warn("Received SEND for session in state {}, ignoring (sessionUID={})",

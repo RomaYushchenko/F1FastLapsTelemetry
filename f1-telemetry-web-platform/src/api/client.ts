@@ -12,7 +12,6 @@ import type {
   ErsPoint,
   FuelByLapDto,
   Lap,
-  LapCorner,
   LeaderboardEntry,
   PacePoint,
   PedalTracePoint,
@@ -265,16 +264,6 @@ export async function getLapSpeedTrace(
 ): Promise<SpeedTracePoint[]> {
   return requestJson<SpeedTracePoint[]>(
     `/api/sessions/${encodeURIComponent(sessionUid!)}/laps/${lapNum}/speed-trace${carIndexQuery(carIndex)}`
-  )
-}
-
-export async function getLapCorners(
-  sessionUid: string | undefined,
-  lapNum: number,
-  carIndex = 0
-): Promise<LapCorner[]> {
-  return requestJson<LapCorner[]>(
-    `/api/sessions/${encodeURIComponent(sessionUid!)}/laps/${lapNum}/corners${carIndexQuery(carIndex)}`
   )
 }
 

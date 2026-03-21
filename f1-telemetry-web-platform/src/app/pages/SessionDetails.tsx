@@ -27,7 +27,6 @@ import {
   getLapTrace,
   getLapErs,
   getLapSpeedTrace,
-  getLapCorners,
   getSessionTyreWear,
   exportSession,
 } from "@/api/client";
@@ -40,7 +39,6 @@ import type {
   PedalTracePoint,
   ErsPoint,
   SpeedTracePoint,
-  LapCorner,
   TyreWearPoint,
 } from "@/api/types";
 import { isValidSessionId } from "@/api/sessionId";
@@ -75,7 +73,6 @@ export default function SessionDetails() {
   const [traceData, setTraceData] = useState<PedalTracePoint[]>([]);
   const [ersData, setErsData] = useState<ErsPoint[]>([]);
   const [speedData, setSpeedData] = useState<SpeedTracePoint[]>([]);
-  const [cornersData, setCornersData] = useState<LapCorner[]>([]);
   const [tyreWearData, setTyreWearData] = useState<TyreWearPoint[]>([]);
   const [chartsLoading, setChartsLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -141,15 +138,13 @@ export default function SessionDetails() {
       getLapTrace(id, selectedLap, carIndex),
       getLapErs(id, selectedLap, carIndex),
       getLapSpeedTrace(id, selectedLap, carIndex),
-      getLapCorners(id, selectedLap, carIndex),
       getSessionTyreWear(id, carIndex),
     ])
-      .then(([pace, trace, ers, speed, corners, tyreWear]) => {
+      .then(([pace, trace, ers, speed, tyreWear]) => {
         setPaceData(pace);
         setTraceData(trace);
         setErsData(ers);
         setSpeedData(speed);
-        setCornersData(corners);
         setTyreWearData(tyreWear);
       })
       .catch(() => {
@@ -157,7 +152,6 @@ export default function SessionDetails() {
         setTraceData([]);
         setErsData([]);
         setSpeedData([]);
-        setCornersData([]);
         setTyreWearData([]);
       })
       .finally(() => setChartsLoading(false));
@@ -558,34 +552,6 @@ export default function SessionDetails() {
           </ResponsiveContainer>
         )}
       </DataCard>
-
-      {/* Corners */}
-      {cornersData.length > 0 && (
-        <DataCard title="Corners">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-secondary/50 border-b border-border/50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Corner</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Entry (kph)</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Apex (kph)</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Exit (kph)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/30">
-                {cornersData.map((c) => (
-                  <tr key={c.cornerIndex} className="hover:bg-secondary/30">
-                    <td className="px-4 py-2 font-medium">{c.name ?? `T${c.cornerIndex}`}</td>
-                    <td className="px-4 py-2 font-mono">{c.entrySpeedKph}</td>
-                    <td className="px-4 py-2 font-mono">{c.apexSpeedKph}</td>
-                    <td className="px-4 py-2 font-mono">{c.exitSpeedKph}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </DataCard>
-      )}
 
       {/* Tyre wear */}
       <DataCard title="Tyre wear">

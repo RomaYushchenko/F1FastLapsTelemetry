@@ -23,8 +23,7 @@ spring:
       group-id: telemetry-processing-group
       auto-offset-reset: earliest
       # Smaller batches = more frequent commits, less delay before new positions reach live UI.
-      # If live map still lags, increase UDP ingest throttle (udp-ingest f1.telemetry.kafka.throttle.permits-per-second)
-      # and ensure DB can keep up (motion_raw writes are async to avoid blocking the consumer).
+      # If live map still lags, increase UDP ingest throttle (udp-ingest f1.telemetry.kafka.throttle.permits-per-second).
       max-poll-records: ${SPRING_KAFKA_CONSUMER_MAX_POLL_RECORDS:100}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
@@ -48,6 +47,15 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+
+telemetry:
+  idempotency:
+    processed-packets:
+      # Rows older than this duration are removed by the scheduled purge (see ProcessedPacketRetentionScheduler).
+      # Must exceed typical Kafka lag/replay; short windows risk duplicate processing after purge.
+      retention: PT24H
+      # Milliseconds between purge runs (@Scheduled fixedDelay).
+      purge-interval-ms: 120000
 
 packet-health:
   threshold:
