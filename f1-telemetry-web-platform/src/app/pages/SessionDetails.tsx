@@ -43,7 +43,7 @@ import type {
 } from "@/api/types";
 import { isValidSessionId } from "@/api/sessionId";
 import { getTrackName } from "@/constants/tracks";
-import { formatLapTime, formatSector } from "@/api/format";
+import { formatDurationClock, formatLapTime, formatSector } from "@/api/format";
 import { Skeleton } from "../components/ui/skeleton";
 import {
   DropdownMenu,
@@ -51,6 +51,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { SessionRaceOverviewPanel } from "../components/SessionRaceOverviewPanel";
 
 const tooltipStyle = {
   backgroundColor: "#1F2937",
@@ -243,7 +245,7 @@ export default function SessionDetails() {
 
   const paceChartData = paceData.map((p) => ({
     lap: p.lapNumber,
-    time: p.lapTimeMs / 1000,
+    time: p.lapTimeMs,
   }));
 
   return (
@@ -283,6 +285,22 @@ export default function SessionDetails() {
         </DropdownMenu>
       </div>
 
+      <Tabs defaultValue="performance" className="w-full">
+        <TabsList className="inline-flex h-auto w-full max-w-lg rounded-xl border border-border/40 bg-secondary/30 p-1.5">
+          <TabsTrigger
+            value="performance"
+            className="flex-1 rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            My Performance
+          </TabsTrigger>
+          <TabsTrigger
+            value="race"
+            className="flex-1 rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+          >
+            Race Overview
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="performance" className="mt-6 space-y-6 outline-none">
       {/* Session Summary: prefer summary API; fallback to derived from laps when summary missing or empty */}
       {(() => {
         const bestLapFromLaps =
@@ -303,10 +321,22 @@ export default function SessionDetails() {
           summary?.bestLapTimeMs != null && summary.bestLapTimeMs > 0
             ? summary.bestLapTimeMs
             : bestLapFromLaps;
-        const totalLaps =
-          summary?.totalLaps != null && summary.totalLaps > 0
-            ? summary.totalLaps
-            : laps.length;
+        const totalLaps = Math.max(
+          laps.length,
+          summary?.totalLaps != null && summary.totalLaps > 0 ? summary.totalLaps : 0
+        );
+        const totalTimeFromLaps = laps.reduce((sum, l) => {
+          if (l.lapTimeMs != null && l.lapTimeMs > 0 && !l.isInvalid) {
+            return sum + l.lapTimeMs
+          }
+          return sum
+        }, 0)
+        const totalTimeMs =
+          session?.totalTimeMs != null && session.totalTimeMs > 0
+            ? session.totalTimeMs
+            : totalTimeFromLaps > 0
+              ? totalTimeFromLaps
+              : null
         return (
           <DataCard title="Session Summary">
             <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -332,7 +362,9 @@ export default function SessionDetails() {
                 <div className="text-xs text-text-secondary uppercase mb-1">
                   Total Time
                 </div>
-                <div className="text-2xl font-bold font-mono">—</div>
+                <div className="text-2xl font-bold font-mono">
+                  {totalTimeMs != null ? formatLapTime(totalTimeMs) : "—"}
+                </div>
               </div>
               <div>
                 <div className="text-xs text-text-secondary uppercase mb-1">
@@ -390,7 +422,7 @@ export default function SessionDetails() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={paceChartData}>
+              <LineChart data={paceChartData} margin={{ left: 4, right: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(249,250,251,0.06)" />
                 <XAxis
                   dataKey="lap"
@@ -404,8 +436,11 @@ export default function SessionDetails() {
                 />
                 <YAxis
                   stroke="#9CA3AF"
+                  width={84}
+                  tickFormatter={(v: number) => formatDurationClock(v)}
+                  tick={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }}
                   label={{
-                    value: "Time (s)",
+                    value: "Time (MM:SS.mmm)",
                     angle: -90,
                     position: "insideLeft",
                     fill: "#9CA3AF",
@@ -414,8 +449,8 @@ export default function SessionDetails() {
                 <Tooltip
                   contentStyle={tooltipStyle}
                   formatter={(value: number) => [
-                    `${value.toFixed(3)}s`,
-                    "Lap Time",
+                    formatDurationClock(value),
+                    "Lap time",
                   ]}
                 />
                 <Line
@@ -692,6 +727,16 @@ export default function SessionDetails() {
           </DataCard>
         );
       })()}
+        </TabsContent>
+        <TabsContent value="race" className="mt-6 outline-none">
+          {id ? (
+            <SessionRaceOverviewPanel
+              sessionId={id}
+              playerCarIndex={session?.playerCarIndex ?? null}
+            />
+          ) : null}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

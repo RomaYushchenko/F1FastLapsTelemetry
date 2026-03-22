@@ -23,6 +23,19 @@ export function formatSector(ms: number | null | undefined): string {
 }
 
 /**
+ * Format duration in ms as MM:SS.mmm (e.g. 01:40.125).
+ */
+export function formatDurationClock(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return '—'
+  const total = Math.round(ms)
+  const totalSec = Math.floor(total / 1000)
+  const minutes = Math.floor(totalSec / 60)
+  const seconds = totalSec % 60
+  const frac = total % 1000
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(frac).padStart(3, '0')}`
+}
+
+/**
  * Format session time in seconds (from game) as M:SS.mmm (e.g. 2:05.500).
  */
 export function formatSessionTime(seconds: number | null | undefined): string {

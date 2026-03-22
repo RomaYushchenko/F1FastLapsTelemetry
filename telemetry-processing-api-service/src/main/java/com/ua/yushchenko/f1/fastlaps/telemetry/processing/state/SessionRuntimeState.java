@@ -2,7 +2,9 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.state;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.ParticipantDataDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.CarPositionDto;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -21,6 +23,9 @@ import java.util.stream.Collectors;
  */
 @Data
 public class SessionRuntimeState {
+
+    /** F1 UDP max cars per session (PacketParticipantsData array size). */
+    public static final int MAX_CARS_IN_UDP_DATA = 22;
 
     private final long sessionUID;
     private final ReadWriteLock stateLock = new ReentrantReadWriteLock();
@@ -62,6 +67,14 @@ public class SessionRuntimeState {
     private final Map<Integer, Integer> participantRaceNumberByCarIndex = new ConcurrentHashMap<>();
     /** Driver name per car from Participants packet (packetId=4). Used for Live Track Map legend. */
     private final Map<Integer, String> participantNameByCarIndex = new ConcurrentHashMap<>();
+
+    /**
+     * From Participants {@code m_numActiveCars}: number of cars on HUD (informational count from the game).
+     * This is <strong>not</strong> a maximum {@code carIndex}; active cars may use non-contiguous indices
+     * (e.g. after retirements). Do not use this value to cap or clear per-index state.
+     */
+    @Setter(AccessLevel.NONE)
+    private volatile int numActiveCars = MAX_CARS_IN_UDP_DATA;
 
     // Snapshot for WebSocket (per carIndex)
     private final Map<Integer, CarSnapshot> snapshots = new ConcurrentHashMap<>();
@@ -196,22 +209,54 @@ public class SessionRuntimeState {
     }
 
     /**
-     * Update participant info (race number, name) for all cars from Participants packet (packetId=4).
-     * Replaces previous participant data for this session.
+     * Update participant info from Participants packet (packetId=4).
+     * When the list contains a full grid ({@value SessionRuntimeState#MAX_CARS_IN_UDP_DATA} rows, as from UDP ingest), empty slots
+     * (no name and no race number) clear that {@code carIndex} from participant maps. Shorter lists only upsert
+     * rows present and do not clear unlisted indices (for tests and partial payloads).
      */
-    public void setParticipants(List<ParticipantDataDto> participants) {
+    public void setParticipants(List<ParticipantDataDto> participants, int numActiveCarsFromPacket) {
         if (participants == null) {
             return;
         }
-        for (var p : participants) {
-            if (p.getRaceNumber() != null) {
-                participantRaceNumberByCarIndex.put(p.getCarIndex(), p.getRaceNumber());
+        this.numActiveCars = normalizeNumActiveCars(numActiveCarsFromPacket);
+        boolean fullGrid = participants.size() >= MAX_CARS_IN_UDP_DATA;
+        for (ParticipantDataDto p : participants) {
+            int idx = p.getCarIndex();
+            if (idx < 0 || idx >= MAX_CARS_IN_UDP_DATA) {
+                continue;
             }
-            if (p.getName() != null && !p.getName().isBlank()) {
-                participantNameByCarIndex.put(p.getCarIndex(), p.getName().trim());
+            if (isEmptyParticipantSlot(p)) {
+                if (fullGrid) {
+                    participantRaceNumberByCarIndex.remove(idx);
+                    participantNameByCarIndex.remove(idx);
+                }
+            } else {
+                if (p.getRaceNumber() != null) {
+                    participantRaceNumberByCarIndex.put(idx, p.getRaceNumber());
+                } else {
+                    participantRaceNumberByCarIndex.remove(idx);
+                }
+                if (p.getName() != null && !p.getName().isBlank()) {
+                    participantNameByCarIndex.put(idx, p.getName().trim());
+                } else {
+                    participantNameByCarIndex.remove(idx);
+                }
             }
         }
         this.lastSeenAt = Instant.now();
+    }
+
+    private static int normalizeNumActiveCars(int raw) {
+        if (raw <= 0 || raw > MAX_CARS_IN_UDP_DATA) {
+            return MAX_CARS_IN_UDP_DATA;
+        }
+        return raw;
+    }
+
+    private static boolean isEmptyParticipantSlot(ParticipantDataDto p) {
+        boolean noName = p.getName() == null || p.getName().isBlank();
+        boolean noRace = p.getRaceNumber() == null;
+        return noName && noRace;
     }
 
     /** Get driver name for car from Participants packet; null if not set. */
@@ -242,6 +287,10 @@ public class SessionRuntimeState {
      */
     public List<CarPositionDto> getLatestPositions() {
         return latestWorldPositionByCarIndex.entrySet().stream()
+                .filter(e -> {
+                    int k = e.getKey();
+                    return k >= 0 && k < MAX_CARS_IN_UDP_DATA;
+                })
                 .sorted(Map.Entry.comparingByKey())
                 .map(e -> {
                     int carIndex = e.getKey();

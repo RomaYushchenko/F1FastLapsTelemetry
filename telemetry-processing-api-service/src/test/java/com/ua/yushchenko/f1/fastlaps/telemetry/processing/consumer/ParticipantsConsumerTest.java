@@ -18,6 +18,7 @@ import java.util.List;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.SESSION_UID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,6 +55,7 @@ class ParticipantsConsumerTest {
         p1.setName("PER");
 
         ParticipantsDto payload = new ParticipantsDto();
+        payload.setNumActiveCars(2);
         payload.setParticipants(List.of(p0, p1));
         event.setPayload(payload);
 
@@ -65,7 +67,7 @@ class ParticipantsConsumerTest {
         // Assert
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ParticipantDataDto>> captor = ArgumentCaptor.forClass((Class<List<ParticipantDataDto>>) (Class<?>) List.class);
-        verify(runtimeState).setParticipants(captor.capture());
+        verify(runtimeState).setParticipants(captor.capture(), eq(2));
         List<ParticipantDataDto> captured = captor.getValue();
         assertThat(captured).hasSize(2);
         verify(acknowledgment).acknowledge();

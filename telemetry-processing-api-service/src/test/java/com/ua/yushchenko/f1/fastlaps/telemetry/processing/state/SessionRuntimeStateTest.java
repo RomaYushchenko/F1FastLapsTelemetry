@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -177,9 +178,10 @@ class SessionRuntimeStateTest {
         p1.setName("PER");
 
         // Act
-        state.setParticipants(List.of(p0, p1));
+        state.setParticipants(List.of(p0, p1), SessionRuntimeState.MAX_CARS_IN_UDP_DATA);
 
         // Assert
+        assertThat(state.getNumActiveCars()).isEqualTo(SessionRuntimeState.MAX_CARS_IN_UDP_DATA);
         assertThat(state.getParticipantRaceNumber(0)).isEqualTo(1);
         assertThat(state.getParticipantName(0)).isEqualTo("VER");
         assertThat(state.getParticipantRaceNumber(1)).isEqualTo(11);
@@ -190,7 +192,7 @@ class SessionRuntimeStateTest {
     @DisplayName("setParticipants ігнорує null список")
     void setParticipants_ignoresNullList() {
         // Act
-        state.setParticipants(null);
+        state.setParticipants(null, 2);
 
         // Assert
         assertThat(state.getParticipantRaceNumber(0)).isNull();
@@ -214,7 +216,7 @@ class SessionRuntimeStateTest {
         p1.setRaceNumber(11);
         p1.setName("PER");
 
-        state.setParticipants(List.of(p0, p1));
+        state.setParticipants(List.of(p0, p1), 2);
 
         // Act
         var positions = state.getLatestPositions();
@@ -230,6 +232,80 @@ class SessionRuntimeStateTest {
         assertThat(positions.get(1).getCarIndex()).isEqualTo(1);
         assertThat(positions.get(1).getRacingNumber()).isEqualTo(11);
         assertThat(positions.get(1).getDriverLabel()).isEqualTo("PER");
+    }
+
+    @Test
+    @DisplayName("setParticipants з неповним списком не очищає інші carIndex (numActiveCars не межа індексу)")
+    void setParticipants_partialList_doesNotDropHighCarIndex() {
+        // Arrange
+        state.setLastCarPosition(0, 1);
+        state.setLastCarPosition(1, 2);
+        state.setLastCarPosition(2, 3);
+        state.updatePosition(2, 99.0f, 88.0f);
+
+        ParticipantDataDto p0 = new ParticipantDataDto();
+        p0.setCarIndex(0);
+        p0.setRaceNumber(1);
+        p0.setName("A");
+
+        ParticipantDataDto p1 = new ParticipantDataDto();
+        p1.setCarIndex(1);
+        p1.setRaceNumber(2);
+        p1.setName("B");
+
+        ParticipantDataDto p2 = new ParticipantDataDto();
+        p2.setCarIndex(2);
+        p2.setRaceNumber(3);
+        p2.setName("C");
+
+        // Act
+        state.setParticipants(List.of(p0, p1, p2), 2);
+
+        // Assert
+        assertThat(state.getNumActiveCars()).isEqualTo(2);
+        assertThat(state.getLastCarPosition(0)).isEqualTo(1);
+        assertThat(state.getLastCarPosition(1)).isEqualTo(2);
+        assertThat(state.getLastCarPosition(2)).isEqualTo(3);
+        assertThat(state.getParticipantName(2)).isEqualTo("C");
+        assertThat(state.getLatestPositions()).hasSize(1);
+        assertThat(state.getLatestPositions().get(0).getCarIndex()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("setParticipants з повною сіткою очищає ім'я/номер у порожніх слотах, lastCarPosition не чіпає")
+    void setParticipants_fullGrid_clearsEmptyParticipantSlotsOnly() {
+        state.setLastCarPosition(5, 2);
+        List<ParticipantDataDto> grid = new ArrayList<>(SessionRuntimeState.MAX_CARS_IN_UDP_DATA);
+        for (int i = 0; i < SessionRuntimeState.MAX_CARS_IN_UDP_DATA; i++) {
+            ParticipantDataDto p = new ParticipantDataDto();
+            p.setCarIndex(i);
+            if (i == 0) {
+                p.setRaceNumber(1);
+                p.setName("Leader");
+            }
+            grid.add(p);
+        }
+        state.setParticipants(grid, 20);
+        assertThat(state.getParticipantName(0)).isEqualTo("Leader");
+        assertThat(state.getParticipantName(5)).isNull();
+        assertThat(state.getLastCarPosition(5)).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("getLatestPositions включає високий carIndex якщо є world position (незалежно від numActiveCars)")
+    void getLatestPositions_includesHighCarIndexWhenMotionPresent() {
+        state.updatePosition(0, 1.0f, 2.0f);
+        state.updatePosition(3, 9.0f, 9.0f);
+        ParticipantDataDto p0 = new ParticipantDataDto();
+        p0.setCarIndex(0);
+        p0.setName("P0");
+        state.setParticipants(List.of(p0), 2);
+
+        var positions = state.getLatestPositions();
+
+        assertThat(positions).hasSize(2);
+        assertThat(positions.get(0).getCarIndex()).isEqualTo(0);
+        assertThat(positions.get(1).getCarIndex()).isEqualTo(3);
     }
 
     @Test

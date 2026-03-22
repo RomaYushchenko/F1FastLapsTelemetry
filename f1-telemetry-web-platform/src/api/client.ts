@@ -13,6 +13,7 @@ import type {
   FuelByLapDto,
   Lap,
   LeaderboardEntry,
+  SessionRaceOverview,
   PacePoint,
   PedalTracePoint,
   PitStopDto,
@@ -364,6 +365,78 @@ export async function getLeaderboard(options?: RequestOptions): Promise<Leaderbo
     throw new HttpError(response.status, message, body ?? undefined)
   }
   return response.json() as Promise<LeaderboardEntry[]>
+}
+
+/** GET /api/sessions/{id}/leaderboard — post-session leaderboard; 204 → [] */
+export async function getSessionLeaderboard(
+  sessionId: string | undefined,
+  options?: RequestOptions
+): Promise<LeaderboardEntry[]> {
+  if (!sessionId) {
+    return []
+  }
+  const url = `${API_BASE_URL}/api/sessions/${encodeURIComponent(sessionId)}/leaderboard`
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options?.headers ?? {}),
+    },
+  })
+  if (response.status === 204) {
+    return []
+  }
+  if (!response.ok) {
+    const body = await parseJsonOrNull(response)
+    const message =
+      (body &&
+        typeof body === 'object' &&
+        'message' in body &&
+        typeof (body as ApiErrorBody).message === 'string'
+        ? (body as ApiErrorBody).message
+        : `Request to /api/sessions/.../leaderboard failed with status ${response.status}`) ?? ''
+    if (response.status !== 404) {
+      notify.error(message)
+    }
+    throw new HttpError(response.status, message, body ?? undefined)
+  }
+  return response.json() as Promise<LeaderboardEntry[]>
+}
+
+/** GET /api/sessions/{id}/race-overview — charts + entries; 204 → null */
+export async function getSessionRaceOverview(
+  sessionId: string | undefined,
+  options?: RequestOptions
+): Promise<SessionRaceOverview | null> {
+  if (!sessionId) {
+    return null
+  }
+  const url = `${API_BASE_URL}/api/sessions/${encodeURIComponent(sessionId)}/race-overview`
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(options?.headers ?? {}),
+    },
+  })
+  if (response.status === 204) {
+    return null
+  }
+  if (!response.ok) {
+    const body = await parseJsonOrNull(response)
+    const message =
+      (body &&
+        typeof body === 'object' &&
+        'message' in body &&
+        typeof (body as ApiErrorBody).message === 'string'
+        ? (body as ApiErrorBody).message
+        : `Request to /api/sessions/.../race-overview failed with status ${response.status}`) ?? ''
+    if (response.status !== 404) {
+      notify.error(message)
+    }
+    throw new HttpError(response.status, message, body ?? undefined)
+  }
+  return response.json() as Promise<SessionRaceOverview>
 }
 
 /** GET /api/sessions/{id}/events — session events for timeline */

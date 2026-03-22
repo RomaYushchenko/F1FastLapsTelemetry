@@ -3,6 +3,7 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.aggregation;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.LapDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.builder.LapBuilder;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.LapId;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,11 +35,11 @@ public class LapAggregator {
      */
     public void processLapData(long sessionUid, short carIndex, LapDto lapDto) {
         String key = sessionUid + "-" + carIndex;
-        LapRuntimeState state = lapStates.computeIfAbsent(key, 
-            k -> new LapRuntimeState(sessionUid, carIndex));
+        LapRuntimeState state = lapStates.computeIfAbsent(key,
+                k -> new LapRuntimeState(sessionUid, carIndex));
 
         short lapNumber = (short) lapDto.getLapNumber();
-        // F1 game m_sector = current sector: 0=in S1, 1=in S2, 2=in S3. So sector=1 means we just completed S1, sector=2 means we just completed S2.
+        // F1 m_sector: 0=S1, 1=S2, 2=S3 (current sector). Values 1 and 2 mean S1/S2 are complete for timing fields.
         int gameSector = lapDto.getSector() != null ? lapDto.getSector() : -1;
         int sectorJustCompleted = (gameSector == 1 || gameSector == 2) ? gameSector : -1;
 
@@ -56,6 +57,18 @@ public class LapAggregator {
 
         // Update current lap data
         state.setCurrentLapTimeMs(lapDto.getCurrentLapTimeMs());
+        if (lapDto.getCurrentLapTimeMs() != null && lapDto.getCurrentLapTimeMs() > 0) {
+            if (state.getMaxCurrentLapTimeMs() == null
+                    || lapDto.getCurrentLapTimeMs() > state.getMaxCurrentLapTimeMs()) {
+                state.setMaxCurrentLapTimeMs(lapDto.getCurrentLapTimeMs());
+            }
+        }
+        if (lapDto.getSector1TimeMs() != null && lapDto.getSector1TimeMs() > 0) {
+            state.setLastPacketSector1TimeMs(lapDto.getSector1TimeMs());
+        }
+        if (lapDto.getSector2TimeMs() != null && lapDto.getSector2TimeMs() > 0) {
+            state.setLastPacketSector2TimeMs(lapDto.getSector2TimeMs());
+        }
         state.setInvalid(lapDto.isInvalid());
         state.setPenaltiesSeconds(lapDto.getPenaltiesSeconds() != null ? lapDto.getPenaltiesSeconds().shortValue() : (short) 0);
 
@@ -67,8 +80,9 @@ public class LapAggregator {
 
         // Check if lap is complete (all 3 sectors); no lastLapTimeMs yet, use current state
         if (state.isComplete()) {
-            finalizeLap(state, null, null, null);
-            state.reset((short) (lapNumber + 1)); // Prepare for next lap
+            if (finalizeLap(state, null, null, null)) {
+                state.reset((short) (lapNumber + 1)); // Prepare for next lap
+            }
         }
     }
 
@@ -111,19 +125,21 @@ public class LapAggregator {
     /**
      * Finalize lap and persist to database.
      * Prefer official times from game (m_lastLapTimeInMS, m_sector1*, m_sector2* from first packet of next lap).
+     *
+     * @return true if a lap row was written
      */
     @Transactional
-    public void finalizeLap(LapRuntimeState state, Integer officialLapTimeMs, Integer officialSector1Ms, Integer officialSector2Ms) {
+    public boolean finalizeLap(LapRuntimeState state, Integer officialLapTimeMs, Integer officialSector1Ms, Integer officialSector2Ms) {
         if (state.getCurrentLapNumber() == 0) {
-            return;
+            return false;
         }
-        int lapTimeMs = (officialLapTimeMs != null && officialLapTimeMs > 0)
-                ? officialLapTimeMs
-                : (state.getCurrentLapTimeMs() != null ? state.getCurrentLapTimeMs() : 0);
+        int lapTimeMs = resolveLapTimeMsForFinalize(state, officialLapTimeMs);
+        if (lapTimeMs <= 0) {
+            return false;
+        }
 
-        // Prefer game sector times when available; otherwise use state (from currentLapTime at sector boundaries)
-        Integer s1 = (officialSector1Ms != null && officialSector1Ms > 0) ? officialSector1Ms : state.getSector1TimeMs();
-        Integer s2 = (officialSector2Ms != null && officialSector2Ms > 0) ? officialSector2Ms : state.getSector2TimeMs();
+        Integer s1 = firstPositive(officialSector1Ms, state.getSector1TimeMs(), state.getLastPacketSector1TimeMs());
+        Integer s2 = firstPositive(officialSector2Ms, state.getSector2TimeMs(), state.getLastPacketSector2TimeMs());
         Integer s3 = state.getSector3TimeMs();
         if (s3 == null && s1 != null && s2 != null && lapTimeMs > 0) {
             int derived = lapTimeMs - s1 - s2;
@@ -134,9 +150,14 @@ public class LapAggregator {
             }
         }
         if (s1 == null || s2 == null || s3 == null) {
-            return; // Still missing sector times
+            return false;
         }
 
+        persistLapRow(state, lapTimeMs, s1, s2, s3);
+        return true;
+    }
+
+    private void persistLapRow(LapRuntimeState state, int lapTimeMs, int s1, int s2, int s3) {
         Lap lap = LapBuilder.build(
                 state.getSessionUid(),
                 state.getCarIndex(),
@@ -158,10 +179,74 @@ public class LapAggregator {
                 state.getSessionUid(), state.getCarIndex(), state.getCurrentLapNumber(),
                 lapTimeMs, state.isInvalid());
 
-        // Update session summary
         if (!state.isInvalid()) {
             summaryAggregator.updateWithLap(state.getSessionUid(), state.getCarIndex(), lap);
         }
+    }
+
+    /**
+     * Last race lap often never gets a "next lap" packet before SEND; flush in-memory progress using max lap time and packet sectors.
+     */
+    private void finalizeLapRelaxedForSessionEnd(LapRuntimeState state) {
+        int lapTimeMs = resolveLapTimeMsForFinalize(state, null);
+        if (lapTimeMs <= 0) {
+            log.debug("finalizeLapRelaxedForSessionEnd: no lap time, sessionUid={}, carIndex={}, lap={}",
+                    state.getSessionUid(), state.getCarIndex(), state.getCurrentLapNumber());
+            return;
+        }
+        Integer s1o = firstPositive(state.getSector1TimeMs(), state.getLastPacketSector1TimeMs());
+        Integer s2o = firstPositive(state.getSector2TimeMs(), state.getLastPacketSector2TimeMs());
+        int s1 = s1o != null ? s1o : 0;
+        int s2 = s2o != null ? s2o : 0;
+        int s3 = lapTimeMs - s1 - s2;
+        if (s3 < 0) {
+            s1 = 0;
+            s2 = 0;
+            s3 = lapTimeMs;
+            log.info("Session end lap flush: using single-sector split for sessionUid={}, carIndex={}, lap={}, time={}ms",
+                    state.getSessionUid(), state.getCarIndex(), state.getCurrentLapNumber(), lapTimeMs);
+        } else {
+            log.info("Session end lap flush: sessionUid={}, carIndex={}, lap={}, time={}ms",
+                    state.getSessionUid(), state.getCarIndex(), state.getCurrentLapNumber(), lapTimeMs);
+        }
+        persistLapRow(state, lapTimeMs, s1, s2, s3);
+    }
+
+    private static Integer firstPositive(Integer... values) {
+        for (Integer v : values) {
+            if (v != null && v > 0) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    private static int resolveLapTimeMsForFinalize(LapRuntimeState state, Integer officialLapTimeMs) {
+        if (officialLapTimeMs != null && officialLapTimeMs > 0) {
+            return officialLapTimeMs;
+        }
+        int best = 0;
+        if (state.getCurrentLapTimeMs() != null && state.getCurrentLapTimeMs() > best) {
+            best = state.getCurrentLapTimeMs();
+        }
+        if (state.getMaxCurrentLapTimeMs() != null && state.getMaxCurrentLapTimeMs() > best) {
+            best = state.getMaxCurrentLapTimeMs();
+        }
+        return best;
+    }
+
+    private void finalizePendingLapOnSessionEnd(LapRuntimeState state) {
+        if (state.getCurrentLapNumber() <= 0) {
+            return;
+        }
+        LapId id = new LapId(state.getSessionUid(), state.getCarIndex(), state.getCurrentLapNumber());
+        if (lapRepository.findById(id).filter(l -> l.getLapTimeMs() != null && l.getLapTimeMs() > 0).isPresent()) {
+            return;
+        }
+        if (finalizeLap(state, null, null, null)) {
+            return;
+        }
+        finalizeLapRelaxedForSessionEnd(state);
     }
 
     /**
@@ -170,6 +255,7 @@ public class LapAggregator {
     public void finalizeAllLaps(long sessionUid) {
         lapStates.entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith(sessionUid + "-"))
-                .forEach(entry -> finalizeLap(entry.getValue(), null, null, null));
+                .map(Map.Entry::getValue)
+                .forEach(this::finalizePendingLapOnSessionEnd);
     }
 }

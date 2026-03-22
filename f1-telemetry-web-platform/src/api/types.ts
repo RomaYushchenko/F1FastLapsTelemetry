@@ -175,10 +175,36 @@ export interface LeaderboardEntry {
   driverLabel: string | null
   compound: string | null
   gap: string | null
+  /** Last completed lap vs P1 last lap (LEAD / +delta / —). */
+  lastLapGap?: string | null
+  bestLapTimeMs: number | null
+  totalRaceTimeMs: number | null
   lastLapTimeMs: number | null
   sector1Ms: number | null
   sector2Ms: number | null
   sector3Ms: number | null
+}
+
+/** GET /api/sessions/{id}/race-overview — driver row for charts (order matches chart value arrays) */
+export interface RaceOverviewDriver {
+  carIndex: number
+  displayLabel: string
+  colorHex: string
+}
+
+/** One lap row; values align with drivers[] order */
+export interface RaceOverviewChartRow {
+  lapNumber: number
+  values: (number | null)[]
+}
+
+/** GET /api/sessions/{id}/race-overview */
+export interface SessionRaceOverview {
+  sessionUid: string
+  entries: LeaderboardEntry[]
+  drivers: RaceOverviewDriver[]
+  positionChartRows: RaceOverviewChartRow[]
+  gapChartRows: RaceOverviewChartRow[]
 }
 
 /** GET /api/sessions/{id}/events — session event for timeline */

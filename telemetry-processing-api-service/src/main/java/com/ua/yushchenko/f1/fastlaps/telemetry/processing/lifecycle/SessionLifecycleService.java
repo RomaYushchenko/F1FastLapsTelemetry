@@ -10,8 +10,10 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Ses
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionDriverRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.TyreCompoundMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.EndReason;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.LastTyreCompoundState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 /**
  * Session lifecycle and FSM transitions.
@@ -42,6 +45,7 @@ public class SessionLifecycleService {
     private final LapAggregator lapAggregator;
     private final LiveDataBroadcaster liveDataBroadcaster;
     private final com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService trackLayoutRecordingService;
+    private final LastTyreCompoundState lastTyreCompoundState;
 
     /** Serializes session persist so only one consumer inserts; others see the row after commit. */
     private final Object sessionCreationLock = new Object();
@@ -157,19 +161,7 @@ public class SessionLifecycleService {
                 session.setEndReason(reason.name());
                 sessionRepository.save(session);
 
-                int carIndex = session.getPlayerCarIndex() != null
-                        ? session.getPlayerCarIndex().intValue()
-                        : (state.getPlayerCarIndex() != null ? state.getPlayerCarIndex().intValue() : 0);
-                Integer lastPosition = state.getLastCarPosition(carIndex);
-                if (lastPosition != null && lastPosition > 0) {
-                    SessionFinishingPosition fp = SessionFinishingPosition.builder()
-                            .sessionUid(sessionUID)
-                            .carIndex((short) carIndex)
-                            .finishingPosition(lastPosition)
-                            .build();
-                    finishingPositionRepository.save(fp);
-                    log.info("Saved finishing position: sessionUID={}, carIndex={}, position={}", sessionUID, carIndex, lastPosition);
-                }
+                persistFinishingPositionsForAllCars(sessionUID, state);
                 // Persist participant names from Participants packet (packetId=4) for leaderboard/session detail after restart
                 persistParticipantsFromState(sessionUID, state);
             });
@@ -188,23 +180,56 @@ public class SessionLifecycleService {
     }
 
     /**
+     * Persist finishing position and tyre compound for every car that has a known race position in runtime state.
+     */
+    private void persistFinishingPositionsForAllCars(long sessionUID, SessionRuntimeState state) {
+        Map<Integer, Integer> positions = state.getLastCarPositionByCarIndex();
+        int maxCar = SessionRuntimeState.MAX_CARS_IN_UDP_DATA;
+        for (Map.Entry<Integer, Integer> e : positions.entrySet()) {
+            Integer pos = e.getValue();
+            if (pos == null || pos <= 0) {
+                continue;
+            }
+            int carIndex = e.getKey();
+            if (carIndex < 0 || carIndex >= maxCar) {
+                continue;
+            }
+            String tyreCompound = TyreCompoundMapper.toPersistedCompound(state.getSnapshot(carIndex));
+            if (tyreCompound == null) {
+                Short actual = lastTyreCompoundState.get(sessionUID, carIndex);
+                tyreCompound = TyreCompoundMapper.toPersistedFromActualCompound(actual);
+            }
+            SessionFinishingPosition fp = SessionFinishingPosition.builder()
+                    .sessionUid(sessionUID)
+                    .carIndex((short) carIndex)
+                    .finishingPosition(pos)
+                    .tyreCompound(tyreCompound)
+                    .build();
+            finishingPositionRepository.save(fp);
+            log.info("Saved finishing position: sessionUID={}, carIndex={}, position={}, tyreCompound={}",
+                    sessionUID, carIndex, pos, tyreCompound);
+        }
+    }
+
+    /**
      * Persist participant names from runtime state to session_drivers so leaderboard and session detail show driver names after restart.
      * Truncates to DRIVER_LABEL_MAX_LENGTH to fit column.
      */
     private void persistParticipantsFromState(long sessionUID, SessionRuntimeState state) {
         Instant now = Instant.now();
-        for (int carIndex = 0; carIndex < 22; carIndex++) {
+        for (Integer carIndex : state.getParticipantNameByCarIndex().keySet()) {
             String name = state.getParticipantName(carIndex);
             if (name == null || name.isBlank()) {
                 continue;
             }
+            short carIndexShort = carIndex.shortValue();
             String label = name.length() > DRIVER_LABEL_MAX_LENGTH
                     ? name.substring(0, DRIVER_LABEL_MAX_LENGTH)
                     : name.trim();
-            SessionDriver sd = sessionDriverRepository.findBySessionUidAndCarIndex(sessionUID, (short) carIndex)
+            SessionDriver sd = sessionDriverRepository.findBySessionUidAndCarIndex(sessionUID, carIndexShort)
                     .orElse(SessionDriver.builder()
                             .sessionUid(sessionUID)
-                            .carIndex((short) carIndex)
+                            .carIndex(carIndexShort)
                             .createdAt(now)
                             .updatedAt(now)
                             .build());
