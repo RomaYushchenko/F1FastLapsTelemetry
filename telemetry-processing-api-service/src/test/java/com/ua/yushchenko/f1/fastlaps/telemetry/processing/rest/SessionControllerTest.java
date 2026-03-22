@@ -1,8 +1,11 @@
 package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ComparisonResponseDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LeaderboardEntryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionRaceOverviewDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.ComparisonQueryService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.RaceOverviewQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionExportService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListResult;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionQueryService;
@@ -41,6 +44,8 @@ class SessionControllerTest {
     private ComparisonQueryService comparisonQueryService;
     @Mock
     private SessionExportService sessionExportService;
+    @Mock
+    private RaceOverviewQueryService raceOverviewQueryService;
 
     @InjectMocks
     private SessionController controller;
@@ -203,5 +208,28 @@ class SessionControllerTest {
         assertThatThrownBy(() -> controller.exportSession(SESSION_PUBLIC_ID_STR, "xml"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("format must be csv or json");
+    }
+
+    @Test
+    @DisplayName("getSessionLeaderboard повертає 204 коли список порожній")
+    void getSessionLeaderboard_returnsNoContent_whenEmpty() {
+        when(raceOverviewQueryService.getLeaderboardForSession(SESSION_PUBLIC_ID_STR)).thenReturn(List.of());
+
+        ResponseEntity<List<LeaderboardEntryDto>> response =
+                controller.getSessionLeaderboard(SESSION_PUBLIC_ID_STR);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    @Test
+    @DisplayName("getSessionRaceOverview повертає 204 коли entries порожні")
+    void getSessionRaceOverview_returnsNoContent_whenEmptyEntries() {
+        when(raceOverviewQueryService.getRaceOverview(SESSION_PUBLIC_ID_STR))
+                .thenReturn(SessionRaceOverviewDto.builder().entries(List.of()).build());
+
+        ResponseEntity<SessionRaceOverviewDto> response =
+                controller.getSessionRaceOverview(SESSION_PUBLIC_ID_STR);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
 }

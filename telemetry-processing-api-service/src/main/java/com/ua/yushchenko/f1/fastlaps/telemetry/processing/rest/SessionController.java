@@ -2,8 +2,11 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.rest;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.reference.F1SessionType;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.ComparisonResponseDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LeaderboardEntryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionDto;
+import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.SessionRaceOverviewDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.ComparisonQueryService;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.RaceOverviewQueryService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionExportService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListFilter;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.SessionListResult;
@@ -37,6 +40,7 @@ public class SessionController {
     private final SessionUpdateService sessionUpdateService;
     private final ComparisonQueryService comparisonQueryService;
     private final SessionExportService sessionExportService;
+    private final RaceOverviewQueryService raceOverviewQueryService;
 
     /** Header name for total count (for pagination "Showing X–Y of Z"). */
     public static final String HEADER_TOTAL_COUNT = "X-Total-Count";
@@ -101,6 +105,32 @@ public class SessionController {
     public ResponseEntity<SessionDto> getSession(@PathVariable("id") String id) {
         log.debug("Get session: id={}", id);
         SessionDto dto = sessionQueryService.getSession(id);
+        return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Post-session leaderboard from DB (finishing order, cumulative gap to P1, last lap sectors).
+     */
+    @GetMapping("/{id}/leaderboard")
+    public ResponseEntity<List<LeaderboardEntryDto>> getSessionLeaderboard(@PathVariable("id") String id) {
+        log.debug("Get session leaderboard: id={}", id);
+        List<LeaderboardEntryDto> entries = raceOverviewQueryService.getLeaderboardForSession(id);
+        if (entries.isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(entries);
+    }
+
+    /**
+     * Race overview: leaderboard plus position and gap-to-leader chart series for all cars with lap data.
+     */
+    @GetMapping("/{id}/race-overview")
+    public ResponseEntity<SessionRaceOverviewDto> getSessionRaceOverview(@PathVariable("id") String id) {
+        log.debug("Get session race overview: id={}", id);
+        SessionRaceOverviewDto dto = raceOverviewQueryService.getRaceOverview(id);
+        if (dto.getEntries() == null || dto.getEntries().isEmpty()) {
+            return ResponseEntity.noContent().build();
+        }
         return ResponseEntity.ok(dto);
     }
 

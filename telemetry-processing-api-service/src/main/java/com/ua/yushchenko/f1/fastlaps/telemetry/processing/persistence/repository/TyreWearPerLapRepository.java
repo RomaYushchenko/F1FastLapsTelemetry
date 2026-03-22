@@ -11,4 +11,7 @@ import java.util.List;
 public interface TyreWearPerLapRepository extends JpaRepository<TyreWearPerLap, TyreWearPerLapId> {
 
     List<TyreWearPerLap> findBySessionUidAndCarIndexOrderByLapNumberAsc(Long sessionUid, Short carIndex);
+
+    /** Ordered so a single pass can keep the last non-null compound per car. */
+    List<TyreWearPerLap> findBySessionUidOrderByCarIndexAscLapNumberAsc(Long sessionUid);
 }

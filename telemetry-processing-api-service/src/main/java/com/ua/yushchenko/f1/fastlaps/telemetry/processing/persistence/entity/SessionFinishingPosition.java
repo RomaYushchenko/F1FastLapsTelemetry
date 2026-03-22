@@ -29,4 +29,8 @@ public class SessionFinishingPosition {
 
     @Column(name = "finishing_position", nullable = false)
     private Integer finishingPosition;
+
+    /** Tyre compound at session end: S, M, or H; null if unknown. */
+    @Column(name = "tyre_compound", length = 1)
+    private String tyreCompound;
 }

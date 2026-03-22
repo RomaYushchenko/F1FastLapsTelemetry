@@ -99,7 +99,8 @@ public class SessionQueryService {
     /**
      * Populate bestLapTimeMs and totalTimeMs on DTO from session summary and timestamps.
      * bestLapTimeMs is taken from SessionSummary for the player car when available.
-     * totalTimeMs is computed as endedAt - startedAt for finished sessions.
+     * totalTimeMs is wall-clock session duration (endedAt - startedAt) when positive; otherwise the sum of valid
+     * completed lap times for the player car (same notion as leaderboard race time).
      */
     private void applyBestLapAndTotalTime(Session session, SessionDto dto) {
         if (dto == null || session.getSessionUid() == null) {
@@ -129,11 +130,23 @@ public class SessionQueryService {
             }
         }
 
-        // Total time: simple duration between startedAt and endedAt for finished sessions
+        // Total time: wall-clock session duration when finished
         if (session.getStartedAt() != null && session.getEndedAt() != null) {
             long millis = Duration.between(session.getStartedAt(), session.getEndedAt()).toMillis();
             if (millis > 0) {
                 dto.setTotalTimeMs(millis);
+            }
+        }
+        // Fallback: sum of valid lap times (on-track race time) when wall clock missing or zero
+        if ((dto.getTotalTimeMs() == null || dto.getTotalTimeMs() <= 0) && carIndex != null) {
+            long sumMs = lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(session.getSessionUid(), carIndex)
+                    .stream()
+                    .filter(lap -> lap.getLapTimeMs() != null && lap.getLapTimeMs() > 0
+                            && !Boolean.TRUE.equals(lap.getIsInvalid()))
+                    .mapToLong(lap -> lap.getLapTimeMs().longValue())
+                    .sum();
+            if (sumMs > 0) {
+                dto.setTotalTimeMs(sumMs);
             }
         }
     }

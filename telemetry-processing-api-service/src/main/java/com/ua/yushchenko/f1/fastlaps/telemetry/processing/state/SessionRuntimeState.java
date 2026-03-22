@@ -2,7 +2,9 @@ package com.ua.yushchenko.f1.fastlaps.telemetry.processing.state;
 
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.kafka.ParticipantDataDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.CarPositionDto;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Setter;
 
 import java.time.Instant;
 import java.util.Comparator;
@@ -21,6 +23,9 @@ import java.util.stream.Collectors;
  */
 @Data
 public class SessionRuntimeState {
+
+    /** F1 UDP max cars per session (PacketParticipantsData array size). */
+    public static final int MAX_CARS_IN_UDP_DATA = 22;
 
     private final long sessionUID;
     private final ReadWriteLock stateLock = new ReentrantReadWriteLock();
@@ -62,6 +67,13 @@ public class SessionRuntimeState {
     private final Map<Integer, Integer> participantRaceNumberByCarIndex = new ConcurrentHashMap<>();
     /** Driver name per car from Participants packet (packetId=4). Used for Live Track Map legend. */
     private final Map<Integer, String> participantNameByCarIndex = new ConcurrentHashMap<>();
+
+    /**
+     * From Participants {@code m_numActiveCars}: number of cars on HUD. Slots {@code [0, numActiveCars)} are active;
+     * indices {@code >= numActiveCars} are cleared on each participants update and excluded from live leaderboard / map.
+     */
+    @Setter(AccessLevel.NONE)
+    private volatile int numActiveCars = MAX_CARS_IN_UDP_DATA;
 
     // Snapshot for WebSocket (per carIndex)
     private final Map<Integer, CarSnapshot> snapshots = new ConcurrentHashMap<>();
@@ -196,13 +208,15 @@ public class SessionRuntimeState {
     }
 
     /**
-     * Update participant info (race number, name) for all cars from Participants packet (packetId=4).
-     * Replaces previous participant data for this session.
+     * Update participant info from Participants packet (packetId=4) and apply {@code m_numActiveCars}.
+     * Clears participant names, race numbers, and last race positions for car indices {@code >= numActiveCars}.
      */
-    public void setParticipants(List<ParticipantDataDto> participants) {
+    public void setParticipants(List<ParticipantDataDto> participants, int numActiveCarsFromPacket) {
         if (participants == null) {
             return;
         }
+        int n = normalizeNumActiveCars(numActiveCarsFromPacket);
+        this.numActiveCars = n;
         for (var p : participants) {
             if (p.getRaceNumber() != null) {
                 participantRaceNumberByCarIndex.put(p.getCarIndex(), p.getRaceNumber());
@@ -211,7 +225,21 @@ public class SessionRuntimeState {
                 participantNameByCarIndex.put(p.getCarIndex(), p.getName().trim());
             }
         }
+        removeDataForInactiveCarSlots(n);
         this.lastSeenAt = Instant.now();
+    }
+
+    private static int normalizeNumActiveCars(int raw) {
+        if (raw <= 0 || raw > MAX_CARS_IN_UDP_DATA) {
+            return MAX_CARS_IN_UDP_DATA;
+        }
+        return raw;
+    }
+
+    private void removeDataForInactiveCarSlots(int activeCount) {
+        participantNameByCarIndex.keySet().removeIf(k -> k >= activeCount);
+        participantRaceNumberByCarIndex.keySet().removeIf(k -> k >= activeCount);
+        lastCarPositionByCarIndex.keySet().removeIf(k -> k >= activeCount);
     }
 
     /** Get driver name for car from Participants packet; null if not set. */
@@ -241,7 +269,9 @@ public class SessionRuntimeState {
      * Enriches with racingNumber and driverLabel from Participants packet when available.
      */
     public List<CarPositionDto> getLatestPositions() {
+        int maxCar = numActiveCars;
         return latestWorldPositionByCarIndex.entrySet().stream()
+                .filter(e -> e.getKey() < maxCar)
                 .sorted(Map.Entry.comparingByKey())
                 .map(e -> {
                     int carIndex = e.getKey();

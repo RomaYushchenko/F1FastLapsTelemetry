@@ -8,6 +8,13 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:telemetry}
     driver-class-name: org.postgresql.Driver
 
+  flyway:
+    schemas: telemetry
+    default-schema: telemetry
+    locations: classpath:db/migration
+    # Schema already exists from infra/init-db; first run creates flyway_schema_history then applies pending scripts.
+    baseline-on-migrate: true
+
   jpa:
     hibernate:
       ddl-auto: validate

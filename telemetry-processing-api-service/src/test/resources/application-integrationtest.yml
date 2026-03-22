@@ -1,5 +1,7 @@
 # Profile for integration tests: real PostgreSQL (Testcontainers), Kafka disabled.
 spring:
+  flyway:
+    enabled: false
   datasource:
     url: jdbc:postgresql://localhost:5432/telemetry
     username: test

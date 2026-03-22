@@ -4,8 +4,13 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.CarPositionDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.api.rest.LeaderboardEntryDto;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.TyreCompoundMapper;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionDriverRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionSummaryRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.LastTyreCompoundState;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.util.LeaderboardTimingHelper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionRuntimeState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +22,9 @@ import java.util.stream.Collectors;
 
 /**
  * Builds live leaderboard for the active session: positions from state, last lap from DB,
- * compound from CarStatus snapshot, driver label from session_drivers (fallback "Car N").
+ * best lap from session summary or laps, cumulative total time vs P1 and separate last-lap gap vs P1,
+ * compound from CarStatus visual snapshot with fallback to last actual compound from Car Status,
+ * driver label from session_drivers (fallback "Car N").
  * Block E — Live leaderboard.
  */
 @Slf4j
@@ -25,12 +32,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class LeaderboardQueryService {
 
-    private static final String GAP_LEAD = "LEAD";
     private static final String GAP_EMPTY = "—";
 
     private final SessionStateManager stateManager;
     private final LapRepository lapRepository;
     private final SessionDriverRepository sessionDriverRepository;
+    private final SessionSummaryRepository sessionSummaryRepository;
+    private final LastTyreCompoundState lastTyreCompoundState;
 
     /**
      * Get leaderboard for the current active session, or empty list if none.
@@ -78,7 +86,10 @@ public class LeaderboardQueryService {
      */
     public List<LeaderboardEntryDto> buildLeaderboard(Long sessionUid, SessionRuntimeState state) {
         log.debug("buildLeaderboard: sessionUid={}", sessionUid);
-        Map<Integer, Integer> positionByCar = state.getLastCarPositionByCarIndex();
+        int maxCar = state.getNumActiveCars();
+        Map<Integer, Integer> positionByCar = state.getLastCarPositionByCarIndex().entrySet().stream()
+                .filter(e -> e.getKey() < maxCar)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         if (positionByCar.isEmpty()) {
             return List.of();
         }
@@ -90,21 +101,58 @@ public class LeaderboardQueryService {
                 .stream()
                 .collect(Collectors.toMap(sd -> sd.getCarIndex().intValue(), SessionDriver::getDriverLabel, (a, b) -> b));
 
-        Integer leaderLastLapMs = null;
+        Map<Integer, Integer> bestFromSummaryByCar = new HashMap<>();
+        for (SessionSummary ss : sessionSummaryRepository.findBySessionUid(sessionUid)) {
+            if (ss.getCarIndex() != null && ss.getBestLapTimeMs() != null && ss.getBestLapTimeMs() > 0) {
+                bestFromSummaryByCar.put(ss.getCarIndex().intValue(), ss.getBestLapTimeMs());
+            }
+        }
+
         List<Integer> carIndicesByPosition = positionByCar.entrySet().stream()
                 .sorted(Comparator.comparingInt(Map.Entry::getValue))
                 .map(Map.Entry::getKey)
                 .toList();
 
+        Map<Integer, Integer> totalMsByCar = new HashMap<>();
+        for (Integer carIndex : carIndicesByPosition) {
+            totalMsByCar.put(carIndex, LeaderboardTimingHelper.totalRaceTimeMs(carIndex, allLaps));
+        }
+        Integer leaderTotalMs = null;
+        Integer leaderLastLapMs = null;
+        if (!carIndicesByPosition.isEmpty()) {
+            int leaderCar = carIndicesByPosition.get(0);
+            int lt = totalMsByCar.getOrDefault(leaderCar, 0);
+            if (lt > 0) {
+                leaderTotalMs = lt;
+            }
+            Lap leaderLastLap = lastLapByCar.get(leaderCar);
+            if (leaderLastLap != null && leaderLastLap.getLapTimeMs() != null && leaderLastLap.getLapTimeMs() > 0) {
+                leaderLastLapMs = leaderLastLap.getLapTimeMs();
+            }
+        }
+
         List<LeaderboardEntryDto> entries = new ArrayList<>();
         int position = 1;
         for (Integer carIndex : carIndicesByPosition) {
             Lap lastLap = lastLapByCar.get(carIndex);
-            if (leaderLastLapMs == null && lastLap != null && lastLap.getLapTimeMs() != null && lastLap.getLapTimeMs() > 0) {
-                leaderLastLapMs = lastLap.getLapTimeMs();
+            int carTotalMs = totalMsByCar.getOrDefault(carIndex, 0);
+            String gap = LeaderboardTimingHelper.formatCumulativeRaceGap(position, leaderTotalMs, carTotalMs);
+            String lastLapGap = LeaderboardTimingHelper.formatLastLapGap(
+                    position,
+                    leaderLastLapMs,
+                    lastLap != null ? lastLap.getLapTimeMs() : null);
+            Integer bestLapMs = LeaderboardTimingHelper.resolveBestLapTimeMs(
+                    bestFromSummaryByCar.get(carIndex),
+                    LeaderboardTimingHelper.bestLapTimeMsFromLaps(carIndex, allLaps));
+            Integer totalRaceMsDto = carTotalMs > 0 ? carTotalMs : null;
+            String compound = TyreCompoundMapper.toDisplayString(state.getSnapshot(carIndex));
+            if (GAP_EMPTY.equals(compound)) {
+                Short actual = lastTyreCompoundState.get(sessionUid, carIndex);
+                String fromActual = TyreCompoundMapper.toPersistedFromActualCompound(actual);
+                if (fromActual != null) {
+                    compound = fromActual;
+                }
             }
-            String gap = formatGap(position, leaderLastLapMs, lastLap);
-            String compound = compoundFromSnapshot(state.getSnapshot(carIndex));
             // Prefer driver name from Participants packet (game), then session_drivers (DB), then fallback
             String driverLabel = state.getParticipantName(carIndex);
             if (driverLabel == null || driverLabel.isBlank()) {
@@ -120,6 +168,9 @@ public class LeaderboardQueryService {
                     .driverLabel(driverLabel)
                     .compound(compound)
                     .gap(gap)
+                    .lastLapGap(lastLapGap)
+                    .bestLapTimeMs(bestLapMs)
+                    .totalRaceTimeMs(totalRaceMsDto)
                     .lastLapTimeMs(lastLap != null ? lastLap.getLapTimeMs() : null)
                     .sector1Ms(lastLap != null ? lastLap.getSector1TimeMs() : null)
                     .sector2Ms(lastLap != null ? lastLap.getSector2TimeMs() : null)
@@ -145,45 +196,4 @@ public class LeaderboardQueryService {
         return lastByCar;
     }
 
-    private static String formatGap(int position, Integer leaderLastLapMs, Lap carLastLap) {
-        if (position == 1) {
-            return GAP_LEAD;
-        }
-        if (leaderLastLapMs == null || carLastLap == null || carLastLap.getLapTimeMs() == null || carLastLap.getLapTimeMs() <= 0) {
-            return GAP_EMPTY;
-        }
-        int deltaMs = carLastLap.getLapTimeMs() - leaderLastLapMs;
-        if (deltaMs <= 0) {
-            return GAP_LEAD;
-        }
-        return "+" + formatLapTimeForGap(deltaMs);
-    }
-
-    private static String formatLapTimeForGap(int ms) {
-        int sec = ms / 1000;
-        int frac = (ms % 1000) / 10;
-        if (sec >= 60) {
-            int min = sec / 60;
-            sec = sec % 60;
-            return String.format("%d:%02d.%02d", min, sec, frac);
-        }
-        return String.format("%d.%02d", sec, frac);
-    }
-
-    /**
-     * Map F1 visual tyre compound code to S/M/H. Default H if unknown.
-     */
-    private static String compoundFromSnapshot(SessionRuntimeState.CarSnapshot snapshot) {
-        if (snapshot == null || snapshot.getVisualTyreCompound() == null) {
-            return "—";
-        }
-        int code = snapshot.getVisualTyreCompound();
-        if (code <= 17) {
-            return "S";
-        }
-        if (code <= 19) {
-            return "M";
-        }
-        return "H";
-    }
 }

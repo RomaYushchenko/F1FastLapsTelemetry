@@ -9,6 +9,7 @@ import { formatLapTime, formatSessionTime } from "@/api/format";
 import { getSessionEvents } from "@/api/client";
 import type { SessionEventDto } from "@/api/types";
 import { Flag, Clock, CloudRain, AlertTriangle } from "lucide-react";
+import { LeaderboardTable } from "../components/LeaderboardTable";
 
 function eventCodeToLabel(code: string): string {
   const map: Record<string, string> = {
@@ -182,79 +183,10 @@ export default function LiveOverview() {
         {/* Leaderboard */}
         <div className="lg:col-span-2">
           <DataCard title="Leaderboard" noPadding>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-secondary/50 border-b border-border/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider w-16">
-                      Pos
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                      Driver
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                      Tyre
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                      Gap
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                      Last Lap
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                      S1
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                      S2
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase tracking-wider">
-                      S3
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/30">
-                  {leaderboard.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-text-secondary">
-                        No leaderboard data yet. Positions appear when LapData is received.
-                      </td>
-                    </tr>
-                  )}
-                  {leaderboard.map((item) => (
-                    <tr key={`${item.position}-${item.carIndex}`} className="hover:bg-secondary/30 transition-colors">
-                      <td className="px-4 py-4 font-bold text-[#00E5FF]">{item.position}</td>
-                      <td className="px-4 py-4 font-bold">{item.driverLabel ?? `Car ${item.carIndex}`}</td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex px-2 py-1 rounded text-xs font-bold ${
-                          item.compound === 'S' ? 'bg-[#E10600]/20 text-[#E10600]' :
-                          item.compound === 'M' ? 'bg-[#FACC15]/20 text-[#FACC15]' :
-                          'bg-[#F9FAFB]/20 text-[#F9FAFB]'
-                        }`}>
-                          {item.compound ?? "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 font-mono text-text-secondary">{item.gap ?? "—"}</td>
-                      <td className="px-4 py-4 font-mono">{item.lastLapTimeMs != null ? formatLapTime(item.lastLapTimeMs) : "—"}</td>
-                      <td className="px-4 py-4">
-                        <span className="inline-flex w-6 h-6 items-center justify-center rounded text-xs font-bold bg-secondary/50 text-text-secondary">
-                          {item.sector1Ms != null ? formatLapTime(item.sector1Ms) : "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="inline-flex w-6 h-6 items-center justify-center rounded text-xs font-bold bg-secondary/50 text-text-secondary">
-                          {item.sector2Ms != null ? formatLapTime(item.sector2Ms) : "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="inline-flex w-6 h-6 items-center justify-center rounded text-xs font-bold bg-secondary/50 text-text-secondary">
-                          {item.sector3Ms != null ? formatLapTime(item.sector3Ms) : "—"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <LeaderboardTable
+              entries={leaderboard}
+              emptyMessage="No leaderboard data yet. Positions appear when LapData is received."
+            />
           </DataCard>
         </div>
 

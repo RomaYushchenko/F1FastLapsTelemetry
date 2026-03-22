@@ -15,7 +15,12 @@ public class LapRuntimeState {
     
     private short currentLapNumber;
     private Integer currentLapTimeMs;
-    
+    /** Max {@link #currentLapTimeMs} seen this lap (game can freeze or drop the field on session end). */
+    private Integer maxCurrentLapTimeMs;
+    /** Latest sector times from LapData packet (may be set before in-state sector completion). */
+    private Integer lastPacketSector1TimeMs;
+    private Integer lastPacketSector2TimeMs;
+
     // Sector times (null until completed)
     private Integer sector1TimeMs;
     private Integer sector2TimeMs;
@@ -52,6 +57,9 @@ public class LapRuntimeState {
     public void reset(short newLapNumber) {
         this.currentLapNumber = newLapNumber;
         this.currentLapTimeMs = null;
+        this.maxCurrentLapTimeMs = null;
+        this.lastPacketSector1TimeMs = null;
+        this.lastPacketSector2TimeMs = null;
         this.sector1TimeMs = null;
         this.sector2TimeMs = null;
         this.sector3TimeMs = null;

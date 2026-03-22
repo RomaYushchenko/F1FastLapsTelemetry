@@ -48,8 +48,9 @@ public class ParticipantsConsumer {
                 return;
             }
             var state = sessionStateManager.getOrCreate(sessionUid);
-            state.setParticipants(payload.getParticipants());
-            log.debug("Updated participants: sessionUid={}, numParticipants={}", sessionUid, payload.getParticipants().size());
+            state.setParticipants(payload.getParticipants(), payload.getNumActiveCars());
+            log.debug("Updated participants: sessionUid={}, numActiveCars={}, numParticipantRows={}",
+                    sessionUid, state.getNumActiveCars(), payload.getParticipants().size());
             acknowledgment.acknowledge();
         } catch (Exception e) {
             log.error("Error processing participants", e);

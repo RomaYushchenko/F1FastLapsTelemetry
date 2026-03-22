@@ -6,6 +6,7 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.service.TrackLayoutRecordingService;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.EndReason;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.LastTyreCompoundState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionState;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.state.SessionStateManager;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.websocket.LiveDataBroadcaster;
@@ -20,6 +21,8 @@ import java.util.Optional;
 
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.SESSION_UID;
 import static com.ua.yushchenko.f1.fastlaps.telemetry.processing.TestData.session;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,10 +49,12 @@ class SessionLifecycleServiceTest {
     private TrackLayoutRecordingService trackLayoutRecordingService;
 
     private SessionLifecycleService sessionLifecycleService;
+    private LastTyreCompoundState lastTyreCompoundState;
 
     @BeforeEach
     void setUp() {
         stateManager = new SessionStateManager();
+        lastTyreCompoundState = new LastTyreCompoundState();
         sessionLifecycleService = new SessionLifecycleService(
                 stateManager,
                 sessionRepository,
@@ -58,7 +63,8 @@ class SessionLifecycleServiceTest {
                 sessionPersistenceService,
                 lapAggregator,
                 liveDataBroadcaster,
-                trackLayoutRecordingService
+                trackLayoutRecordingService,
+                lastTyreCompoundState
         );
     }
 
@@ -76,6 +82,20 @@ class SessionLifecycleServiceTest {
         verify(lapAggregator).finalizeAllLaps(SESSION_UID);
         verify(liveDataBroadcaster).notifySessionEnded(SESSION_UID, EndReason.EVENT_SEND.name());
         verify(trackLayoutRecordingService).onSessionFinished(SESSION_UID);
+    }
+
+    @Test
+    @DisplayName("onSessionEnded зберігає finishing position для кожної машини з відомою позицією в state")
+    void onSessionEnded_persistsFinishingForAllCarsWithPosition() {
+        var st = stateManager.getOrCreate(SESSION_UID);
+        st.transitionTo(SessionState.ACTIVE);
+        st.setLastCarPosition(0, 1);
+        st.setLastCarPosition(1, 2);
+        when(sessionRepository.findById(SESSION_UID)).thenReturn(Optional.of(session()));
+
+        sessionLifecycleService.onSessionEnded(SESSION_UID, null, EndReason.EVENT_SEND);
+
+        verify(finishingPositionRepository, atLeastOnce()).save(any());
     }
 
     @Test

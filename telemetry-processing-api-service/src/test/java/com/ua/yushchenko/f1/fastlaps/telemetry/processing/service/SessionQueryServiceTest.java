@@ -254,6 +254,36 @@ class SessionQueryServiceTest {
     }
 
     @Test
+    @DisplayName("getSession: totalTimeMs з суми валідних кіл коли немає wall-clock тривалості")
+    void getSession_setsTotalTimeMs_fromLapSum_whenWallClockMissing() {
+        Session session = session();
+        session.setEndedAt(null);
+        session.setPlayerCarIndex(CAR_INDEX);
+        Lap lap2 = Lap.builder()
+                .sessionUid(SESSION_UID)
+                .carIndex(CAR_INDEX)
+                .lapNumber((short) 2)
+                .lapTimeMs(90_000)
+                .isInvalid(false)
+                .build();
+        when(sessionResolveService.getSessionByPublicIdOrUid(SESSION_PUBLIC_ID_STR)).thenReturn(session);
+        when(stateManager.get(SESSION_UID)).thenReturn(runtimeStateActive());
+        when(lapRepository.findBySessionUidOrderByCarIndexAscLapNumberAsc(SESSION_UID))
+                .thenReturn(List.of(lap(), lap2));
+        when(lapRepository.findBySessionUidAndCarIndexOrderByLapNumberAsc(SESSION_UID, CAR_INDEX))
+                .thenReturn(List.of(lap(), lap2));
+        when(sessionSummaryRepository.findBySessionUid(SESSION_UID)).thenReturn(Collections.emptyList());
+        when(sessionSummaryRepository.findBySessionUidAndCarIndex(SESSION_UID, CAR_INDEX)).thenReturn(Optional.empty());
+        when(finishingPositionRepository.findBySessionUidAndCarIndex(SESSION_UID, CAR_INDEX)).thenReturn(Optional.empty());
+        when(finishingPositionRepository.findBySessionUidOrderByFinishingPositionAsc(SESSION_UID))
+                .thenReturn(Collections.emptyList());
+
+        SessionDto dto = service.getSession(SESSION_PUBLIC_ID_STR);
+
+        assertThat(dto.getTotalTimeMs()).isEqualTo((long) LAP_TIME_MS + 90_000L);
+    }
+
+    @Test
     @DisplayName("listSessions заповнює bestLapTimeMs та totalTimeMs з summary і timestampів")
     void listSessions_setsBestLapAndTotalTime_fromSummary() {
         // Arrange
