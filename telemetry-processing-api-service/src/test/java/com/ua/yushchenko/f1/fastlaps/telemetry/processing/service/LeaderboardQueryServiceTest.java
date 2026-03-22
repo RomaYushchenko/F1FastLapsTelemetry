@@ -236,8 +236,8 @@ class LeaderboardQueryServiceTest {
     }
 
     @Test
-    @DisplayName("buildLeaderboard ігнорує позиції для carIndex >= numActiveCars")
-    void buildLeaderboard_excludesCarIndicesOutsideActiveRange() {
+    @DisplayName("buildLeaderboard включає усі carIndex з позицією в межах UDP (numActiveCars не відсікає високий індекс)")
+    void buildLeaderboard_includesAllCarsWithPositionWithinUdpRange() {
         SessionRuntimeState state = runtimeStateActive();
         ParticipantDataDto p0 = new ParticipantDataDto();
         p0.setCarIndex(0);
@@ -254,7 +254,7 @@ class LeaderboardQueryServiceTest {
 
         List<LeaderboardEntryDto> result = service.buildLeaderboard(SESSION_UID, state);
 
-        assertThat(result).hasSize(2);
-        assertThat(result).extracting(LeaderboardEntryDto::getCarIndex).containsExactly(0, 1);
+        assertThat(result).hasSize(3);
+        assertThat(result).extracting(LeaderboardEntryDto::getCarIndex).containsExactly(0, 1, 2);
     }
 }

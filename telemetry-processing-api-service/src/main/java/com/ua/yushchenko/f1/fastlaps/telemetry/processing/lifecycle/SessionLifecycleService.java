@@ -184,7 +184,7 @@ public class SessionLifecycleService {
      */
     private void persistFinishingPositionsForAllCars(long sessionUID, SessionRuntimeState state) {
         Map<Integer, Integer> positions = state.getLastCarPositionByCarIndex();
-        int maxCar = state.getNumActiveCars();
+        int maxCar = SessionRuntimeState.MAX_CARS_IN_UDP_DATA;
         for (Map.Entry<Integer, Integer> e : positions.entrySet()) {
             Integer pos = e.getValue();
             if (pos == null || pos <= 0) {
@@ -217,19 +217,19 @@ public class SessionLifecycleService {
      */
     private void persistParticipantsFromState(long sessionUID, SessionRuntimeState state) {
         Instant now = Instant.now();
-        int maxCar = state.getNumActiveCars();
-        for (int carIndex = 0; carIndex < maxCar; carIndex++) {
+        for (Integer carIndex : state.getParticipantNameByCarIndex().keySet()) {
             String name = state.getParticipantName(carIndex);
             if (name == null || name.isBlank()) {
                 continue;
             }
+            short carIndexShort = carIndex.shortValue();
             String label = name.length() > DRIVER_LABEL_MAX_LENGTH
                     ? name.substring(0, DRIVER_LABEL_MAX_LENGTH)
                     : name.trim();
-            SessionDriver sd = sessionDriverRepository.findBySessionUidAndCarIndex(sessionUID, (short) carIndex)
+            SessionDriver sd = sessionDriverRepository.findBySessionUidAndCarIndex(sessionUID, carIndexShort)
                     .orElse(SessionDriver.builder()
                             .sessionUid(sessionUID)
-                            .carIndex((short) carIndex)
+                            .carIndex(carIndexShort)
                             .createdAt(now)
                             .updatedAt(now)
                             .build());

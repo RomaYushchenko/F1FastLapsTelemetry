@@ -86,7 +86,7 @@ public class LeaderboardQueryService {
      */
     public List<LeaderboardEntryDto> buildLeaderboard(Long sessionUid, SessionRuntimeState state) {
         log.debug("buildLeaderboard: sessionUid={}", sessionUid);
-        int maxCar = state.getNumActiveCars();
+        int maxCar = SessionRuntimeState.MAX_CARS_IN_UDP_DATA;
         Map<Integer, Integer> positionByCar = state.getLastCarPositionByCarIndex().entrySet().stream()
                 .filter(e -> e.getKey() < maxCar)
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));

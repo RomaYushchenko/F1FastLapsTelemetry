@@ -669,8 +669,9 @@ export default function LiveTrackMap() {
                   <div className="text-xs text-text-secondary uppercase">Last Lap</div>
                   <div className="text-lg font-mono font-bold text-[#00E5FF]">
                     {formatLapTime(
-                      playerLeaderboardEntry?.bestLapTimeMs ??
-                        playerLeaderboardEntry?.lastLapTimeMs ??
+                      playerLeaderboardEntry?.lastLapTimeMs ??
+                        snapshot?.currentLapTimeMs ??
+                        playerLeaderboardEntry?.bestLapTimeMs ??
                         snapshot?.bestLapTimeMs
                     )}
                   </div>
