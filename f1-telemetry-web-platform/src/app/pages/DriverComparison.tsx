@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { ChevronDown, ChevronUp, Settings } from "lucide-react"
 import { DataCard } from "../components/DataCard"
 import {
   Select,
@@ -8,16 +9,14 @@ import {
   SelectValue,
 } from "../components/ui/select"
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
+  ReferenceLine,
 } from "recharts"
 import { getSessions, getSession, getComparison } from "@/api/client"
 import { formatLapTime } from "@/api/format"
@@ -25,14 +24,87 @@ import type {
   Session,
   SessionParticipantDto,
   ComparisonResponseDto,
+  PedalTracePoint,
   SpeedTracePoint,
 } from "@/api/types"
 import { notify } from "@/notify"
 import { Skeleton } from "../components/ui/skeleton"
 
 const DRIVER_A_COLOR = "#00E5FF"
-const DRIVER_B_COLOR = "#E10600"
+const DRIVER_B_COLOR = "#FACC15"
 const DELTA_COLOR = "#00FF85"
+
+/** Distance bucket (m) when merging two laps: coarser than raw samples so both drivers share the same X grid. */
+const COMPARISON_DISTANCE_BUCKET_M = 1
+
+function splitDriverLabel(label: string): { first: string; last: string } {
+  const t = label.trim()
+  if (!t) return { first: "Driver", last: "—" }
+  const parts = t.split(/\s+/)
+  if (parts.length === 1) return { first: "Driver", last: parts[0] }
+  return { first: parts[0]!, last: parts.slice(1).join(" ") }
+}
+
+function formatSessionDate(iso: string | undefined | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10)
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })
+}
+
+interface ComparisonChartTooltipProps {
+  active?: boolean
+  payload?: ReadonlyArray<{
+    name?: string
+    value?: number
+    color?: string
+  }>
+  label?: string | number
+  /** Decimal places for numeric values (default 1, matching reference UI). */
+  decimals?: number
+  suffix?: string
+  /** When true, prefix positive values with "+". */
+  signed?: boolean
+}
+
+function ComparisonChartTooltip({
+  active,
+  payload,
+  label,
+  decimals = 1,
+  suffix = "",
+  signed = false,
+}: ComparisonChartTooltipProps) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-card/95 backdrop-blur-sm border border-border rounded-lg p-3 shadow-xl">
+      <p className="text-xs text-text-secondary mb-2">
+        Distance: {label}m
+      </p>
+      {payload.map((entry, index) => {
+        const v = entry.value
+        const sign =
+          signed && typeof v === "number" && v > 0 ? "+" : ""
+        return (
+          <p
+            key={index}
+            style={{ color: entry.color }}
+            className="text-sm font-bold"
+          >
+            {entry.name}:{" "}
+            {typeof v === "number" && !Number.isNaN(v)
+              ? `${sign}${v.toFixed(decimals)}${suffix}`
+              : "—"}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
 
 /** Build common distance grid from two speed traces and compute time delta (Driver A − Driver B) along distance. */
 function computeTimeDeltaFromSpeedTraces(
@@ -84,6 +156,138 @@ function computeTimeDeltaFromSpeedTraces(
   })
 }
 
+/** One row for dual-driver charts: distance on X, optional per-driver Y (null = no series). */
+interface MergedTwinSeriesRow {
+  distance: number
+  driverA: number | null
+  driverB: number | null
+}
+
+function bucketDistanceM(d: number): number {
+  const s = COMPARISON_DISTANCE_BUCKET_M
+  return Math.round(d / s) * s
+}
+
+/**
+ * Fills null driver columns for chart display only: forward pass (carry last value), then backward
+ * pass (carry next value) so Recharts does not break lines on every row with a single-driver sample.
+ */
+function fillTwinSeriesGaps(rows: MergedTwinSeriesRow[]): MergedTwinSeriesRow[] {
+  if (rows.length === 0) return rows
+  const sorted = [...rows].sort((a, b) => a.distance - b.distance)
+  const out = sorted.map((r) => ({ ...r }))
+
+  let lastA: number | null = null
+  let lastB: number | null = null
+  for (let i = 0; i < out.length; i++) {
+    const row = out[i]!
+    if (row.driverA != null) lastA = row.driverA
+    else if (lastA != null) row.driverA = lastA
+    if (row.driverB != null) lastB = row.driverB
+    else if (lastB != null) row.driverB = lastB
+  }
+
+  let nextA: number | null = null
+  let nextB: number | null = null
+  for (let i = out.length - 1; i >= 0; i--) {
+    const row = out[i]!
+    if (row.driverA != null) nextA = row.driverA
+    else if (nextA != null) row.driverA = nextA
+    if (row.driverB != null) nextB = row.driverB
+    else if (nextB != null) row.driverB = nextB
+  }
+
+  return out
+}
+
+/**
+ * Merges two speed traces onto one distance axis. Buckets distance (see COMPARISON_DISTANCE_BUCKET_M)
+ * so samples from both laps align, then fills gaps for continuous lines (display only).
+ */
+function mergeSpeedTracesForChart(
+  traceA: SpeedTracePoint[],
+  traceB: SpeedTracePoint[]
+): MergedTwinSeriesRow[] {
+  if (!traceA.length && !traceB.length) return []
+  if (!traceA.length) {
+    return fillTwinSeriesGaps(
+      traceB.map((p) => ({
+        distance: bucketDistanceM(p.distanceM ?? 0),
+        driverA: null,
+        driverB: p.speedKph ?? 0,
+      })).sort((a, b) => a.distance - b.distance)
+    )
+  }
+  if (!traceB.length) {
+    return fillTwinSeriesGaps(
+      traceA.map((p) => ({
+        distance: bucketDistanceM(p.distanceM ?? 0),
+        driverA: p.speedKph ?? 0,
+        driverB: null,
+      })).sort((a, b) => a.distance - b.distance)
+    )
+  }
+  const map = new Map<number, MergedTwinSeriesRow>()
+  for (const p of traceA) {
+    const k = bucketDistanceM(p.distanceM ?? 0)
+    const cur = map.get(k) ?? { distance: k, driverA: null, driverB: null }
+    cur.driverA = p.speedKph ?? 0
+    map.set(k, cur)
+  }
+  for (const p of traceB) {
+    const k = bucketDistanceM(p.distanceM ?? 0)
+    const cur = map.get(k) ?? { distance: k, driverA: null, driverB: null }
+    cur.driverB = p.speedKph ?? 0
+    map.set(k, cur)
+  }
+  return fillTwinSeriesGaps(
+    Array.from(map.values()).sort((a, b) => a.distance - b.distance)
+  )
+}
+
+function mergePedalFieldForChart(
+  traceA: PedalTracePoint[],
+  traceB: PedalTracePoint[],
+  field: "throttle" | "brake"
+): MergedTwinSeriesRow[] {
+  const scaled = (p: PedalTracePoint) => (p[field] ?? 0) * 100
+  if (!traceA.length && !traceB.length) return []
+  if (!traceA.length) {
+    return fillTwinSeriesGaps(
+      traceB.map((p) => ({
+        distance: bucketDistanceM(p.distance ?? 0),
+        driverA: null,
+        driverB: scaled(p),
+      })).sort((a, b) => a.distance - b.distance)
+    )
+  }
+  if (!traceB.length) {
+    return fillTwinSeriesGaps(
+      traceA.map((p) => ({
+        distance: bucketDistanceM(p.distance ?? 0),
+        driverA: scaled(p),
+        driverB: null,
+      })).sort((a, b) => a.distance - b.distance)
+    )
+  }
+  const map = new Map<number, MergedTwinSeriesRow>()
+  for (const p of traceA) {
+    const k = bucketDistanceM(p.distance ?? 0)
+    const cur = map.get(k) ?? { distance: k, driverA: null, driverB: null }
+    cur.driverA = scaled(p)
+    map.set(k, cur)
+  }
+  for (const p of traceB) {
+    const k = bucketDistanceM(p.distance ?? 0)
+    const cur = map.get(k) ?? { distance: k, driverA: null, driverB: null }
+    cur.driverB = scaled(p)
+    map.set(k, cur)
+  }
+  return fillTwinSeriesGaps(
+    Array.from(map.values()).sort((a, b) => a.distance - b.distance)
+  )
+}
+
 export default function DriverComparison() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [sessionsLoading, setSessionsLoading] = useState(true)
@@ -102,6 +306,8 @@ export default function DriverComparison() {
   const [comparison, setComparison] = useState<ComparisonResponseDto | null>(null)
   const [comparisonLoading, setComparisonLoading] = useState(false)
   const [comparisonError, setComparisonError] = useState<string | null>(null)
+
+  const [showSelectionPanel, setShowSelectionPanel] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -235,83 +441,57 @@ export default function DriverComparison() {
     participants.find((p) => p.carIndex === carIndexB)?.displayLabel ??
     `Car ${carIndexB}`
 
-  const lapTimeChartData = useMemo(() => {
-    if (!comparison) return []
-    const byLap = new Map<number, { lap: number; driverA: number | null; driverB: number | null }>()
-    for (const lap of comparison.lapsA) {
-      if (lap.lapTimeMs != null && !lap.isInvalid) {
-        byLap.set(lap.lapNumber, {
-          lap: lap.lapNumber,
-          driverA: lap.lapTimeMs / 1000,
-          driverB: null,
-        })
-      }
+  const nameA = splitDriverLabel(labelA)
+  const nameB = splitDriverLabel(labelB)
+  const chartNameA = nameA.last
+  const chartNameB = nameB.last
+
+  const {
+    speedOverlayData,
+    showSpeedTraceA,
+    showSpeedTraceB,
+  } = useMemo(() => {
+    const a = comparison?.speedTraceA ?? []
+    const b = comparison?.speedTraceB ?? []
+    return {
+      speedOverlayData: mergeSpeedTracesForChart(a, b),
+      showSpeedTraceA: a.length > 0,
+      showSpeedTraceB: b.length > 0,
     }
-    for (const lap of comparison.lapsB) {
-      const row = byLap.get(lap.lapNumber) ?? {
-        lap: lap.lapNumber,
-        driverA: null,
-        driverB: null,
-      }
-      if (lap.lapTimeMs != null && !lap.isInvalid) row.driverB = lap.lapTimeMs / 1000
-      byLap.set(lap.lapNumber, row)
-    }
-    return Array.from(byLap.values()).sort((a, b) => a.lap - b.lap)
   }, [comparison])
 
-  const sectorData = useMemo(() => {
-    if (!comparison) return []
-    const s1A = (comparison.summaryA.bestSector1Ms ?? 0) / 1000
-    const s2A = (comparison.summaryA.bestSector2Ms ?? 0) / 1000
-    const s3A = (comparison.summaryA.bestSector3Ms ?? 0) / 1000
-    const s1B = (comparison.summaryB.bestSector1Ms ?? 0) / 1000
-    const s2B = (comparison.summaryB.bestSector2Ms ?? 0) / 1000
-    const s3B = (comparison.summaryB.bestSector3Ms ?? 0) / 1000
-    return [
-      { sector: "Sector 1", driverA: s1A, driverB: s1B },
-      { sector: "Sector 2", driverA: s2A, driverB: s2B },
-      { sector: "Sector 3", driverA: s3A, driverB: s3B },
-    ]
+  const {
+    throttleOverlayData,
+    showThrA,
+    showThrB,
+  } = useMemo(() => {
+    const a = comparison?.traceA ?? []
+    const b = comparison?.traceB ?? []
+    return {
+      throttleOverlayData: mergePedalFieldForChart(a, b, "throttle"),
+      showThrA: a.length > 0,
+      showThrB: b.length > 0,
+    }
   }, [comparison])
 
-  const speedOverlayData = useMemo(() => {
-    if (!comparison?.speedTraceA?.length || !comparison?.speedTraceB?.length)
-      return []
-    const byDist = new Map<number, { distance: number; driverA: number; driverB: number }>()
-    for (const p of comparison.speedTraceA) {
-      const d = p.distanceM ?? 0
-      byDist.set(d, { distance: d, driverA: p.speedKph ?? 0, driverB: 0 })
+  const {
+    brakeOverlayData,
+    showBrkA,
+    showBrkB,
+  } = useMemo(() => {
+    const a = comparison?.traceA ?? []
+    const b = comparison?.traceB ?? []
+    return {
+      brakeOverlayData: mergePedalFieldForChart(a, b, "brake"),
+      showBrkA: a.length > 0,
+      showBrkB: b.length > 0,
     }
-    for (const p of comparison.speedTraceB) {
-      const d = p.distanceM ?? 0
-      const row = byDist.get(d) ?? { distance: d, driverA: 0, driverB: 0 }
-      row.driverB = p.speedKph ?? 0
-      byDist.set(d, row)
-    }
-    return Array.from(byDist.values())
-      .filter((r) => r.driverA > 0 || r.driverB > 0)
-      .sort((a, b) => a.distance - b.distance)
   }, [comparison])
 
-  const throttleOverlayData = useMemo(() => {
-    if (!comparison?.traceA?.length || !comparison?.traceB?.length) return []
-    const byDist = new Map<number, { distance: number; driverA: number; driverB: number }>()
-    for (const p of comparison.traceA) {
-      const d = p.distance ?? 0
-      byDist.set(d, {
-        distance: d,
-        driverA: (p.throttle ?? 0) * 100,
-        driverB: 0,
-      })
-    }
-    for (const p of comparison.traceB) {
-      const d = p.distance ?? 0
-      const row = byDist.get(d) ?? { distance: d, driverA: 0, driverB: 0 }
-      row.driverB = (p.throttle ?? 0) * 100
-      byDist.set(d, row)
-    }
-    return Array.from(byDist.values()).sort((a, b) => a.distance - b.distance)
-  }, [comparison])
+  const hasAnyTelemetryChart =
+    speedOverlayData.length > 0 ||
+    throttleOverlayData.length > 0 ||
+    brakeOverlayData.length > 0
 
   const timeDeltaData = useMemo(() => {
     if (!comparison?.speedTraceA?.length || !comparison?.speedTraceB?.length)
@@ -354,151 +534,385 @@ export default function DriverComparison() {
     carIndexB !== "" &&
     carIndexA !== carIndexB
 
+  const selectedSessionData = useMemo(
+    () => sessions.find((s) => s.id === sessionUid) ?? null,
+    [sessions, sessionUid]
+  )
+
+  const refLapA = comparison?.lapsA.find(
+    (l) => l.lapNumber === comparison.referenceLapNumA
+  )
+  const refLapB = comparison?.lapsB.find(
+    (l) => l.lapNumber === comparison.referenceLapNumB
+  )
+  const refLapTimeMsA = refLapA?.lapTimeMs ?? null
+  const refLapTimeMsB = refLapB?.lapTimeMs ?? null
+  /** Seconds: positive means driver A slower than B on the selected laps. */
+  const refLapDeltaSeconds =
+    refLapTimeMsA != null &&
+    refLapTimeMsB != null &&
+    !refLapA?.isInvalid &&
+    !refLapB?.isInvalid
+      ? (refLapTimeMsA - refLapTimeMsB) / 1000
+      : null
+
+  const positionA = refLapA?.positionAtLapStart
+  const positionB = refLapB?.positionAtLapStart
+
+  const topSpeedA =
+    comparison?.speedTraceA && comparison.speedTraceA.length > 0
+      ? Math.max(...comparison.speedTraceA.map((p) => p.speedKph ?? 0))
+      : null
+  const topSpeedB =
+    comparison?.speedTraceB && comparison.speedTraceB.length > 0
+      ? Math.max(...comparison.speedTraceB.map((p) => p.speedKph ?? 0))
+      : null
+
+  const avgSpeedA =
+    comparison?.speedTraceA && comparison.speedTraceA.length > 0
+      ? comparison.speedTraceA.reduce((sum, p) => sum + (p.speedKph ?? 0), 0) /
+        comparison.speedTraceA.length
+      : null
+  const avgSpeedB =
+    comparison?.speedTraceB && comparison.speedTraceB.length > 0
+      ? comparison.speedTraceB.reduce((sum, p) => sum + (p.speedKph ?? 0), 0) /
+        comparison.speedTraceB.length
+      : null
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Driver Comparison</h1>
+        <h1 className="text-3xl font-bold mb-2">LAP TIME ANALYSIS</h1>
         <p className="text-text-secondary">
-          Compare telemetry and performance between two cars in a session
+          Detailed telemetry comparison • Turn by turn analysis
         </p>
       </div>
 
-      <DataCard>
-        <div className="grid md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs text-text-secondary uppercase mb-2 block">
-              Session
-            </label>
-            {sessionsLoading ? (
-              <Skeleton className="h-10 w-full" />
-            ) : (
-              <Select
-                value={sessionUid || undefined}
-                onValueChange={(v) => setSessionUid(v)}
-              >
-                <SelectTrigger className="bg-input-background border-border">
-                  <SelectValue placeholder="Select session" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sessionOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          <div>
-            <label className="text-xs text-text-secondary uppercase mb-2 block">
-              Driver A
-            </label>
-            {sessionDetailLoading ? (
-              <Skeleton className="h-10 w-full" />
-            ) : (
-              <Select
-                value={carIndexA === "" ? undefined : String(carIndexA)}
-                onValueChange={(v) => setCarIndexA(v === "" ? "" : Number(v))}
-              >
-                <SelectTrigger className="bg-input-background border-border">
-                  <SelectValue placeholder="Select driver" />
-                </SelectTrigger>
-                <SelectContent>
-                  {participants.map((p) => (
-                    <SelectItem key={p.carIndex} value={String(p.carIndex)}>
-                      {p.displayLabel ?? `Car ${p.carIndex}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-          <div>
-            <label className="text-xs text-text-secondary uppercase mb-2 block">
-              Driver B
-            </label>
-            {sessionDetailLoading ? (
-              <Skeleton className="h-10 w-full" />
-            ) : (
-              <Select
-                value={carIndexB === "" ? undefined : String(carIndexB)}
-                onValueChange={(v) => setCarIndexB(v === "" ? "" : Number(v))}
-              >
-                <SelectTrigger className="bg-input-background border-border">
-                  <SelectValue placeholder="Select driver" />
-                </SelectTrigger>
-                <SelectContent>
-                  {participants.map((p) => (
-                    <SelectItem key={p.carIndex} value={String(p.carIndex)}>
-                      {p.displayLabel ?? `Car ${p.carIndex}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        </div>
-        {canCompare && (
-          <div className="grid md:grid-cols-2 gap-4 mt-4">
-            <div>
-              <label className="text-xs text-text-secondary uppercase mb-2 block">
-                Lap for Driver A
-              </label>
-              <Select
-                value={
-                  referenceLapNumA !== ""
-                    ? String(referenceLapNumA)
-                    : comparison
-                      ? String(comparison.referenceLapNumA)
-                      : undefined
-                }
-                onValueChange={(v) =>
-                  setReferenceLapNumA(v === "" ? "" : Number(v))
-                }
-              >
-                <SelectTrigger className="bg-input-background border-border">
-                  <SelectValue placeholder="Best lap" />
-                </SelectTrigger>
-                <SelectContent>
-                  {lapOptionsA.map((opt) => (
-                    <SelectItem key={opt.value} value={String(opt.value)}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Comparison Settings Panel */}
+      <div className="bg-gradient-to-br from-card via-card to-secondary/20 border border-border rounded-xl overflow-hidden">
+        {!showSelectionPanel && (
+          <button
+            type="button"
+            onClick={() => setShowSelectionPanel(true)}
+            className="w-full p-4 flex items-center justify-between cursor-pointer hover:bg-secondary/20 transition-colors text-left"
+          >
+            <div className="flex items-center gap-6 min-w-0">
+              <div className="flex items-center gap-2 shrink-0">
+                <Settings className="w-4 h-4 text-[#00E5FF]" aria-hidden />
+                <span className="text-sm font-bold text-text-secondary uppercase">
+                  Comparison Settings
+                </span>
+              </div>
+              <div className="flex items-center gap-4 flex-wrap min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-secondary">Session:</span>
+                  <span className="text-sm font-bold truncate">
+                    {selectedSessionData
+                      ? selectedSessionData.sessionDisplayName ??
+                        selectedSessionData.sessionType ??
+                        selectedSessionData.id
+                      : "Select session"}
+                  </span>
+                </div>
+                {canCompare && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: DRIVER_A_COLOR }}
+                      />
+                      <span className="text-sm font-bold font-mono truncate max-w-[10rem]">
+                        {labelA}
+                      </span>
+                    </div>
+                    <span className="text-xs text-text-secondary">vs</span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: DRIVER_B_COLOR }}
+                      />
+                      <span className="text-sm font-bold font-mono truncate max-w-[10rem]">
+                        {labelB}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-            <div>
-              <label className="text-xs text-text-secondary uppercase mb-2 block">
-                Lap for Driver B
-              </label>
-              <Select
-                value={
-                  referenceLapNumB !== ""
-                    ? String(referenceLapNumB)
-                    : comparison
-                      ? String(comparison.referenceLapNumB)
-                      : undefined
-                }
-                onValueChange={(v) =>
-                  setReferenceLapNumB(v === "" ? "" : Number(v))
-                }
+            <ChevronDown
+              className="w-5 h-5 text-text-secondary shrink-0"
+              aria-hidden
+            />
+          </button>
+        )}
+
+        {showSelectionPanel && (
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-[#00E5FF]" aria-hidden />
+                <span className="text-sm font-bold text-text-secondary uppercase">
+                  Comparison Settings
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSelectionPanel(false)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 hover:bg-secondary/70 transition-colors text-sm"
               >
-                <SelectTrigger className="bg-input-background border-border">
-                  <SelectValue placeholder="Best lap" />
-                </SelectTrigger>
-                <SelectContent>
-                  {lapOptionsB.map((opt) => (
-                    <SelectItem key={opt.value} value={String(opt.value)}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <span>Hide</span>
+                <ChevronUp className="w-4 h-4" aria-hidden />
+              </button>
             </div>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              <div>
+                <label className="text-xs text-text-secondary uppercase mb-3 block font-bold">
+                  Select Session
+                </label>
+                {sessionsLoading ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : (
+                  <div className="space-y-2">
+                    {sessionOptions.map((session) => {
+                      const meta = sessions.find((s) => s.id === session.value)
+                      const dateLine = formatSessionDate(meta?.startedAt)
+                      return (
+                        <button
+                          key={session.value}
+                          type="button"
+                          onClick={() => setSessionUid(session.value)}
+                          className={`w-full text-left p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                            sessionUid === session.value
+                              ? "border-[#00E5FF] bg-[#00E5FF]/10"
+                              : "border-border/50 bg-secondary/30 hover:border-border hover:bg-secondary/50"
+                          }`}
+                        >
+                          <div className="text-sm font-bold">{session.label}</div>
+                          {dateLine ? (
+                            <div className="text-xs text-text-secondary mt-1">
+                              {dateLine}
+                            </div>
+                          ) : null}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs text-text-secondary uppercase mb-3 block font-bold">
+                  Driver A
+                  {carIndexA !== "" ? (
+                    <span className="ml-2 text-[#00E5FF] font-mono">
+                      {labelA}
+                    </span>
+                  ) : null}
+                </label>
+                {sessionDetailLoading ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : !sessionUid ? (
+                  <div className="text-xs text-text-secondary">
+                    Select a session to load drivers.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {participants.map((p) => {
+                      const selected = p.carIndex === carIndexA
+                      const blocked =
+                        carIndexB !== "" && p.carIndex === carIndexB
+                      const plabel = p.displayLabel ?? `Car ${p.carIndex}`
+                      return (
+                        <button
+                          key={p.carIndex}
+                          type="button"
+                          disabled={blocked}
+                          onClick={() => {
+                            if (blocked) return
+                            setCarIndexA(p.carIndex)
+                          }}
+                          className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                            selected
+                              ? "border-[#00E5FF] bg-[#00E5FF]/10"
+                              : blocked
+                                ? "opacity-50 cursor-not-allowed border-border/30 bg-secondary/20"
+                                : "border-border/50 bg-secondary/30 hover:border-border hover:bg-secondary/50"
+                          }`}
+                          style={
+                            selected
+                              ? {
+                                  borderColor: DRIVER_A_COLOR,
+                                  backgroundColor: `${DRIVER_A_COLOR}15`,
+                                }
+                              : undefined
+                          }
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-bold">{plabel}</div>
+                              <div className="text-xs text-text-secondary">
+                                Car {p.carIndex}
+                              </div>
+                            </div>
+                            <span
+                              className="w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: DRIVER_A_COLOR }}
+                            />
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs text-text-secondary uppercase mb-3 block font-bold">
+                  Driver B
+                  {carIndexB !== "" ? (
+                    <span className="ml-2 text-[#FACC15] font-mono">
+                      {labelB}
+                    </span>
+                  ) : null}
+                </label>
+                {sessionDetailLoading ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : !sessionUid ? (
+                  <div className="text-xs text-text-secondary">
+                    Select a session to load drivers.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {participants.map((p) => {
+                      const selected = p.carIndex === carIndexB
+                      const blocked =
+                        carIndexA !== "" && p.carIndex === carIndexA
+                      const plabel = p.displayLabel ?? `Car ${p.carIndex}`
+                      return (
+                        <button
+                          key={p.carIndex}
+                          type="button"
+                          disabled={blocked}
+                          onClick={() => {
+                            if (blocked) return
+                            setCarIndexB(p.carIndex)
+                          }}
+                          className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                            selected
+                              ? "border-[#FACC15] bg-[#FACC15]/10"
+                              : blocked
+                                ? "opacity-50 cursor-not-allowed border-border/30 bg-secondary/20"
+                                : "border-border/50 bg-secondary/30 hover:border-border hover:bg-secondary/50"
+                          }`}
+                          style={
+                            selected
+                              ? {
+                                  borderColor: DRIVER_B_COLOR,
+                                  backgroundColor: `${DRIVER_B_COLOR}15`,
+                                }
+                              : undefined
+                          }
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-bold">{plabel}</div>
+                              <div className="text-xs text-text-secondary">
+                                Car {p.carIndex}
+                              </div>
+                            </div>
+                            <span
+                              className="w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: DRIVER_B_COLOR }}
+                            />
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {canCompare && (
+              <div className="mt-6 pt-6 border-t border-border/50 grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-text-secondary uppercase mb-2 block">
+                    Lap for Driver A
+                  </label>
+                  <Select
+                    value={
+                      referenceLapNumA !== ""
+                        ? String(referenceLapNumA)
+                        : comparison
+                          ? String(comparison.referenceLapNumA)
+                          : undefined
+                    }
+                    onValueChange={(v) =>
+                      setReferenceLapNumA(v === "" ? "" : Number(v))
+                    }
+                  >
+                    <SelectTrigger className="bg-input-background border-border">
+                      <SelectValue placeholder="Best lap" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lapOptionsA.map((opt) => (
+                        <SelectItem key={opt.value} value={String(opt.value)}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-text-secondary uppercase mb-2 block">
+                    Lap for Driver B
+                  </label>
+                  <Select
+                    value={
+                      referenceLapNumB !== ""
+                        ? String(referenceLapNumB)
+                        : comparison
+                          ? String(comparison.referenceLapNumB)
+                          : undefined
+                    }
+                    onValueChange={(v) =>
+                      setReferenceLapNumB(v === "" ? "" : Number(v))
+                    }
+                  >
+                    <SelectTrigger className="bg-input-background border-border">
+                      <SelectValue placeholder="Best lap" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {lapOptionsB.map((opt) => (
+                        <SelectItem key={opt.value} value={String(opt.value)}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {selectedSessionData && (
+              <div className="mt-6 pt-6 border-t border-border/50 flex items-center justify-between">
+                <div className="text-sm text-text-secondary">
+                  Analyzing:{" "}
+                  <span className="font-bold text-foreground">
+                    {selectedSessionData.sessionDisplayName ??
+                      selectedSessionData.sessionType ??
+                      selectedSessionData.id}
+                  </span>
+                </div>
+                <div className="text-xs text-text-secondary">
+                  {formatSessionDate(selectedSessionData.startedAt)}
+                </div>
+              </div>
+            )}
           </div>
         )}
-      </DataCard>
+      </div>
 
       {sessionsError && (
         <div className="text-destructive text-sm">{sessionsError}</div>
@@ -536,357 +950,642 @@ export default function DriverComparison() {
       {comparison && !comparisonLoading && (
         <>
           <div className="grid md:grid-cols-2 gap-6">
-            <DataCard title={`Driver A — ${labelA}`}>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <div className="text-xs text-text-secondary uppercase mb-1">
-                    Best Lap
-                  </div>
-                  <div
-                    className="text-xl font-bold font-mono"
-                    style={{ color: DRIVER_A_COLOR }}
-                  >
-                    {formatLapTime(comparison.summaryA.bestLapTimeMs)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-text-secondary uppercase mb-1">
-                    Total Laps
-                  </div>
-                  <div className="text-xl font-bold">
-                    {comparison.summaryA.totalLaps ?? "—"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-text-secondary uppercase mb-1">
-                    Best lap #
-                  </div>
-                  <div className="text-xl font-bold">
-                    {comparison.summaryA.bestLapNumber ?? "—"}
-                  </div>
-                </div>
-              </div>
-            </DataCard>
-            <DataCard title={`Driver B — ${labelB}`}>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <div className="text-xs text-text-secondary uppercase mb-1">
-                    Best Lap
-                  </div>
-                  <div
-                    className="text-xl font-bold font-mono"
-                    style={{ color: DRIVER_B_COLOR }}
-                  >
-                    {formatLapTime(comparison.summaryB.bestLapTimeMs)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-text-secondary uppercase mb-1">
-                    Total Laps
-                  </div>
-                  <div className="text-xl font-bold">
-                    {comparison.summaryB.totalLaps ?? "—"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-text-secondary uppercase mb-1">
-                    Best lap #
-                  </div>
-                  <div className="text-xl font-bold">
-                    {comparison.summaryB.bestLapNumber ?? "—"}
-                  </div>
-                </div>
-              </div>
-            </DataCard>
-          </div>
-
-          {lapTimeChartData.length > 0 && (
-            <DataCard title="Lap Time Comparison">
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={lapTimeChartData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(249,250,251,0.06)"
-                  />
-                  <XAxis
-                    dataKey="lap"
-                    stroke="#9CA3AF"
-                    label={{
-                      value: "Lap",
-                      position: "insideBottom",
-                      offset: -5,
-                      fill: "#9CA3AF",
-                    }}
-                  />
-                  <YAxis
-                    stroke="#9CA3AF"
-                    label={{
-                      value: "Time (s)",
-                      angle: -90,
-                      position: "insideLeft",
-                      fill: "#9CA3AF",
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid rgba(249,250,251,0.08)",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: unknown) =>
-                      value != null ? `${Number(value).toFixed(3)}s` : "—"
-                    }
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="driverA"
-                    stroke={DRIVER_A_COLOR}
-                    strokeWidth={2}
-                    dot={false}
-                    name={labelA}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="driverB"
-                    stroke={DRIVER_B_COLOR}
-                    strokeWidth={2}
-                    dot={false}
-                    name={labelB}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </DataCard>
-          )}
-
-          {sectorData.length > 0 && (
-            <DataCard title="Sector Delta Comparison">
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={sectorData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(249,250,251,0.06)"
-                  />
-                  <XAxis dataKey="sector" stroke="#9CA3AF" />
-                  <YAxis stroke="#9CA3AF" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid rgba(249,250,251,0.08)",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: unknown) =>
-                      value != null ? `${Number(value).toFixed(3)}s` : "—"
-                    }
-                  />
-                  <Legend />
-                  <Bar dataKey="driverA" fill={DRIVER_A_COLOR} name={labelA} />
-                  <Bar dataKey="driverB" fill={DRIVER_B_COLOR} name={labelB} />
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="mt-6 grid grid-cols-3 gap-4">
-                {sectorData.map((row) => {
-                  const delta = row.driverA - row.driverB
-                  return (
+            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card via-card to-secondary/20">
+              <div
+                className="absolute top-0 left-0 w-1 h-full"
+                style={{ backgroundColor: DRIVER_A_COLOR }}
+              />
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-4">
                     <div
-                      key={row.sector}
-                      className="p-3 bg-secondary/30 rounded-lg"
+                      className="w-16 h-16 rounded-lg flex items-center justify-center text-3xl font-bold border-2"
+                      style={{
+                        backgroundColor: `${DRIVER_A_COLOR}20`,
+                        borderColor: DRIVER_A_COLOR,
+                        color: DRIVER_A_COLOR,
+                      }}
                     >
-                      <div className="text-sm text-text-secondary mb-1">
-                        {row.sector}
+                      {positionA != null ? positionA : "—"}
+                    </div>
+                    <div>
+                      <div className="text-sm text-text-secondary uppercase tracking-wide">
+                        {nameA.first}
                       </div>
                       <div
-                        className={`text-lg font-bold ${
-                          delta < 0 ? "text-[#00FF85]" : "text-[#E10600]"
-                        }`}
+                        className="text-2xl font-bold"
+                        style={{ color: DRIVER_A_COLOR }}
                       >
-                        {delta > 0 ? "+" : ""}
-                        {delta.toFixed(3)}s
+                        {nameA.last}
                       </div>
-                      <div className="text-xs text-text-secondary">
-                        {delta < 0 ? "A faster" : "B faster"}
+                      <div className="text-xs text-text-secondary mt-0.5">
+                        Car {carIndexA}
                       </div>
                     </div>
-                  )
-                })}
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-border/50">
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <div className="text-xs text-text-secondary uppercase mb-1">
+                        Lap Time
+                      </div>
+                      <div
+                        className="text-3xl font-bold font-mono"
+                        style={{ color: DRIVER_A_COLOR }}
+                      >
+                        {formatLapTime(
+                          refLapTimeMsA ?? comparison.summaryA.bestLapTimeMs
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-text-secondary uppercase mb-1">
+                        Delta
+                      </div>
+                      <div
+                        className={`text-xl font-bold font-mono ${
+                          refLapDeltaSeconds == null
+                            ? "text-text-secondary"
+                            : refLapDeltaSeconds <= 0
+                              ? "text-[#00FF85]"
+                              : "text-[#E10600]"
+                        }`}
+                      >
+                        {refLapDeltaSeconds != null
+                          ? `${refLapDeltaSeconds > 0 ? "+" : ""}${refLapDeltaSeconds.toFixed(3)}s`
+                          : "—"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 pt-3">
+                    <div className="bg-secondary/30 rounded-lg p-2.5">
+                      <div className="text-[10px] text-text-secondary uppercase mb-1">
+                        Top Speed
+                      </div>
+                      <div className="text-lg font-bold font-mono">
+                        {topSpeedA != null ? Math.round(topSpeedA) : "—"}
+                      </div>
+                      <div className="text-[10px] text-text-secondary">km/h</div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-2.5">
+                      <div className="text-[10px] text-text-secondary uppercase mb-1">
+                        Avg Speed
+                      </div>
+                      <div className="text-lg font-bold font-mono">
+                        {avgSpeedA != null ? Math.round(avgSpeedA) : "—"}
+                      </div>
+                      <div className="text-[10px] text-text-secondary">km/h</div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-2.5">
+                      <div className="text-[10px] text-text-secondary uppercase mb-1">
+                        Max Gear
+                      </div>
+                      <div className="text-lg font-bold font-mono">—</div>
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
+
+            <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card via-card to-secondary/20">
+              <div
+                className="absolute top-0 left-0 w-1 h-full"
+                style={{ backgroundColor: DRIVER_B_COLOR }}
+              />
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-16 h-16 rounded-lg flex items-center justify-center text-3xl font-bold border-2"
+                      style={{
+                        backgroundColor: `${DRIVER_B_COLOR}20`,
+                        borderColor: DRIVER_B_COLOR,
+                        color: DRIVER_B_COLOR,
+                      }}
+                    >
+                      {positionB != null ? positionB : "—"}
+                    </div>
+                    <div>
+                      <div className="text-sm text-text-secondary uppercase tracking-wide">
+                        {nameB.first}
+                      </div>
+                      <div
+                        className="text-2xl font-bold"
+                        style={{ color: DRIVER_B_COLOR }}
+                      >
+                        {nameB.last}
+                      </div>
+                      <div className="text-xs text-text-secondary mt-0.5">
+                        Car {carIndexB}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t border-border/50">
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <div className="text-xs text-text-secondary uppercase mb-1">
+                        Lap Time
+                      </div>
+                      <div
+                        className="text-3xl font-bold font-mono"
+                        style={{ color: DRIVER_B_COLOR }}
+                      >
+                        {formatLapTime(
+                          refLapTimeMsB ?? comparison.summaryB.bestLapTimeMs
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-text-secondary uppercase mb-1">
+                        Delta
+                      </div>
+                      <div
+                        className={`text-xl font-bold font-mono ${
+                          refLapDeltaSeconds == null
+                            ? "text-text-secondary"
+                            : -refLapDeltaSeconds <= 0
+                              ? "text-[#00FF85]"
+                              : "text-[#E10600]"
+                        }`}
+                      >
+                        {refLapDeltaSeconds != null
+                          ? `${-refLapDeltaSeconds > 0 ? "+" : ""}${(-refLapDeltaSeconds).toFixed(3)}s`
+                          : "—"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 pt-3">
+                    <div className="bg-secondary/30 rounded-lg p-2.5">
+                      <div className="text-[10px] text-text-secondary uppercase mb-1">
+                        Top Speed
+                      </div>
+                      <div className="text-lg font-bold font-mono">
+                        {topSpeedB != null ? Math.round(topSpeedB) : "—"}
+                      </div>
+                      <div className="text-[10px] text-text-secondary">km/h</div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-2.5">
+                      <div className="text-[10px] text-text-secondary uppercase mb-1">
+                        Avg Speed
+                      </div>
+                      <div className="text-lg font-bold font-mono">
+                        {avgSpeedB != null ? Math.round(avgSpeedB) : "—"}
+                      </div>
+                      <div className="text-[10px] text-text-secondary">km/h</div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-2.5">
+                      <div className="text-[10px] text-text-secondary uppercase mb-1">
+                        Max Gear
+                      </div>
+                      <div className="text-lg font-bold font-mono">—</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {!hasAnyTelemetryChart && (
+            <DataCard>
+              <p className="text-text-secondary text-sm text-center py-6 px-4">
+                No speed or pedal samples for the selected reference laps, so charts are hidden. If lap
+                times look correct but this persists, confirm raw car telemetry is stored for both drivers on
+                those laps.
+              </p>
             </DataCard>
           )}
 
           {speedOverlayData.length > 0 && (
-            <DataCard title="Speed Overlay">
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={speedOverlayData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(249,250,251,0.06)"
-                  />
-                  <XAxis
-                    dataKey="distance"
-                    stroke="#9CA3AF"
-                    label={{
-                      value: "Distance (m)",
-                      position: "insideBottom",
-                      offset: -5,
-                      fill: "#9CA3AF",
-                    }}
-                  />
-                  <YAxis
-                    stroke="#9CA3AF"
-                    label={{
-                      value: "Speed (km/h)",
-                      angle: -90,
-                      position: "insideLeft",
-                      fill: "#9CA3AF",
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid rgba(249,250,251,0.08)",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: unknown) =>
-                      value != null ? `${Math.round(Number(value))} km/h` : "—"
-                    }
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="driverA"
-                    stroke={DRIVER_A_COLOR}
-                    strokeWidth={2}
-                    dot={false}
-                    name={labelA}
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="driverB"
-                    stroke={DRIVER_B_COLOR}
-                    strokeWidth={2}
-                    dot={false}
-                    name={labelB}
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <DataCard title="SPEED" noPadding>
+              <div className="p-6 pb-2 min-w-0 w-full min-h-[220px]">
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart
+                    data={speedOverlayData}
+                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="dcCmpSpeedA"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={DRIVER_A_COLOR}
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={DRIVER_A_COLOR}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                      <linearGradient
+                        id="dcCmpSpeedB"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={DRIVER_B_COLOR}
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={DRIVER_B_COLOR}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(249,250,251,0.05)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="distance"
+                      stroke="rgba(249,250,251,0.3)"
+                      tick={{
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                      axisLine={{ stroke: "rgba(249,250,251,0.1)" }}
+                    />
+                    <YAxis
+                      stroke="rgba(249,250,251,0.3)"
+                      tick={{
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                      axisLine={{ stroke: "rgba(249,250,251,0.1)" }}
+                      domain={[0, 350]}
+                      label={{
+                        value: "km/h",
+                        angle: -90,
+                        position: "insideLeft",
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                    />
+                    <Tooltip
+                      content={(props) => (
+                        <ComparisonChartTooltip
+                          {...props}
+                          decimals={0}
+                          suffix=" km/h"
+                        />
+                      )}
+                    />
+                    {showSpeedTraceA ? (
+                      <Area
+                        type="monotone"
+                        dataKey="driverA"
+                        stroke={DRIVER_A_COLOR}
+                        strokeWidth={2.5}
+                        fill="url(#dcCmpSpeedA)"
+                        name={chartNameA}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                    {showSpeedTraceB ? (
+                      <Area
+                        type="monotone"
+                        dataKey="driverB"
+                        stroke={DRIVER_B_COLOR}
+                        strokeWidth={2.5}
+                        fill="url(#dcCmpSpeedB)"
+                        name={chartNameB}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </DataCard>
           )}
 
           {throttleOverlayData.length > 0 && (
-            <DataCard title="Throttle Overlay">
-              <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={throttleOverlayData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(249,250,251,0.06)"
-                  />
-                  <XAxis
-                    dataKey="distance"
-                    stroke="#9CA3AF"
-                    label={{
-                      value: "Distance (m)",
-                      position: "insideBottom",
-                      offset: -5,
-                      fill: "#9CA3AF",
-                    }}
-                  />
-                  <YAxis
-                    stroke="#9CA3AF"
-                    domain={[0, 100]}
-                    label={{
-                      value: "Throttle (%)",
-                      angle: -90,
-                      position: "insideLeft",
-                      fill: "#9CA3AF",
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid rgba(249,250,251,0.08)",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: unknown) =>
-                      value != null ? `${Math.round(Number(value))}%` : "—"
-                    }
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="driverA"
-                    stroke={DRIVER_A_COLOR}
-                    strokeWidth={2}
-                    dot={false}
-                    name={labelA}
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="driverB"
-                    stroke={DRIVER_B_COLOR}
-                    strokeWidth={2}
-                    dot={false}
-                    name={labelB}
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            <DataCard title="THROTTLE" noPadding>
+              <div className="p-6 pb-2 min-w-0 w-full min-h-[140px]">
+                <ResponsiveContainer width="100%" height={140}>
+                  <AreaChart
+                    data={throttleOverlayData}
+                    margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="dcCmpThrA"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={DRIVER_A_COLOR}
+                          stopOpacity={0.4}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={DRIVER_A_COLOR}
+                          stopOpacity={0.05}
+                        />
+                      </linearGradient>
+                      <linearGradient
+                        id="dcCmpThrB"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={DRIVER_B_COLOR}
+                          stopOpacity={0.4}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={DRIVER_B_COLOR}
+                          stopOpacity={0.05}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(249,250,251,0.05)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="distance"
+                      stroke="rgba(249,250,251,0.3)"
+                      tick={{
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                      axisLine={{ stroke: "rgba(249,250,251,0.1)" }}
+                    />
+                    <YAxis
+                      stroke="rgba(249,250,251,0.3)"
+                      domain={[0, 100]}
+                      tick={{
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                      axisLine={{ stroke: "rgba(249,250,251,0.1)" }}
+                      label={{
+                        value: "%",
+                        angle: -90,
+                        position: "insideLeft",
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                    />
+                    <Tooltip
+                      content={(props) => (
+                        <ComparisonChartTooltip
+                          {...props}
+                          decimals={0}
+                          suffix="%"
+                        />
+                      )}
+                    />
+                    {showThrA ? (
+                      <Area
+                        type="monotone"
+                        dataKey="driverA"
+                        stroke={DRIVER_A_COLOR}
+                        strokeWidth={2}
+                        fill="url(#dcCmpThrA)"
+                        name={chartNameA}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                    {showThrB ? (
+                      <Area
+                        type="monotone"
+                        dataKey="driverB"
+                        stroke={DRIVER_B_COLOR}
+                        strokeWidth={2}
+                        fill="url(#dcCmpThrB)"
+                        name={chartNameB}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </DataCard>
+          )}
+
+          {brakeOverlayData.length > 0 && (
+            <DataCard title="BRAKE" noPadding>
+              <div className="p-6 pb-2 min-w-0 w-full min-h-[140px]">
+                <ResponsiveContainer width="100%" height={140}>
+                  <AreaChart
+                    data={brakeOverlayData}
+                    margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="dcCmpBrkA"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop offset="5%" stopColor="#E10600" stopOpacity={0.5} />
+                        <stop offset="95%" stopColor="#E10600" stopOpacity={0.05} />
+                      </linearGradient>
+                      <linearGradient
+                        id="dcCmpBrkB"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop offset="5%" stopColor="#FF6B6B" stopOpacity={0.5} />
+                        <stop offset="95%" stopColor="#FF6B6B" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(249,250,251,0.05)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="distance"
+                      stroke="rgba(249,250,251,0.3)"
+                      tick={{
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                      axisLine={{ stroke: "rgba(249,250,251,0.1)" }}
+                    />
+                    <YAxis
+                      stroke="rgba(249,250,251,0.3)"
+                      domain={[0, 100]}
+                      tick={{
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                      axisLine={{ stroke: "rgba(249,250,251,0.1)" }}
+                      label={{
+                        value: "%",
+                        angle: -90,
+                        position: "insideLeft",
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                    />
+                    <Tooltip
+                      content={(props) => (
+                        <ComparisonChartTooltip
+                          {...props}
+                          decimals={0}
+                          suffix="%"
+                        />
+                      )}
+                    />
+                    {showBrkA ? (
+                      <Area
+                        type="monotone"
+                        dataKey="driverA"
+                        stroke="#E10600"
+                        strokeWidth={2}
+                        fill="url(#dcCmpBrkA)"
+                        name={chartNameA}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                    {showBrkB ? (
+                      <Area
+                        type="monotone"
+                        dataKey="driverB"
+                        stroke="#FF6B6B"
+                        strokeWidth={2}
+                        fill="url(#dcCmpBrkB)"
+                        name={chartNameB}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                      />
+                    ) : null}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </DataCard>
           )}
 
           {timeDeltaData.length > 0 && (
-            <DataCard title={`Time Delta (${labelA} − ${labelB})`}>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={timeDeltaData}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(249,250,251,0.06)"
-                  />
-                  <XAxis
-                    dataKey="distance"
-                    stroke="#9CA3AF"
-                    label={{
-                      value: "Distance (m)",
-                      position: "insideBottom",
-                      offset: -5,
-                      fill: "#9CA3AF",
-                    }}
-                  />
-                  <YAxis
-                    stroke="#9CA3AF"
-                    label={{
-                      value: "Delta (s)",
-                      angle: -90,
-                      position: "insideLeft",
-                      fill: "#9CA3AF",
-                    }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#1F2937",
-                      border: "1px solid rgba(249,250,251,0.08)",
-                      borderRadius: "8px",
-                    }}
-                    formatter={(value: unknown) =>
-                      value != null
-                        ? `${Number(value) > 0 ? "+" : ""}${Number(value).toFixed(3)}s`
-                        : "—"
-                    }
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="delta"
-                    stroke={DELTA_COLOR}
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-              <div className="mt-4 text-sm text-text-secondary text-center">
-                Positive = {labelA} ahead · Negative = {labelB} ahead
+            <DataCard title="DELTA" noPadding>
+              <div className="p-6 pb-2 min-w-0 w-full min-h-[140px]">
+                <ResponsiveContainer width="100%" height={140}>
+                  <AreaChart
+                    data={timeDeltaData}
+                    margin={{ top: 5, right: 10, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient
+                        id="dcCmpDelta"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor={DELTA_COLOR}
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={DELTA_COLOR}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(249,250,251,0.05)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="distance"
+                      stroke="rgba(249,250,251,0.3)"
+                      tick={{
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                      axisLine={{ stroke: "rgba(249,250,251,0.1)" }}
+                      label={{
+                        value: "DISTANCE (m)",
+                        position: "insideBottom",
+                        offset: -5,
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                    />
+                    <YAxis
+                      stroke="rgba(249,250,251,0.3)"
+                      tick={{
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                      axisLine={{ stroke: "rgba(249,250,251,0.1)" }}
+                      label={{
+                        value: "seconds",
+                        angle: -90,
+                        position: "insideLeft",
+                        fill: "rgba(249,250,251,0.5)",
+                        fontSize: 11,
+                      }}
+                    />
+                    <Tooltip
+                      content={(props) => (
+                        <ComparisonChartTooltip
+                          {...props}
+                          decimals={3}
+                          suffix="s"
+                          signed
+                        />
+                      )}
+                    />
+                    <ReferenceLine
+                      y={0}
+                      stroke="rgba(249,250,251,0.3)"
+                      strokeDasharray="3 3"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="delta"
+                      stroke={DELTA_COLOR}
+                      strokeWidth={2.5}
+                      fill="url(#dcCmpDelta)"
+                      name="Time Delta"
+                      isAnimationActive={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+                <div className="px-6 pb-4 pt-2">
+                  <div className="text-xs text-text-secondary text-center">
+                    Negative = {chartNameA} faster · Positive = {chartNameB}{" "}
+                    faster
+                  </div>
+                </div>
               </div>
             </DataCard>
           )}

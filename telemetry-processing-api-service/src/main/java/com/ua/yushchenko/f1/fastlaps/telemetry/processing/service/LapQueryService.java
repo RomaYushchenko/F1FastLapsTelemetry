@@ -100,13 +100,17 @@ public class LapQueryService {
     public List<SpeedTracePointDto> getSpeedTrace(String sessionId, int lapNum, Short carIndex) {
         log.debug("getSpeedTrace: sessionId={}, lapNum={}, carIndex={}", sessionId, lapNum, carIndex);
         Session session = sessionResolveService.getSessionByPublicIdOrUid(normalizeId(sessionId));
-        List<SpeedTracePointDto> result = carTelemetryRawRepository
+        List<CarTelemetryRaw> speedRows = carTelemetryRawRepository
                 .findBySessionUidAndCarIndexAndLapNumberOrderByFrameIdentifierAsc(
-                        session.getSessionUid(), carIndex, (short) lapNum)
-                .stream()
-                .map(lapMapper::toSpeedTracePointDto)
-                .filter(p -> p != null)
-                .collect(Collectors.toList());
+                        session.getSessionUid(), carIndex, (short) lapNum);
+        List<SpeedTracePointDto> result = new ArrayList<>(speedRows.size());
+        int seq = 0;
+        for (CarTelemetryRaw row : speedRows) {
+            SpeedTracePointDto p = lapMapper.toSpeedTracePointDto(row, seq++);
+            if (p != null) {
+                result.add(p);
+            }
+        }
         log.debug("getSpeedTrace: returning {} speed trace points", result.size());
         return result;
     }

@@ -6,9 +6,11 @@ import com.ua.yushchenko.f1.fastlaps.telemetry.processing.exception.SessionNotFo
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.mapper.SessionMapper;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Lap;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.Session;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionDriver;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionFinishingPosition;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.entity.SessionSummary;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.LapRepository;
+import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionDriverRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionFinishingPositionRepository;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.spec.SessionListSpecification;
 import com.ua.yushchenko.f1.fastlaps.telemetry.processing.persistence.repository.SessionRepository;
@@ -23,7 +25,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -43,6 +47,7 @@ public class SessionQueryService {
     private final LapRepository lapRepository;
     private final SessionSummaryRepository sessionSummaryRepository;
     private final SessionFinishingPositionRepository finishingPositionRepository;
+    private final SessionDriverRepository sessionDriverRepository;
     private final SessionStateManager stateManager;
     private final SessionMapper sessionMapper;
     private final SessionResolveService sessionResolveService;
@@ -237,7 +242,8 @@ public class SessionQueryService {
 
     /**
      * Load participants (car indices with at least one lap or summary) for Driver Comparison.
-     * displayLabel from session_finishing_positions (e.g. "P1") or fallback "Car {carIndex}".
+     * displayLabel: persisted {@code session_drivers.driver_label} (from Participants packet) when present;
+     * else finishing position label (e.g. "P1"); else "Car {carIndex}".
      * Block G — Driver Comparison.
      */
     public List<SessionParticipantDto> loadParticipants(Long sessionUid) {
@@ -256,14 +262,32 @@ public class SessionQueryService {
 
         List<SessionFinishingPosition> positions =
                 finishingPositionRepository.findBySessionUidOrderByFinishingPositionAsc(sessionUid);
-        java.util.Map<Short, String> labelByCar = positions.stream()
+        Map<Short, String> positionLabelByCar = positions.stream()
                 .filter(p -> p.getCarIndex() != null && p.getFinishingPosition() != null)
                 .collect(Collectors.toMap(SessionFinishingPosition::getCarIndex,
                         p -> "P" + p.getFinishingPosition(), (a, b) -> a));
 
+        List<SessionDriver> driverRows = sessionDriverRepository.findBySessionUidOrderByCarIndexAsc(sessionUid);
+        if (driverRows == null) {
+            driverRows = List.of();
+        }
+        Map<Short, String> driverLabelByCar = new HashMap<>();
+        for (SessionDriver sd : driverRows) {
+            if (sd.getCarIndex() == null) {
+                continue;
+            }
+            String label = sd.getDriverLabel();
+            if (label != null && !label.isBlank()) {
+                driverLabelByCar.put(sd.getCarIndex(), label.trim());
+            }
+        }
+
         List<SessionParticipantDto> result = new ArrayList<>();
         for (Short carIndex : carIndices) {
-            String displayLabel = labelByCar.getOrDefault(carIndex, "Car " + carIndex);
+            String fromDriver = driverLabelByCar.get(carIndex);
+            String displayLabel = (fromDriver != null && !fromDriver.isBlank())
+                    ? fromDriver
+                    : positionLabelByCar.getOrDefault(carIndex, "Car " + carIndex);
             result.add(SessionParticipantDto.builder()
                     .carIndex(carIndex.intValue())
                     .displayLabel(displayLabel)

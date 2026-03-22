@@ -19,6 +19,6 @@ public class SessionParticipantDto {
 
     /** Car index (0–19). */
     private int carIndex;
-    /** Display label, e.g. "P1", "P2" or "Car 0". Optional; when drivers table exists may hold driver name. */
+    /** Display label: driver name from {@code session_drivers} when persisted, else finishing position (e.g. "P1"), else "Car 0". */
     private String displayLabel;
 }

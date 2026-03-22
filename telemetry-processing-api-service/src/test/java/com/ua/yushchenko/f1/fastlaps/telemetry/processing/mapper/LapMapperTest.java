@@ -148,19 +148,29 @@ class LapMapperTest {
     }
 
     @Test
-    @DisplayName("toSpeedTracePointDto повертає null коли distance або speed null")
-    void toSpeedTracePointDto_returnsNull_whenDistanceOrSpeedNull() {
-        // Arrange
-        CarTelemetryRaw noDistance = CarTelemetryRaw.builder()
-                .sessionUid(SESSION_UID).frameIdentifier(FRAME_ID).carIndex(CAR_INDEX).ts(RAW_TS)
-                .lapDistanceM(null).speedKph(SPEED_KPH).build();
+    @DisplayName("toSpeedTracePointDto повертає null коли speed null")
+    void toSpeedTracePointDto_returnsNull_whenSpeedNull() {
         CarTelemetryRaw noSpeed = CarTelemetryRaw.builder()
                 .sessionUid(SESSION_UID).frameIdentifier(FRAME_ID).carIndex(CAR_INDEX).ts(RAW_TS)
                 .lapDistanceM(LAP_DISTANCE_M).speedKph(null).build();
 
-        // Act & Assert
-        assertThat(mapper.toSpeedTracePointDto(noDistance)).isNull();
         assertThat(mapper.toSpeedTracePointDto(noSpeed)).isNull();
+    }
+
+    @Test
+    @DisplayName("toSpeedTracePointDto підставляє синтетичну відстань коли lapDistanceM null")
+    void toSpeedTracePointDto_usesSyntheticDistance_whenLapDistanceNull() {
+        CarTelemetryRaw noDistance = CarTelemetryRaw.builder()
+                .sessionUid(SESSION_UID).frameIdentifier(FRAME_ID).carIndex(CAR_INDEX).ts(RAW_TS)
+                .lapDistanceM(null).speedKph(SPEED_KPH).build();
+
+        SpeedTracePointDto at0 = mapper.toSpeedTracePointDto(noDistance, 0);
+        SpeedTracePointDto at4 = mapper.toSpeedTracePointDto(noDistance, 4);
+
+        assertThat(at0).isNotNull();
+        assertThat(at0.getDistanceM()).isEqualTo(0f);
+        assertThat(at0.getSpeedKph()).isEqualTo(SPEED_KPH);
+        assertThat(at4.getDistanceM()).isEqualTo(20f);
     }
 
     @Test
